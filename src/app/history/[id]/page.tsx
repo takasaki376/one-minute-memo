@@ -1,5 +1,6 @@
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
-export default function HistoryDetailPage({ params }: Props) {
-  return <div>履歴詳細画面（仮）: {params.id}</div>;
+export default async function HistoryDetailPage({ params }: Props) {
+  const { id } = await params;
+  return <div>履歴詳細画面（仮）: {id}</div>;
 }
