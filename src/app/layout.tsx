@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
+import { Header } from "@/components/ui/Header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,17 +24,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ja">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-slate-50 text-slate-900`}
       >
-        <nav className="flex gap-4 text-sm">
-          <Link href="/">Home</Link>
-          <Link href="/session">セッション</Link>
-          <Link href="/history">履歴</Link>
-          <Link href="/themes">テーマ管理</Link>
-        </nav>
-        {children}
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">
+            <div className="max-w-4xl mx-auto px-4 py-6">
+              {children}
+            </div>
+          </main>
+          <footer className="border-t bg-white">
+            <div className="max-w-4xl mx-auto px-4 py-3 text-xs text-slate-500">
+              © {new Date().getFullYear()} one-minute-memo
+            </div>
+          </footer>
+        </div>
       </body>
     </html>
   );
