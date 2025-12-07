@@ -2,16 +2,12 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { initBuiltinThemesIfNeeded } from "@/lib/db/themesRepo";
 
 export default function HomePage() {
   useEffect(() => {
-    // TODO: 初期テーマ投入処理 (initBuiltinThemesIfNeeded) を呼び出す
-    // 実装が完了次第、ここで呼び出す
-  }, []);
-
-  useEffect(() => {
-    // TODO: 初期テーマ投入処理 (initBuiltinThemesIfNeeded) を呼び出す
-    // 実装が完了次第、ここで呼び出す
+    // アプリ起動時に初期テーマを投入（初回のみ）
+    initBuiltinThemesIfNeeded().catch(console.error);
   }, []);
 
   return (
