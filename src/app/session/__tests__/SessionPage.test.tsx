@@ -1,0 +1,226 @@
+// src/app/session/__tests__/SessionPage.test.tsx
+import React from 'react';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+
+// --- モック定義（hoistされるので import より前に書く） ---
+
+// next/navigation の useRouter をモック（push をトラッキングしたい）
+vi.mock('next/navigation', () => {
+  const push = vi.fn();
+  return {
+    useRouter: () => ({ push }),
+    // テストから参照するためにエクスポートしておく
+    __routerPushMock: push,
+  };
+});
+
+// タイマー useCountdown をモック
+// 本物のロジックは useCountdown のテストで担保しているので、
+// ここでは「秒数表示が出る」「start/reset が呼べる」だけあればOK
+vi.mock('@/lib/timer/useCountdown', () => {
+  const startMock = vi.fn();
+  const resetMock = vi.fn();
+
+  // onFinish をテストから呼べるように保存
+  let lastOnFinish: (() => void) | undefined;
+
+  function useCountdown({
+    initialSeconds,
+    onFinish,
+  }: {
+    initialSeconds: number;
+    autoStart?: boolean;
+    onFinish?: () => void;
+  }) {
+    lastOnFinish = onFinish;
+    return {
+      secondsLeft: initialSeconds,
+      isRunning: true,
+      start: startMock,
+      reset: resetMock,
+    };
+  }
+
+  function __callLastOnFinish() {
+    if (lastOnFinish) lastOnFinish();
+  }
+
+  return {
+    useCountdown,
+    __callLastOnFinish,
+  };
+});
+
+// sessionsRepo（createSession / completeSession）をモック
+vi.mock('@/lib/db/sessionsRepo', () => {
+  const createSession = vi.fn(
+    async (themeIds: string[]) => ({
+      id: 'session-1',
+      themeIds,
+      startedAt: '2025-01-01T00:00:00.000Z',
+      endedAt: null,
+      memoCount: 0,
+    }),
+  );
+
+  const completeSession = vi.fn(async () => {});
+
+  return {
+    createSession,
+    completeSession,
+  };
+});
+
+// memosRepo（saveMemo）をモック
+vi.mock('@/lib/db/memosRepo', () => {
+  const saveMemo = vi.fn(async memo => ({
+    // 実際の MemoRecord っぽい形にしておくと後々便利
+    ...memo,
+    id: memo.id ?? 'memo-mocked-id',
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+  }));
+
+  return {
+    saveMemo,
+  };
+});
+
+// --- モック後に SessionPage をインポート ---
+import SessionPage from '../page';
+// モックされたモジュールをインポート（モックが適用される）
+import * as sessionsRepo from '@/lib/db/sessionsRepo';
+import * as memosRepo from '@/lib/db/memosRepo';
+// モック内で定義した特別なエクスポートを取得
+// @ts-expect-error - モック内で定義した特別なエクスポート
+import { __routerPushMock } from 'next/navigation';
+// @ts-expect-error - モック内で定義した特別なエクスポート
+import { __callLastOnFinish } from '@/lib/timer/useCountdown';
+
+// TODO: SessionPage の実装が完了したら、この describe.skip を describe に変更してください
+describe.skip('/session page (タイマー＋保存フロー)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('初期ロード後、1つ目のテーマが表示され、手動で「次へ」を押すと saveMemo が呼ばれて次のテーマに進む', async () => {
+    render(<SessionPage />);
+
+    // 最初は「準備中」が出て、その後に 1 テーマ目が表示される想定
+    await waitFor(() => {
+      expect(
+        screen.getByText(/テーマ 1 \/ 10/),
+      ).toBeInTheDocument();
+    });
+
+    // createSession が呼ばれていること
+    expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
+
+    // テキストエディタを取得（placeholder から取る）
+    const textarea = screen.getByPlaceholderText(
+      /書き出してみましょう/,
+    ) as HTMLTextAreaElement;
+
+    // 何か入力する
+    fireEvent.change(textarea, {
+      target: { value: '1つ目のメモ内容' },
+    });
+
+    // 「このテーマを終了して次へ」ボタンをクリック
+    const nextButton = screen.getByText('このテーマを終了して次へ');
+    fireEvent.click(nextButton);
+
+    // saveMemo が1回呼ばれ、内容が渡されていること
+    expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    const savedArg = (memosRepo.saveMemo as unknown as Mock).mock
+      .calls[0][0];
+
+    expect(savedArg.sessionId).toBe('session-1');
+    expect(savedArg.order).toBe(1);
+    expect(savedArg.textContent).toBe('1つ目のメモ内容');
+
+    // 次のテーマ（2/10）に進んでいること
+    await waitFor(() => {
+      expect(
+        screen.getByText(/テーマ 2 \/ 10/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('10 テーマ分進めると completeSession が呼ばれ、/session/complete に遷移する', async () => {
+    render(<SessionPage />);
+
+    // 1 テーマ目の表示を待つ
+    await waitFor(() => {
+      expect(
+        screen.getByText(/テーマ 1 \/ 10/),
+      ).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      /書き出してみましょう/,
+    ) as HTMLTextAreaElement;
+    const nextButton = screen.getByText('このテーマを終了して次へ');
+
+    // 10 テーマ分ループ（全て手動で「次へ」）
+    for (let i = 1; i <= 10; i += 1) {
+      fireEvent.change(textarea, {
+        target: { value: `メモ ${i}` },
+      });
+      fireEvent.click(nextButton);
+    }
+
+    // saveMemo が10回呼ばれていること
+    expect(memosRepo.saveMemo).toHaveBeenCalledTimes(10);
+
+    // completeSession が1回呼ばれていること
+    expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
+    const [sessionIdArg, memoCountArg] = (sessionsRepo.completeSession as unknown as Mock).mock.calls[0];
+
+    expect(sessionIdArg).toBe('session-1');
+    expect(memoCountArg).toBe(10);
+
+    // router.push('/session/complete') が呼ばれていること
+    expect(__routerPushMock).toHaveBeenCalledWith('/session/complete');
+  });
+
+  it('タイマー完了(onFinish)を呼ぶと、自動的に saveMemo が呼ばれて次のテーマに進む（擬似）', async () => {
+    render(<SessionPage />);
+
+    // 1 テーマ目の表示を待つ
+    await waitFor(() => {
+      expect(
+        screen.getByText(/テーマ 1 \/ 10/),
+      ).toBeInTheDocument();
+    });
+
+    // テキストを入力
+    const textarea = screen.getByPlaceholderText(
+      /書き出してみましょう/,
+    ) as HTMLTextAreaElement;
+
+    fireEvent.change(textarea, {
+      target: { value: 'タイマー自動で保存されるメモ' },
+    });
+
+    // useCountdown の onFinish をテスト側から呼び出して「60秒経過」をシミュレート
+    __callLastOnFinish();
+
+    // saveMemo が1回呼ばれていること
+    await waitFor(() => {
+      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    });
+
+    const savedArg = (memosRepo.saveMemo as unknown as Mock).mock
+      .calls[0][0];
+    expect(savedArg.textContent).toBe('タイマー自動で保存されるメモ');
+
+    // テーマ2に進んでいること
+    await waitFor(() => {
+      expect(
+        screen.getByText(/テーマ 2 \/ 10/),
+      ).toBeInTheDocument();
+    });
+  });
+});
