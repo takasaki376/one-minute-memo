@@ -1,8 +1,8 @@
 ﻿了解です！
-*履歴一覧* {{/history}} *向けの SessionCard.tsx* を、
-あなたの現在の設計に合う *シンプル & Tailwind / classcat / Link 対応* の形で実装します。
+_履歴一覧_ {{/history}} _向けの SessionCard.tsx_ を、
+あなたの現在の設計に合う _シンプル & Tailwind / classcat / Link 対応_ の形で実装します。
 
-----
+---
 
 h1. 📄 {{src/components/history/SessionCard.tsx}}
 
@@ -73,14 +73,15 @@ export function SessionCard({ session, href, className }: SessionCardProps) {
 }
 ```
 
-----
+---
 
 h1. 🔍 特徴・設計ポイント
 
 ### ✔ {{session: SessionRecord}} を丸ごと渡すだけで使える
 
 ```<SessionCard session={s} href={`/history/${s.id}`} />
-```
+
+````
 
 ### ✔ クリック時の遷移は {{href}}（Buttonの内部で Link 対応）
 
@@ -110,14 +111,6 @@ h1. 🚀 使用例（/history/page.tsx 内）
     </li>
   ))}
 </ul>
-```
+````
 
-----
-
-必要であれば：
-
-- 「MemoItem.tsx の実装サンプル」
-- 「SessionSummary.tsx（履歴詳細上部の概要カード）」
-- 「テーマ名を含む SessionCard の強化版」
-
-なども作れます。どれに進みましょう？
+---

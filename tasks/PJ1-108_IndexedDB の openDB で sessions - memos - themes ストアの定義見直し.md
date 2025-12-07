@@ -1,61 +1,61 @@
 ﻿いいタイミングでの見直しですね。
 いままで出てきた {{sessions / memos / themes}} の使い方を踏まえて、*IndexedDB のスキーマと openDB 実装を整理し直す*形で提案します。
 
-----
+---
 
 ## 1. ストア設計の整理
 
-### 🔹 sessions ストア（1セッション＝1レコード）
+### 🔹 sessions ストア（1 セッション＝ 1 レコード）
 
-*主にやりたいこと*
+_主にやりたいこと_
 
-- セッション開始時：{{createSession}} で 1件追加
+- セッション開始時：{{createSession}} で 1 件追加
 - セッション完了時：{{completeSession}} で更新
 - 履歴一覧：{{getAllSessions}} で全部取得 → 新しい順に並び替え
-- 詳細・完了画面：{{getSessionById}} で1件取得
+- 詳細・完了画面：{{getSessionById}} で 1 件取得
 
-*ストア定義案*
+_ストア定義案_
 
 - 名前: {{sessions}}
 - keyPath: {{id}}（{{SessionRecord.id}}）
 - インデックス（必須ではないが将来用に）
-** {{by_startedAt}} … {{startedAt}} で並び替え／絞り込みしたいとき用
-** {{by_endedAt}} … 終了したセッションだけ抜き出すとき用
+  ** {{by_startedAt}} … {{startedAt}} で並び替え／絞り込みしたいとき用
+  ** {{by_endedAt}} … 終了したセッションだけ抜き出すとき用
 
-----
+---
 
-### 🔹 memos ストア（1テーマ分のメモ＝1レコード）
+### 🔹 memos ストア（1 テーマ分のメモ＝ 1 レコード）
 
-*主にやりたいこと*
+_主にやりたいこと_
 
-- セッション中：{{saveMemo}} で 1テーマごとに追加／更新
+- セッション中：{{saveMemo}} で 1 テーマごとに追加／更新
 - 履歴詳細：{{getMemosBySessionId}} で「そのセッションに属するメモ全部」を取得
 - 取得時は {{order}} 昇順（1〜10）で並べたい
 
-*ストア定義案*
+_ストア定義案_
 
 - 名前: {{memos}}
 - keyPath: {{id}}（{{MemoRecord.id}}）
 - インデックス
-** {{by_sessionId}} … *必須*。{{sessionId}} でまとめて取得するため
-** （おまけ）{{by_themeId}} … 将来テーマ単位で検索したくなったら活きる
+  ** {{by_sessionId}} … _必須_。{{sessionId}} でまとめて取得するため
+  ** （おまけ）{{by_themeId}} … 将来テーマ単位で検索したくなったら活きる
 
-----
+---
 
-### 🔹 themes ストア（テーママスタ 200件）
+### 🔹 themes ストア（テーママスタ 200 件）
 
-*主にやりたいこと*
+_主にやりたいこと_
 
 - アプリ起動時やセッション開始時：有効なテーマ一覧を取得
 - カテゴリごとのフィルタなど（将来）
 
-*ストア定義案*
+_ストア定義案_
 
 - 名前: {{themes}}
 - keyPath: {{id}}
 - インデックス
-** {{by_isActive}} … 有効フラグ（{{isActive: boolean}}）で絞り込み
-** {{by_category}} … カテゴリごとの一覧を出したくなったとき用
+  ** {{by_isActive}} … 有効フラグ（{{isActive: boolean}}）で絞り込み
+  ** {{by_category}} … カテゴリごとの一覧を出したくなったとき用
 
 ※ {{ThemeRecord}} は例えばこんなイメージを想定：
 
@@ -69,7 +69,7 @@
 }
 ```
 
-----
+---
 
 ## 2. {{openDB.ts}} 実装サンプル
 
@@ -178,34 +178,34 @@ export function getDB(): Promise<IDBPDatabase<OneMinuteMemoDB>> {
 }
 ```
 
-----
+---
 
 ## 3. 既存の Repository との対応関係
 
 今まで出してきた Repo 関数との対応を軽く整理すると：
 
 - {{createSession}} / {{completeSession}} / {{getAllSessions}} / {{getSessionById}}
-** 👉 {{sessions}} ストア（主キー {{id}}、場合によっては index で期間絞り込みも可）
+  \*\* 👉 {{sessions}} ストア（主キー {{id}}、場合によっては index で期間絞り込みも可）
 - {{saveMemo}} / {{getMemosBySessionId}}
-** 👉 {{memos}} ストア
-** *今後は* {{by_sessionId}} *index を使って* {{store.index('by_sessionId').getAll(sessionId)}} *が使える*ので、
-「getAll → filter」から最適化できます
+  ** 👉 {{memos}} ストア
+  ** _今後は_ {{by_sessionId}} _index を使って_ {{store.index('by_sessionId').getAll(sessionId)}} *が使える*ので、
+  「getAll → filter」から最適化できます
 - {{getActiveThemes}}（まだ仮ですが）
-** 👉 {{themes}} ストアの {{by_isActive}} index を使って
-{{index.getAll(IDBKeyRange.only(true))}} みたいな取り方ができます
+  \*\* 👉 {{themes}} ストアの {{by_isActive}} index を使って
+  {{index.getAll(IDBKeyRange.only(true))}} みたいな取り方ができます
 
-----
+---
 
 ## 4. もしすでに別スキーマで開いていた場合
 
 - ローカルで既に試験的に別スキーマの DB を作っている場合、
-** {{DB_VERSION}} を {{2}} に上げて、
-** {{upgrade}} 内で {{oldVersion < 2}} のときだけ index を追加する、などの分岐を書くのが正式ですが、
-- *開発初期でデータを捨ててもよいのであれば*
-** Chrome DevTools の Application → IndexedDB から {{one-minute-memo}} を削除して
-** {{DB_VERSION = 1}} のままこの実装に差し替えるのが一番ラクです。
+  ** {{DB_VERSION}} を {{2}} に上げて、
+  ** {{upgrade}} 内で {{oldVersion < 2}} のときだけ index を追加する、などの分岐を書くのが正式ですが、
+- _開発初期でデータを捨ててもよいのであれば_
+  ** Chrome DevTools の Application → IndexedDB から {{one-minute-memo}} を削除して
+  ** {{DB_VERSION = 1}} のままこの実装に差し替えるのが一番ラクです。
 
-----
+---
 
 ここまでで
 
@@ -213,10 +213,3 @@ export function getDB(): Promise<IDBPDatabase<OneMinuteMemoDB>> {
 - {{openDB}} の型付き実装
 
 が揃いました。
-
-次にやりやすいのは、
-
-- {{getMemosBySessionId}} を index ベースの実装に書き換える
-- {{getActiveThemes}} / {{getThemesByIds}} を themes ストア前提で実装する
-
-あたりですが、どこから進めましょう？

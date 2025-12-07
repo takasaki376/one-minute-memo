@@ -1,7 +1,7 @@
 ﻿いいですね、ここまで来たら IndexedDB にちゃんとつなげたくなりますよね。
 {{saveMemo / createSession / completeSession}} *を使ってセッション画面から IndexedDB を叩く流れ*を、サンプル実装付きでまとめます。
 
-----
+---
 
 ## 1️⃣ 型定義（{{SessionRecord}} / {{MemoRecord}}）
 
@@ -40,7 +40,7 @@ export interface MemoRecord {
 }
 ```
 
-----
+---
 
 ## 2️⃣ Repository 実装（IndexedDB 用）
 
@@ -108,7 +108,7 @@ export async function completeSession(
 }
 ```
 
-----
+---
 
 ### {{src/lib/db/memosRepo.ts}}
 
@@ -156,12 +156,12 @@ export async function saveMemo(
 - 呼び出し側で {{id}} を決めたい場合は {{id}} を渡せる
 - 特にこだわらなければ repo 側で {{randomUUID()}} を生成{quote}
 
-----
+---
 
 ## 3️⃣ セッション画面への「差し込み」
 
 先に出した {{/session/page.tsx}} の骨組みに、
-{{createSession}} */* {{saveMemo}} */* {{completeSession}} *を組み込んだ版*です。
+{{createSession}} _/_ {{saveMemo}} _/_ {{completeSession}} *を組み込んだ版*です。
 
 ### 📄 {{src/app/session/page.tsx}}（IndexedDB 連携版）
 
@@ -470,12 +470,12 @@ export default function SessionPage() {
 }
 ```
 
-----
+---
 
 ## ✅ これで「差し込み」完了後にできること
 
-- セッション開始時に {{sessions}} ストアへ 1レコード追加
-- 各テーマ終了ごとに {{memos}} ストアへ 1レコード追加
+- セッション開始時に {{sessions}} ストアへ 1 レコード追加
+- 各テーマ終了ごとに {{memos}} ストアへ 1 レコード追加
 - セッション完了時に {{completeSession}} で {{endedAt}} & {{memoCount}} 更新
 
 あとは：
@@ -484,6 +484,3 @@ export default function SessionPage() {
 - 将来 Supabase 導入時に、同じ {{SessionRecord}} / {{MemoRecord}} をサーバ側にも同期
 
 みたいな流れで拡張できます。
-
-次は、履歴一覧／履歴詳細でこれらを読むための
-{{getSessions}} / {{getMemosBySessionId}} みたいな repo 関数と画面骨組みも一緒に作っていきましょうか？
