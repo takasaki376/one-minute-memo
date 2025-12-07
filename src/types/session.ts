@@ -1,7 +1,7 @@
 export interface SessionRecord {
-  id: string; // 'sess-2025-01-10-090000-xxx' など
-  startedAt: string; // ISO文字列
-  endedAt: string | null; // セッション完了前は null
-  themeIds: string[]; // このセッションで使ったテーマID（10個）
-  memoCount: number; // 実際に保存されたメモ数
+  id: string; // 'sess-2025-01-10-090000-xxx'
+  startedAt: string; // ISO string
+  endedAt: string | null; // null until the session finishes
+  themeIds: string[]; // theme ids used in this session
+  memoCount: number; // number of memos recorded
 }

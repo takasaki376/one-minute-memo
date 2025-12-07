@@ -72,10 +72,8 @@ export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
   const db = await getDB();
   const tx = db.transaction(SESSION_STORE);
   const store = tx.store;
-  // startedAt の降順（新しい順）で並べたい場合
   const index = store.index('by_startedAt');
   const sessions = await index.getAll();
-  // index で昇順になることが多いので手動で逆順にしたければここでソート
   sessions.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
-  return sessions.map(s => fromDB(s as SessionRecordDB)!);
+  return sessions.map((s) => fromDB(s as SessionRecordDB)!);
 }

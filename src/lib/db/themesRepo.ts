@@ -63,14 +63,12 @@ export async function toggleThemeActive(
 }
 
 /**
- * 初期テーマをDBに投入する（初回起動時のみ）
- * 既にテーマが存在する場合は何もしない
+ * Built-in themes are seeded once on the first launch.
  */
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
   const db = await getDB();
   const count = await db.count(THEME_STORE);
   if (count > 0) {
-    // data already exists; skip seeding
     return;
   }
 
