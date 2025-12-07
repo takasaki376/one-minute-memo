@@ -9,14 +9,17 @@ export default function HomePage() {
     // 実装が完了次第、ここで呼び出す
   }, []);
 
+  useEffect(() => {
+    // TODO: 初期テーマ投入処理 (initBuiltinThemesIfNeeded) を呼び出す
+    // 実装が完了次第、ここで呼び出す
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 max-w-xl mx-auto px-4">
       {/* アプリ名・サブタイトル */}
       <div className="text-center space-y-2">
         <h1 className="text-4xl font-bold text-slate-900">one-minute-memo</h1>
-        <p className="text-lg text-slate-600">
-          1分で思考を書き出すメモアプリ
-        </p>
+        <p className="text-lg text-slate-600">1分で思考を書き出すメモアプリ</p>
       </div>
 
       {/* 説明文 */}
@@ -26,7 +29,11 @@ export default function HomePage() {
 
       {/* メインアクション：セッション開始ボタン */}
       <div className="w-full max-w-sm">
-        <Button href="/session" variant="primary" className="w-full text-lg py-4">
+        <Button
+          href="/session"
+          variant="primary"
+          className="w-full text-lg py-4"
+        >
           セッションを開始
         </Button>
       </div>
