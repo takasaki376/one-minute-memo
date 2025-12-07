@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import React, { useEffect, useRef } from 'react';
-import cc from 'classcat';
+import type React from "react";
+import { useEffect, useRef } from "react";
+import cc from "classcat";
 
 export interface HandwritingCanvasProps {
   /** 現在のキャンバス内容（dataURL）。履歴からの復元などに使う */
@@ -41,10 +42,11 @@ export function HandwritingCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const dpr =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
     canvas.width = width * dpr;
     canvas.height = height * dpr;
@@ -53,11 +55,11 @@ export function HandwritingCanvas({
     canvas.style.height = `${height}px`;
 
     ctx.scale(dpr, dpr);
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#111827'; // slate-900 相当
-    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = "#111827"; // slate-900 相当
+    ctx.fillStyle = "#ffffff";
 
     // 背景を白で塗りつぶす
     ctx.fillRect(0, 0, width, height);
@@ -67,7 +69,7 @@ export function HandwritingCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     // いったん白でクリア
@@ -76,8 +78,9 @@ export function HandwritingCanvas({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    ctx.fillStyle = '#ffffff';
+    const dpr =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
 
     if (!value) {
@@ -101,12 +104,12 @@ export function HandwritingCanvas({
   };
 
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
+    event
   ) => {
     if (disabled) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     canvas.setPointerCapture(event.pointerId);
@@ -118,13 +121,13 @@ export function HandwritingCanvas({
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
+    event
   ) => {
     if (!isDrawingRef.current) return;
     if (disabled) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const { x, y } = getCanvasPos(event);
@@ -140,10 +143,10 @@ export function HandwritingCanvas({
     if (!canvas) return;
 
     try {
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = canvas.toDataURL("image/png");
       onChange?.(dataUrl);
     } catch (e) {
-      console.error('Failed to export canvas as dataURL', e);
+      console.error("Failed to export canvas as dataURL", e);
     }
 
     try {
@@ -154,13 +157,13 @@ export function HandwritingCanvas({
   };
 
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
+    event
   ) => {
     finishDrawing(event);
   };
 
   const handlePointerLeave: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
+    event
   ) => {
     // 外に出ても描画終了扱い
     finishDrawing(event);
@@ -169,50 +172,48 @@ export function HandwritingCanvas({
   const handleClear = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const dpr =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
 
     onChange?.(null);
   };
 
-  const containerClass = cc([
-    'flex flex-col gap-2',
-    className,
-  ]);
+  const containerClass = cc(["flex flex-col gap-2", className]);
 
   const canvasWrapperClass = cc([
-    'relative',
-    'rounded-md',
-    'border',
-    'border-slate-300',
-    'bg-white',
-    disabled && 'opacity-70',
+    "relative",
+    "rounded-md",
+    "border",
+    "border-slate-300",
+    "bg-white",
+    disabled && "opacity-70",
   ]);
 
   const canvasClass = cc([
-    'block',
-    'rounded-md',
-    'touch-none', // スクロールではなく描画優先
-    disabled && 'pointer-events-none',
+    "block",
+    "rounded-md",
+    "touch-none", // スクロールではなく描画優先
+    disabled && "pointer-events-none",
   ]);
 
   const clearButtonClass = cc([
-    'self-end',
-    'inline-flex items-center justify-center',
-    'rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600',
-    'hover:bg-slate-50',
-    'transition-colors',
-    disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
+    "self-end",
+    "inline-flex items-center justify-center",
+    "rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600",
+    "hover:bg-slate-50",
+    "transition-colors",
+    disabled && "opacity-50 cursor-not-allowed pointer-events-none",
   ]);
 
   return (

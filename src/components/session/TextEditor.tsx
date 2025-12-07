@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import cc from 'classcat';
+import type React from "react";
+import { useEffect, useRef } from "react";
+import cc from "classcat";
 
 export interface TextEditorProps {
   /** 現在のテキスト値（親コンポーネントで管理） */
@@ -31,42 +32,48 @@ export interface TextEditorProps {
 export function TextEditor({
   value,
   onChange,
-  placeholder = '思いつくことを自由に書き出してみましょう',
+  placeholder = "思いつくことを自由に書き出してみましょう",
   disabled = false,
   autoFocus = false,
   maxLength,
   className,
-  ariaLabel = 'テキストメモ入力',
+  ariaLabel = "テキストメモ入力",
 }: TextEditorProps) {
-  const containerClass = cc([
-    'w-full',
-    className,
-  ]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // autoFocusの代替実装（アクセシビリティのため）
+  useEffect(() => {
+    if (autoFocus && textareaRef.current && !disabled) {
+      textareaRef.current.focus();
+    }
+  }, [autoFocus, disabled]);
+
+  const containerClass = cc(["w-full", className]);
 
   const textareaClass = cc([
-    'w-full',
-    'min-h-40', // お好みで高さは調整
-    'rounded-md',
-    'border',
-    'border-slate-300',
-    'bg-white',
-    'px-3',
-    'py-2',
-    'text-sm',
-    'leading-relaxed',
-    'text-slate-900',
-    'shadow-sm',
-    'placeholder:text-slate-400',
-    'focus-visible:outline-none',
-    'focus-visible:ring-2',
-    'focus-visible:ring-blue-500',
-    'focus-visible:ring-offset-1',
-    'resize-y', // 縦方向のリサイズは許可
-    disabled && 'bg-slate-100 text-slate-400 cursor-not-allowed',
+    "w-full",
+    "min-h-40", // お好みで高さは調整
+    "rounded-md",
+    "border",
+    "border-slate-300",
+    "bg-white",
+    "px-3",
+    "py-2",
+    "text-sm",
+    "leading-relaxed",
+    "text-slate-900",
+    "shadow-sm",
+    "placeholder:text-slate-400",
+    "focus-visible:outline-none",
+    "focus-visible:ring-2",
+    "focus-visible:ring-blue-500",
+    "focus-visible:ring-offset-1",
+    "resize-y", // 縦方向のリサイズは許可
+    disabled && "bg-slate-100 text-slate-400 cursor-not-allowed",
   ]);
 
   const handleChange: React.ChangeEventHandler<HTMLTextAreaElement> = (
-    event,
+    event
   ) => {
     onChange(event.target.value);
   };
@@ -74,6 +81,7 @@ export function TextEditor({
   return (
     <div className={containerClass}>
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={handleChange}
         placeholder={placeholder}
