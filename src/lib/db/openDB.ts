@@ -1,0 +1,89 @@
+import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
+import type { ThemeRecord } from '@/types/theme';
+
+// SessionRecord と MemoRecord の型定義（後で別ファイルに移動可能）
+interface SessionRecord {
+  id: string;
+  startedAt: string;
+  endedAt: string;
+  themeIds: string[];
+  memoCount: number;
+}
+
+interface MemoRecord {
+  id: string;
+  sessionId: string;
+  themeId: string;
+  order: number;
+  textContent: string;
+  handwritingType: 'none' | 'blob' | 'dataUrl';
+  handwritingDataUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OneMinuteMemoDB extends DBSchema {
+  themes: {
+    key: string; // ThemeRecord.id
+    value: ThemeRecord;
+    indexes: {
+      by_isActive: number; // IndexedDBではbooleanは数値として扱われる（実際の使用ではフィルタリングで対応）
+      by_category: string;
+    };
+  };
+
+  sessions: {
+    key: string; // SessionRecord.id
+    value: SessionRecord;
+    indexes: {
+      by_startedAt: string;
+      by_endedAt: string;
+    };
+  };
+
+  memos: {
+    key: string; // MemoRecord.id
+    value: MemoRecord;
+    indexes: {
+      by_sessionId: string;
+      by_themeId: string;
+      by_createdAt: string;
+    };
+  };
+}
+
+const DB_NAME = 'one-minute-memo-db';
+const DB_VERSION = 1;
+
+let dbPromise: Promise<IDBPDatabase<OneMinuteMemoDB>> | null = null;
+
+export function getDB() {
+  if (!dbPromise) {
+    dbPromise = openDB<OneMinuteMemoDB>(DB_NAME, DB_VERSION, {
+      upgrade(db, oldVersion, newVersion, transaction) {
+        // themes
+        if (!db.objectStoreNames.contains('themes')) {
+          const store = db.createObjectStore('themes', { keyPath: 'id' });
+          store.createIndex('by_isActive', 'isActive', { unique: false });
+          store.createIndex('by_category', 'category', { unique: false });
+        }
+
+        // sessions
+        if (!db.objectStoreNames.contains('sessions')) {
+          const store = db.createObjectStore('sessions', { keyPath: 'id' });
+          store.createIndex('by_startedAt', 'startedAt', { unique: false });
+          store.createIndex('by_endedAt', 'endedAt', { unique: false });
+        }
+
+        // memos
+        if (!db.objectStoreNames.contains('memos')) {
+          const store = db.createObjectStore('memos', { keyPath: 'id' });
+          store.createIndex('by_sessionId', 'sessionId', { unique: false });
+          store.createIndex('by_themeId', 'themeId', { unique: false });
+          store.createIndex('by_createdAt', 'createdAt', { unique: false });
+        }
+      },
+    });
+  }
+  return dbPromise;
+}
