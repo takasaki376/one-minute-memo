@@ -1,42 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseCountdownOptions {
   /** 初期秒数（例: 60） */
   initialSeconds: number;
-  /** マウント時に自動でスタートするかどうか（デフォルト: true） */
+  /** 自動でカウントダウンを開始するかどうか（true で自動開始） */
   autoStart?: boolean;
-  /** 0秒になったタイミングで1度だけ呼ばれるコールバック */
+  /** カウントダウンが終了したときに呼び出されるコールバック関数 */
   onFinish?: () => void;
 }
 
 export interface UseCountdownResult {
   /** 残り秒数 */
   secondsLeft: number;
-  /** タイマーが動作中かどうか */
+  /** カウントダウンが実行中かどうか */
   isRunning: boolean;
-  /** カウントダウンを開始・再開 */
+  /** カウントダウンを開始する */
   start: () => void;
-  /** カウントダウンを一時停止 */
+  /** カウントダウンを一時停止する */
   pause: () => void;
   /**
-   * カウントダウンをリセット
-   * newInitialSeconds が指定されていればその値でリセット、
-   * なければ初期値(initialSeconds)でリセット
+   * カウントダウンをリセットする
+   * newInitialSeconds が指定された場合はその値で初期秒数を更新
+   * 指定されなかった場合は initialSeconds の値で初期秒数を更新
    */
   reset: (newInitialSeconds?: number) => void;
 }
 
 /**
- * シンプルなカウントダウン用フック。
- * セッション画面の「1分タイマー」にそのまま使える想定。
+ * カウントダウンタイマーのカスタムフック
  */
 export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   const { initialSeconds, autoStart = true, onFinish } = options;
 
-  // 現在の "基準の初期値" を保持（reset のときに使う）
+  // 初期秒数の参照を保持（reset で使用）
   const initialSecondsRef = useRef(initialSeconds);
 
-  // onFinish を ref に保持して、依存配列を増やさないようにする
+  // onFinish の ref に値を設定
   const onFinishRef = useRef<(() => void) | undefined>(onFinish);
   useEffect(() => {
     onFinishRef.current = onFinish;
@@ -46,28 +45,23 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   const [secondsLeft, setSecondsLeft] = useState<number>(safeInitialSeconds);
   const [isRunning, setIsRunning] = useState<boolean>(autoStart);
 
-  // initialSeconds が外から変わった場合の追従（頻繁には変えない想定）
-  // 注意: このuseEffectはinitialSecondsRefの更新のみを行い、
-  // 状態の更新はreset関数経由で行うことを推奨
+  // secondsLeft の ref に値を設定（start で使用）
+  const secondsLeftRef = useRef(secondsLeft);
   useEffect(() => {
-    const safe = Math.max(0, initialSeconds);
-    initialSecondsRef.current = safe;
-    // initialSecondsが変わった場合、状態を更新する必要がある場合は
-    // 呼び出し側でreset()を呼び出すことを推奨
-    // ここではrefのみ更新（パフォーマンスとReactのベストプラクティスのため）
+    secondsLeftRef.current = secondsLeft;
+  }, [secondsLeft]);
+
+  // initialSeconds の変更時の処理（reset で使用）
+  useEffect(() => {
+    initialSecondsRef.current = Math.max(0, initialSeconds);
   }, [initialSeconds]);
 
-  // interval ID を保持する ref（クリーンアップ用）
+  // interval ID を保持する ref
   const intervalIdRef = useRef<number | null>(null);
-  // onFinish が既に呼ばれたかどうかを追跡（React Strict Mode での重複呼び出しを防ぐ）
-  const onFinishCalledRef = useRef<boolean>(false);
+  // onFinish の呼び出し状態を管理（Strict Mode 対策）
+  const onFinishCalledRef = useRef(false);
 
-  // カウントダウン本体
-
-  // secondsLeft を依存配列に含めない理由: setInterval のコールバック内で prev を使っているため、
-  // secondsLeft が変わるたびに interval を再作成する必要はない。含めると毎秒 interval が再作成される問題が発生する。
   useEffect(() => {
-    // 既存の interval をクリーンアップ
     if (intervalIdRef.current !== null) {
       window.clearInterval(intervalIdRef.current);
       intervalIdRef.current = null;
@@ -79,14 +73,11 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     const id = window.setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          // 0 になるタイミング
-          // ここで止めて onFinish を1回だけ呼ぶ
           if (intervalIdRef.current !== null) {
             window.clearInterval(intervalIdRef.current);
             intervalIdRef.current = null;
           }
           setIsRunning(false);
-          // onFinish が既に呼ばれていない場合のみ呼ぶ（React Strict Mode での重複呼び出しを防ぐ）
           if (onFinishRef.current && !onFinishCalledRef.current) {
             onFinishCalledRef.current = true;
             onFinishRef.current();
@@ -107,30 +98,30 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     };
   }, [isRunning]);
 
-  const start = () => {
-    if (secondsLeft <= 0) {
-      // 0から再スタートしたい場合は reset → start の組み合わせで呼んでもらう前提
+  const start = useCallback(() => {
+    if (secondsLeftRef.current <= 0) {
       return;
     }
     onFinishCalledRef.current = false;
     setIsRunning(true);
-  };
+  }, []);
 
-  const pause = () => {
+  const pause = useCallback(() => {
     setIsRunning(false);
-  };
+  }, []);
 
-  const reset = (newInitialSeconds?: number) => {
+  const reset = useCallback((newInitialSeconds?: number) => {
     const next = Math.max(
       0,
       newInitialSeconds ?? initialSecondsRef.current ?? 0
     );
     initialSecondsRef.current = next;
+    // Keep the ref in sync so a start() immediately after reset() can proceed.
+    secondsLeftRef.current = next;
     setSecondsLeft(next);
     setIsRunning(false);
-    // reset 時に onFinish 呼び出しフラグをリセット
     onFinishCalledRef.current = false;
-  };
+  }, []);
 
   return {
     secondsLeft,
