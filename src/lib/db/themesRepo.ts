@@ -2,6 +2,14 @@ import { getDB } from './openDB';
 import type { ThemeRecord } from '@/types/theme';
 
 const THEME_STORE = 'themes';
+type ThemeRecordWithIndex = ThemeRecord & { isActiveIndex: number };
+
+function withIndex(theme: ThemeRecord): ThemeRecordWithIndex {
+  return {
+    ...theme,
+    isActiveIndex: theme.isActive ? 1 : 0,
+  };
+}
 
 export async function getAllThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
@@ -10,14 +18,14 @@ export async function getAllThemes(): Promise<ThemeRecord[]> {
 
 export async function getActiveThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  return db.getAllFromIndex(THEME_STORE, 'by_isActive', true);
+  return db.getAllFromIndex(THEME_STORE, 'by_isActive', 1);
 }
 
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(THEME_STORE, 'readwrite');
   for (const theme of themes) {
-    await tx.store.put(theme);
+    await tx.store.put(withIndex(theme));
   }
   await tx.done;
 }
@@ -42,7 +50,7 @@ export async function toggleThemeActive(
     updatedAt: new Date().toISOString(),
   };
 
-  await store.put(updated);
+  await store.put(withIndex(updated));
   await tx.done;
 }
 

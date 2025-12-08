@@ -26,7 +26,7 @@ export interface OneMinuteMemoDB extends DBSchema {
     key: string; // ThemeRecord.id
     value: ThemeRecord;
     indexes: {
-      by_isActive: boolean; // store isActive flag for quick lookup
+      by_isActive: number; // numeric index (0/1) derived from isActive for querying
       by_category: string;
     };
   };
@@ -63,7 +63,8 @@ export function getDB() {
         // themes
         if (!db.objectStoreNames.contains('themes')) {
           const store = db.createObjectStore('themes', { keyPath: 'id' });
-          store.createIndex('by_isActive', 'isActive', { unique: false });
+          // use numeric flag (0/1) for index key; IndexedDB index keys cannot be boolean
+          store.createIndex('by_isActive', 'isActiveIndex', { unique: false });
           store.createIndex('by_category', 'category', { unique: false });
         }
 
