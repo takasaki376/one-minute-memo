@@ -1,25 +1,11 @@
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ThemeRecord } from '@/types/theme';
+import type { SessionRecord } from '@/types/session';
+import type { MemoRecord } from '@/types/memo';
 
-interface SessionRecord {
-  id: string;
-  startedAt: string;
-  endedAt: string;
-  themeIds: string[];
-  memoCount: number;
-}
-
-interface MemoRecord {
-  id: string;
-  sessionId: string;
-  themeId: string;
-  order: number;
-  textContent: string;
-  handwritingType: 'none' | 'blob' | 'dataUrl';
-  handwritingDataUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type SessionRecordDB = Omit<SessionRecord, 'endedAt'> & {
+  endedAt: string; // '' means "not finished yet"
+};
 
 export interface OneMinuteMemoDB extends DBSchema {
   themes: {
@@ -32,8 +18,8 @@ export interface OneMinuteMemoDB extends DBSchema {
   };
 
   sessions: {
-    key: string; // SessionRecord.id
-    value: SessionRecord;
+    key: SessionRecord['id']; // SessionRecord.id
+    value: SessionRecordDB;
     indexes: {
       by_startedAt: string;
       by_endedAt: string;
@@ -41,7 +27,7 @@ export interface OneMinuteMemoDB extends DBSchema {
   };
 
   memos: {
-    key: string; // MemoRecord.id
+    key: MemoRecord['id']; // MemoRecord.id
     value: MemoRecord;
     indexes: {
       by_sessionId: string;
@@ -52,7 +38,7 @@ export interface OneMinuteMemoDB extends DBSchema {
 }
 
 const DB_NAME = 'one-minute-memo-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<OneMinuteMemoDB>> | null = null;
 
