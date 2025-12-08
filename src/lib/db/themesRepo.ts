@@ -10,8 +10,7 @@ export async function getAllThemes(): Promise<ThemeRecord[]> {
 
 export async function getActiveThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  const allThemes = await db.getAll(THEME_STORE);
-  return allThemes.filter((theme) => theme.isActive === true);
+  return db.getAllFromIndex(THEME_STORE, 'by_isActive', true);
 }
 
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
@@ -47,7 +46,7 @@ export async function toggleThemeActive(
   await tx.done;
 }
 
-// 仮のテーマ配列（本番は別ファイルでもOK）
+// Placeholder built-in themes (real dataset will be added later)
 const builtinThemes: Omit<ThemeRecord, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     title: '今日やりたいことは？',
@@ -61,14 +60,14 @@ const builtinThemes: Omit<ThemeRecord, 'id' | 'createdAt' | 'updatedAt'>[] = [
     isActive: true,
     source: 'builtin',
   },
-  // ...200件分（実際のデータは別途追加予定）
+  // ...200件程度の実データは別途追加予定
 ];
 
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
   const db = await getDB();
   const count = await db.count(THEME_STORE);
   if (count > 0) {
-    // すでに何か入っている場合は何もしない
+    // data already exists; skip seeding
     return;
   }
 

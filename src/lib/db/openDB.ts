@@ -1,7 +1,6 @@
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ThemeRecord } from '@/types/theme';
 
-// SessionRecord と MemoRecord の型定義（後で別ファイルに移動可能）
 interface SessionRecord {
   id: string;
   startedAt: string;
@@ -27,7 +26,7 @@ export interface OneMinuteMemoDB extends DBSchema {
     key: string; // ThemeRecord.id
     value: ThemeRecord;
     indexes: {
-      by_isActive: number; // IndexedDBではbooleanは数値として扱われる（実際の使用ではフィルタリングで対応）
+      by_isActive: boolean; // store isActive flag for quick lookup
       by_category: string;
     };
   };
@@ -60,7 +59,7 @@ let dbPromise: Promise<IDBPDatabase<OneMinuteMemoDB>> | null = null;
 export function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<OneMinuteMemoDB>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) {
+      upgrade(db) {
         // themes
         if (!db.objectStoreNames.contains('themes')) {
           const store = db.createObjectStore('themes', { keyPath: 'id' });
