@@ -1,25 +1,7 @@
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ThemeRecord } from '@/types/theme';
-
-interface SessionRecord {
-  id: string;
-  startedAt: string;
-  endedAt: string;
-  themeIds: string[];
-  memoCount: number;
-}
-
-interface MemoRecord {
-  id: string;
-  sessionId: string;
-  themeId: string;
-  order: number;
-  textContent: string;
-  handwritingType: 'none' | 'blob' | 'dataUrl';
-  handwritingDataUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { SessionRecord } from '@/types/session';
+import type { MemoRecord } from '@/types/memo';
 
 export interface OneMinuteMemoDB extends DBSchema {
   themes: {
@@ -32,7 +14,7 @@ export interface OneMinuteMemoDB extends DBSchema {
   };
 
   sessions: {
-    key: string; // SessionRecord.id
+    key: SessionRecord['id']; // SessionRecord.id
     value: SessionRecord;
     indexes: {
       by_startedAt: string;
@@ -41,7 +23,7 @@ export interface OneMinuteMemoDB extends DBSchema {
   };
 
   memos: {
-    key: string; // MemoRecord.id
+    key: MemoRecord['id']; // MemoRecord.id
     value: MemoRecord;
     indexes: {
       by_sessionId: string;
