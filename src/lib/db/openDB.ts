@@ -3,6 +3,10 @@ import type { ThemeRecord } from '@/types/theme';
 import type { SessionRecord } from '@/types/session';
 import type { MemoRecord } from '@/types/memo';
 
+export type SessionRecordDB = Omit<SessionRecord, 'endedAt'> & {
+  endedAt: string; // '' means "not finished yet"
+};
+
 export interface OneMinuteMemoDB extends DBSchema {
   themes: {
     key: string; // ThemeRecord.id
@@ -15,7 +19,7 @@ export interface OneMinuteMemoDB extends DBSchema {
 
   sessions: {
     key: SessionRecord['id']; // SessionRecord.id
-    value: SessionRecord;
+    value: SessionRecordDB;
     indexes: {
       by_startedAt: string;
       by_endedAt: string;
@@ -34,7 +38,7 @@ export interface OneMinuteMemoDB extends DBSchema {
 }
 
 const DB_NAME = 'one-minute-memo-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<OneMinuteMemoDB>> | null = null;
 
