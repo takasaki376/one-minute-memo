@@ -3,23 +3,37 @@ import type { ThemeRecord } from '@/types/theme';
 import { builtinThemes } from '@/lib/data/builtinThemes';
 
 const THEME_STORE = 'themes';
+type ThemeRecordWithIndex = ThemeRecord & { isActiveIndex: number };
+
+function withIndex(theme: ThemeRecord): ThemeRecordWithIndex {
+  return {
+    ...theme,
+    isActiveIndex: theme.isActive ? 1 : 0,
+  };
+}
+
+function stripIndex(theme: ThemeRecord | ThemeRecordWithIndex): ThemeRecord {
+  const { isActiveIndex: _ignored, ...rest } = theme as ThemeRecordWithIndex;
+  return rest;
+}
 
 export async function getAllThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  return db.getAll(THEME_STORE);
+  const records = await db.getAll(THEME_STORE);
+  return records.map(stripIndex);
 }
 
 export async function getActiveThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  const allThemes = await db.getAll(THEME_STORE);
-  return allThemes.filter((theme) => theme.isActive === true);
+  const active = await db.getAllFromIndex(THEME_STORE, 'by_isActive', 1);
+  return active.map(stripIndex);
 }
 
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(THEME_STORE, 'readwrite');
   for (const theme of themes) {
-    await tx.store.put(theme);
+    await tx.store.put(withIndex(theme));
   }
   await tx.done;
 }
@@ -39,12 +53,12 @@ export async function toggleThemeActive(
   }
 
   const updated: ThemeRecord = {
-    ...existing,
+    ...stripIndex(existing),
     isActive,
     updatedAt: new Date().toISOString(),
   };
 
-  await store.put(updated);
+  await store.put(withIndex(updated));
   await tx.done;
 }
 
@@ -56,7 +70,7 @@ export async function initBuiltinThemesIfNeeded(): Promise<void> {
   const db = await getDB();
   const count = await db.count(THEME_STORE);
   if (count > 0) {
-    // すでに何か入っている場合は何もしない
+    // data already exists; skip seeding
     return;
   }
 
