@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
-import { initBuiltinThemesIfNeeded } from "@/lib/db/themesRepo";
+import { useThemeSeedState } from "@/components/providers/ThemeSeedProvider";
 
 export default function HomePage() {
-  useEffect(() => {
-    // アプリ起動時に初期テーマを投入（初回のみ）
-    initBuiltinThemesIfNeeded().catch(console.error);
-  }, []);
+  const { isReady, isSeeding, error } = useThemeSeedState();
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 max-w-xl mx-auto px-4">
@@ -17,6 +13,17 @@ export default function HomePage() {
         <h1 className="text-4xl font-bold text-slate-900">one-minute-memo</h1>
         <p className="text-lg text-slate-600">1分で思考を書き出すメモアプリ</p>
       </div>
+
+      {/* 初期テーマ投入の進行状況 */}
+      {!isReady && (
+        <div className="w-full max-w-sm text-sm text-slate-700 bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-sm">
+          {error
+            ? "初期データの準備に失敗しました。ページを再読み込みしてください。"
+            : isSeeding
+              ? "初期テーマを準備しています…"
+              : "初期データの準備を待機しています。"}
+        </div>
+      )}
 
       {/* 説明文 */}
       <p className="text-center text-slate-700 max-w-md">
@@ -30,6 +37,7 @@ export default function HomePage() {
           href="/session"
           variant="primary"
           className="w-full text-lg py-4"
+          disabled={!isReady}
         >
           セッションを開始
         </Button>
@@ -37,10 +45,20 @@ export default function HomePage() {
 
       {/* その他のアクション */}
       <div className="w-full max-w-sm space-y-3">
-        <Button href="/history" variant="secondary" className="w-full">
+        <Button
+          href="/history"
+          variant="secondary"
+          className="w-full"
+          disabled={!isReady}
+        >
           履歴を見る
         </Button>
-        <Button href="/themes" variant="secondary" className="w-full">
+        <Button
+          href="/themes"
+          variant="secondary"
+          className="w-full"
+          disabled={!isReady}
+        >
           テーマを管理
         </Button>
       </div>
