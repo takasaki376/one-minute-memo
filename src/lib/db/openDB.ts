@@ -9,8 +9,8 @@ export type SessionRecordDB = Omit<SessionRecord, 'endedAt'> & {
 
 export interface OneMinuteMemoDB extends DBSchema {
   themes: {
-    key: string; // ThemeRecord.id
-    value: ThemeRecord;
+    key: ThemeRecord['id'];
+    value: ThemeRecord & { isActiveIndex?: number };
     indexes: {
       by_isActive: number; // numeric index (0/1) derived from isActive for querying
       by_category: string;
@@ -18,7 +18,7 @@ export interface OneMinuteMemoDB extends DBSchema {
   };
 
   sessions: {
-    key: SessionRecord['id']; // SessionRecord.id
+    key: SessionRecord['id'];
     value: SessionRecordDB;
     indexes: {
       by_startedAt: string;
@@ -27,7 +27,7 @@ export interface OneMinuteMemoDB extends DBSchema {
   };
 
   memos: {
-    key: MemoRecord['id']; // MemoRecord.id
+    key: MemoRecord['id'];
     value: MemoRecord;
     indexes: {
       by_sessionId: string;
@@ -45,13 +45,26 @@ let dbPromise: Promise<IDBPDatabase<OneMinuteMemoDB>> | null = null;
 export function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<OneMinuteMemoDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade: async (db, oldVersion, _newVersion, transaction) => {
         // themes
         if (!db.objectStoreNames.contains('themes')) {
           const store = db.createObjectStore('themes', { keyPath: 'id' });
           // use numeric flag (0/1) for index key; IndexedDB index keys cannot be boolean
           store.createIndex('by_isActive', 'isActiveIndex', { unique: false });
           store.createIndex('by_category', 'category', { unique: false });
+        } else if (oldVersion < 2 && transaction) {
+          const store = transaction.objectStore('themes');
+          if (store.indexNames.contains('by_isActive')) {
+            store.deleteIndex('by_isActive');
+          }
+          store.createIndex('by_isActive', 'isActiveIndex', { unique: false });
+          const existing = await store.getAll();
+          for (const theme of existing) {
+            await store.put({
+              ...theme,
+              isActiveIndex: theme.isActive ? 1 : 0,
+            });
+          }
         }
 
         // sessions

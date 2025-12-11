@@ -9,6 +9,7 @@ interface ButtonProps {
   variant?: ButtonVariant;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -26,22 +27,41 @@ export function Button({
   variant = "primary",
   onClick,
   className = "",
+  disabled = false,
 }: ButtonProps) {
   const baseStyles =
     "inline-flex items-center justify-center px-6 py-3 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
 
-  const combinedClassName = `${baseStyles} ${variantStyles[variant]} ${className}`;
+  const disabledStyles = disabled ? "opacity-60 cursor-not-allowed" : "";
+  const combinedClassName = `${baseStyles} ${variantStyles[variant]} ${disabledStyles} ${className}`;
 
   if (href) {
     return (
-      <Link href={href} className={combinedClassName}>
+      <Link
+        href={href}
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+        className={combinedClassName}
+        onClick={(e) => {
+          if (disabled) {
+            e.preventDefault();
+            return;
+          }
+          onClick?.();
+        }}
+      >
         {children}
       </Link>
     );
   }
 
   return (
-    <button type="button" onClick={onClick} className={combinedClassName}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={combinedClassName}
+      disabled={disabled}
+    >
       {children}
     </button>
   );

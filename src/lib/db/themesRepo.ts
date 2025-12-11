@@ -1,5 +1,6 @@
 import { getDB } from './openDB';
 import type { ThemeRecord } from '@/types/theme';
+import { builtinThemes } from '@/lib/data/builtinThemes';
 
 const THEME_STORE = 'themes';
 type ThemeRecordWithIndex = ThemeRecord & { isActiveIndex: number };
@@ -11,14 +12,21 @@ function withIndex(theme: ThemeRecord): ThemeRecordWithIndex {
   };
 }
 
+function stripIndex(theme: ThemeRecord | ThemeRecordWithIndex): ThemeRecord {
+  const { isActiveIndex: _ignored, ...rest } = theme as ThemeRecordWithIndex;
+  return rest;
+}
+
 export async function getAllThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  return db.getAll(THEME_STORE);
+  const records = await db.getAll(THEME_STORE);
+  return records.map(stripIndex);
 }
 
 export async function getActiveThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  return db.getAllFromIndex(THEME_STORE, 'by_isActive', 1);
+  const active = await db.getAllFromIndex(THEME_STORE, 'by_isActive', 1);
+  return active.map(stripIndex);
 }
 
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
@@ -45,7 +53,7 @@ export async function toggleThemeActive(
   }
 
   const updated: ThemeRecord = {
-    ...existing,
+    ...stripIndex(existing),
     isActive,
     updatedAt: new Date().toISOString(),
   };
@@ -54,23 +62,10 @@ export async function toggleThemeActive(
   await tx.done;
 }
 
-// Placeholder built-in themes (real dataset will be added later)
-const builtinThemes: Omit<ThemeRecord, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  {
-    title: '今日やりたいことは？',
-    category: '目標',
-    isActive: true,
-    source: 'builtin',
-  },
-  {
-    title: '今気になっていることは？',
-    category: '感情',
-    isActive: true,
-    source: 'builtin',
-  },
-  // ...200件程度の実データは別途追加予定
-];
-
+/**
+ * 初期テーマをDBに投入する（初回起動時のみ）
+ * 既にテーマが存在する場合は何もしない
+ */
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
   const db = await getDB();
   const count = await db.count(THEME_STORE);
