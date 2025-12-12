@@ -1,17 +1,7 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/ui/Header";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { ThemeSeedProvider } from "@/components/providers/ThemeSeedProvider";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -26,21 +16,23 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-slate-50 text-slate-900`}
+        className="antialiased min-h-screen bg-slate-50 text-slate-900"
       >
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1">
-            <div className="max-w-4xl mx-auto px-4 py-6">
-              {children}
-            </div>
-          </main>
-          <footer className="border-t bg-white">
-            <div className="max-w-4xl mx-auto px-4 py-3 text-xs text-slate-500">
-              © {new Date().getFullYear()} one-minute-memo
-            </div>
-          </footer>
-        </div>
+        <ThemeSeedProvider>
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-1">
+              <div className="max-w-4xl mx-auto px-4 py-6">
+                {children}
+              </div>
+            </main>
+            <footer className="border-t bg-white">
+              <div className="max-w-4xl mx-auto px-4 py-3 text-xs text-slate-500">
+                © {new Date().getFullYear()} one-minute-memo
+              </div>
+            </footer>
+          </div>
+        </ThemeSeedProvider>
       </body>
     </html>
   );

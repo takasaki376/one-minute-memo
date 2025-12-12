@@ -4,7 +4,7 @@ import type React from 'react';
 import Link from 'next/link';
 import cc from 'classcat';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps {
@@ -16,7 +16,7 @@ export interface ButtonProps {
   /** type属性（form内で使う時） */
   type?: 'button' | 'submit' | 'reset';
   /** クリックハンドラ（hrefと併用しない前提） */
-  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
   /** ボタン無効化 */
   disabled?: boolean;
   /** ローディング中表示＆クリック無効 */
@@ -48,18 +48,30 @@ export function Button({
 }: ButtonProps) {
   const isDisabled = disabled || isLoading;
 
-  const classes = cc([
-    'inline-flex items-center justify-center rounded-md font-medium transition-colors',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2',
-    variant === 'primary' &&
-      'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    variant === 'secondary' &&
-      'border border-slate-300 bg-white text-slate-900 hover:bg-slate-50 focus:ring-slate-300',
-    variant === 'ghost' &&
+  const baseClasses =
+    'inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500';
+
+  const variantClasses: Record<ButtonVariant, string> = {
+    primary:
+      'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-md',
+    secondary:
+      'bg-slate-200 text-slate-900 hover:bg-slate-300 active:bg-slate-400',
+    ghost:
       'bg-transparent text-slate-700 hover:bg-slate-100 focus:ring-slate-300',
-    size === 'sm' && 'text-sm px-3 py-1.5',
-    size === 'md' && 'text-sm px-4 py-2',
-    size === 'lg' && 'text-base px-5 py-2.5',
+    outline:
+      'border-2 border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100',
+  };
+
+  const sizeClasses: Record<ButtonSize, string> = {
+    sm: 'text-sm px-3 py-1.5',
+    md: 'text-sm px-4 py-2',
+    lg: 'text-base px-5 py-2.5',
+  };
+
+  const classes = cc([
+    baseClasses,
+    variantClasses[variant],
+    sizeClasses[size],
     isDisabled && 'opacity-60 cursor-not-allowed pointer-events-none',
     fullWidth && 'w-full',
     className,
@@ -90,8 +102,16 @@ export function Button({
     return (
       <Link
         href={href}
-        className={classes}
         aria-disabled={isDisabled}
+        tabIndex={isDisabled ? -1 : undefined}
+        className={classes}
+        onClick={(e) => {
+          if (isDisabled) {
+            e.preventDefault();
+            return;
+          }
+          onClick?.(e);
+        }}
       >
         {content}
       </Link>
