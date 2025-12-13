@@ -1,7 +1,22 @@
-import { getDB } from './openDB';
+import { getDB, type SessionRecordDB } from './openDB';
 import type { SessionRecord } from '@/types/session';
 
 const SESSION_STORE = 'sessions';
+
+function toDB(record: SessionRecord): SessionRecordDB {
+  return {
+    ...record,
+    endedAt: record.endedAt ?? '',
+  };
+}
+
+function fromDB(record: SessionRecordDB | undefined): SessionRecord | undefined {
+  if (!record) return undefined;
+  return {
+    ...record,
+    endedAt: record.endedAt === '' ? null : record.endedAt,
+  };
+}
 
 export async function createSession(themeIds: string[]): Promise<SessionRecord> {
   const db = await getDB();
@@ -11,12 +26,12 @@ export async function createSession(themeIds: string[]): Promise<SessionRecord> 
   const record: SessionRecord = {
     id,
     startedAt: now.toISOString(),
-    endedAt: now.toISOString(), // 開始時点では startedAt と同じでOK
+    endedAt: null,
     themeIds,
     memoCount: 0,
   };
 
-  await db.add(SESSION_STORE, record);
+  await db.add(SESSION_STORE, toDB(record));
   return record;
 }
 
@@ -34,13 +49,14 @@ export async function completeSession(
     return;
   }
 
-  const updated: SessionRecord = {
-    ...existing,
+  const updated: SessionRecord = fromDB(existing)!;
+  const updatedForSave: SessionRecord = {
+    ...updated,
     memoCount,
     endedAt: new Date().toISOString(),
   };
 
-  await store.put(updated);
+  await store.put(toDB(updatedForSave));
   await tx.done;
 }
 
@@ -48,7 +64,8 @@ export async function getSessionById(
   sessionId: string,
 ): Promise<SessionRecord | undefined> {
   const db = await getDB();
-  return db.get(SESSION_STORE, sessionId);
+  const data = await db.get(SESSION_STORE, sessionId);
+  return fromDB(data as SessionRecordDB | undefined);
 }
 
 export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
@@ -60,5 +77,5 @@ export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
   const sessions = await index.getAll();
   // index で昇順になることが多いので手動で逆順にしたければここでソート
   sessions.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
-  return sessions;
+  return sessions.map(s => fromDB(s as SessionRecordDB)!);
 }
