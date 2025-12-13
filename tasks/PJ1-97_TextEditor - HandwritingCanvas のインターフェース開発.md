@@ -594,11 +594,3 @@ function SessionContent() {
 - 解像度・太さ・色などは固定（必要になったら props で拡張）
 
 ----
-
-これで「TextEditor + HandwritingCanvas + useCountdown + ランダムテーマ」の材料が揃ってきました。
-次にやるとしたら：
-
-- {{/session/page.tsx}} にこれらを組み合わせた *セッション画面の骨組み実装サンプル*
-- もしくは「セッション完了画面」の簡単な UI＆タスク
-
-あたりを一緒に詰めていけます。
