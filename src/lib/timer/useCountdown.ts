@@ -59,6 +59,7 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   // カウントダウン本体
   useEffect(() => {
     if (!isRunning) return;
+    if (typeof window === 'undefined') return;
 
     const id = window.setInterval(() => {
       setSecondsLeft(prev => {
@@ -76,7 +77,9 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     }, 1000);
 
     return () => {
-      window.clearInterval(id);
+      if (typeof window !== 'undefined') {
+        window.clearInterval(id);
+      }
     };
   }, [isRunning]);
 
