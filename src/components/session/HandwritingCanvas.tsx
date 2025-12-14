@@ -186,7 +186,10 @@ export function HandwritingCanvas({
     onChange?.(null);
   };
 
-  const containerClass = cc(['flex flex-col gap-2', className]);
+  const containerClass = cc([
+    'flex flex-col gap-2',
+    className,
+  ]);
 
   const canvasWrapperClass = cc([
     'relative',

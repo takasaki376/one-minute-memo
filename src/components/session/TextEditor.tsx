@@ -48,7 +48,10 @@ export function TextEditor({
     }
   }, [autoFocus, disabled]);
 
-  const containerClass = cc(['w-full', className]);
+  const containerClass = cc([
+    'w-full',
+    className,
+  ]);
 
   const textareaClass = cc([
     'w-full',
