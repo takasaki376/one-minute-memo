@@ -8,25 +8,15 @@ import { TextEditor } from '@/components/session/TextEditor';
 import { HandwritingCanvas } from '@/components/session/HandwritingCanvas';
 import { ThemeHeader } from '@/components/session/ThemeHeader';
 import { useCountdown } from '@/lib/timer/useCountdown';
-import { getActiveThemes } from '@/lib/db/themesRepo';
 import { createSession, completeSession } from '@/lib/db/sessionsRepo';
 import { saveMemo } from '@/lib/db/memosRepo';
+import { pickRandomActiveThemes } from '@/lib/utils/selectRandomThemes';
 import type { ThemeRecord } from '@/types/theme';
 
 type SessionStage = 'loading' | 'running' | 'finished' | 'error';
 
 const TOTAL_THEMES_PER_SESSION = 10;
 const SECONDS_PER_THEME = 60;
-
-/** 配列をシャッフルして先頭N件を返す */
-function pickRandomThemes<T>(allThemes: T[], count: number): T[] {
-  const copy = [...allThemes];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, Math.min(count, copy.length));
-}
 
 export default function SessionPage() {
   const router = useRouter();
@@ -64,16 +54,7 @@ export default function SessionPage() {
       try {
         setStage('loading');
 
-        // IndexedDB から有効テーマを取得
-        const activeThemes = await getActiveThemes();
-
-        if (activeThemes.length === 0) {
-          setStage('error');
-          return;
-        }
-
-        const selected = pickRandomThemes(
-          activeThemes,
+        const selected = await pickRandomActiveThemes(
           TOTAL_THEMES_PER_SESSION,
         );
 
