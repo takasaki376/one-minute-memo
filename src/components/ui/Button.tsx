@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import type React from 'react';
-import Link from 'next/link';
-import cc from 'classcat';
+import type React from "react";
+import Link from "next/link";
+import cc from "classcat";
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "outline";
+export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps {
   children: React.ReactNode;
@@ -14,7 +14,7 @@ export interface ButtonProps {
   /** サイズ */
   size?: ButtonSize; // default: 'md'
   /** type属性（form内で使う時） */
-  type?: 'button' | 'submit' | 'reset';
+  type?: "button" | "submit" | "reset";
   /** クリックハンドラ（hrefと併用しない前提） */
   onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
   /** ボタン無効化 */
@@ -30,13 +30,14 @@ export interface ButtonProps {
   rightIcon?: React.ReactNode;
   /** aria-label など追加属性を渡すための拡張用 */
   className?: string;
+  disabled?: boolean;
 }
 
 export function Button({
   children,
-  variant = 'primary',
-  size = 'md',
-  type = 'button',
+  variant = "primary",
+  size = "md",
+  type = "button",
   onClick,
   disabled = false,
   isLoading = false,
@@ -49,36 +50,36 @@ export function Button({
   const isDisabled = disabled || isLoading;
 
   const baseClasses =
-    'inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500';
+    "inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-md',
+      "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-md",
     secondary:
-      'bg-slate-200 text-slate-900 hover:bg-slate-300 active:bg-slate-400',
+      "bg-slate-200 text-slate-900 hover:bg-slate-300 active:bg-slate-400",
     ghost:
-      'bg-transparent text-slate-700 hover:bg-slate-100 focus:ring-slate-300',
+      "bg-transparent text-slate-700 hover:bg-slate-100 focus:ring-slate-300",
     outline:
-      'border-2 border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100',
+      "border-2 border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100",
   };
 
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: 'text-sm px-3 py-1.5',
-    md: 'text-sm px-4 py-2',
-    lg: 'text-base px-5 py-2.5',
+    sm: "text-sm px-3 py-1.5",
+    md: "text-sm px-4 py-2",
+    lg: "text-base px-5 py-2.5",
   };
 
   const classes = cc([
     baseClasses,
     variantClasses[variant],
     sizeClasses[size],
-    isDisabled && 'opacity-60 cursor-not-allowed pointer-events-none',
-    fullWidth && 'w-full',
+    isDisabled && "opacity-60 cursor-not-allowed pointer-events-none",
+    fullWidth && "w-full",
     className,
   ]);
 
   const spinnerColor =
-    variant === 'primary' ? 'border-white' : 'border-slate-700';
+    variant === "primary" ? "border-white" : "border-slate-700";
 
   const content = (
     <>
@@ -91,9 +92,7 @@ export function Button({
         <span className="mr-2 inline-flex">{leftIcon}</span>
       )}
       <span>{children}</span>
-      {rightIcon && (
-        <span className="ml-2 inline-flex">{rightIcon}</span>
-      )}
+      {rightIcon && <span className="ml-2 inline-flex">{rightIcon}</span>}
     </>
   );
 

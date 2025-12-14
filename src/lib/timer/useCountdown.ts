@@ -63,11 +63,11 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   const onFinishCalledRef = useRef<boolean>(false);
 
   // カウントダウン本体
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // secondsLeft を依存配列に含めない理由:
-  // setInterval コールバック内で prev を使っており、secondsLeft が変わるたびに
-  // interval を作り直す必要がないため。
+
+  // secondsLeft を依存配列に含めない理由: setInterval のコールバック内で prev を使っているため、
+  // secondsLeft が変わるたびに interval を再作成する必要はない。含めると毎秒 interval が再作成される問題が発生する。
   useEffect(() => {
+    // 既存の interval をクリーンアップ
     if (intervalIdRef.current !== null) {
       window.clearInterval(intervalIdRef.current);
       intervalIdRef.current = null;
@@ -79,11 +79,14 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     const id = window.setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
+          // 0 になるタイミング
+          // ここで止めて onFinish を1回だけ呼ぶ
           if (intervalIdRef.current !== null) {
             window.clearInterval(intervalIdRef.current);
             intervalIdRef.current = null;
           }
           setIsRunning(false);
+          // onFinish が既に呼ばれていない場合のみ呼ぶ（React Strict Mode での重複呼び出しを防ぐ）
           if (onFinishRef.current && !onFinishCalledRef.current) {
             onFinishCalledRef.current = true;
             onFinishRef.current();
@@ -125,6 +128,7 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     initialSecondsRef.current = next;
     setSecondsLeft(next);
     setIsRunning(false);
+    // reset 時に onFinish 呼び出しフラグをリセット
     onFinishCalledRef.current = false;
   };
 
