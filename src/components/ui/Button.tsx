@@ -30,7 +30,6 @@ export interface ButtonProps {
   rightIcon?: React.ReactNode;
   /** aria-label など追加属性を渡すための拡張用 */
   className?: string;
-  disabled?: boolean;
 }
 
 export function Button({

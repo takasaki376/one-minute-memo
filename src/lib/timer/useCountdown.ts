@@ -57,9 +57,9 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     // ここではrefのみ更新（パフォーマンスとReactのベストプラクティスのため）
   }, [initialSeconds]);
 
-  // interval ID を保持してクリーンアップを容易にする
+  // interval ID を保持する ref（クリーンアップ用）
   const intervalIdRef = useRef<number | null>(null);
-  // onFinish が複数回呼ばれるのを防ぐ（React Strict Mode 対応）
+  // onFinish が既に呼ばれたかどうかを追跡（React Strict Mode での重複呼び出しを防ぐ）
   const onFinishCalledRef = useRef<boolean>(false);
 
   // カウントダウン本体
