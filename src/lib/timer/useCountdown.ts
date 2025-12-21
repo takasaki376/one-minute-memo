@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 export interface UseCountdownOptions {
   /** 初期秒数（例: 60） */
@@ -42,16 +42,9 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     onFinishRef.current = onFinish;
   }, [onFinish]);
 
-  const [secondsLeft, setSecondsLeft] = useState<number>(
-    Math.max(0, initialSeconds),
-  );
+  const safeInitialSeconds = Math.max(0, initialSeconds);
+  const [secondsLeft, setSecondsLeft] = useState<number>(safeInitialSeconds);
   const [isRunning, setIsRunning] = useState<boolean>(autoStart);
-
-  // secondsLeftの現在の値をrefで保持（start関数で使用）
-  const secondsLeftRef = useRef(secondsLeft);
-  useEffect(() => {
-    secondsLeftRef.current = secondsLeft;
-  }, [secondsLeft]);
 
   // initialSeconds が外から変わった場合の追従（頻繁には変えない想定）
   // 注意: このuseEffectはinitialSecondsRefの更新のみを行い、
@@ -64,18 +57,38 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     // ここではrefのみ更新（パフォーマンスとReactのベストプラクティスのため）
   }, [initialSeconds]);
 
+  // interval ID を保持する ref（クリーンアップ用）
+  const intervalIdRef = useRef<number | null>(null);
+  // onFinish が既に呼ばれたかどうかを追跡（React Strict Mode での重複呼び出しを防ぐ）
+  const onFinishCalledRef = useRef<boolean>(false);
+
   // カウントダウン本体
+
+  // secondsLeft を依存配列に含めない理由: setInterval のコールバック内で prev を使っているため、
+  // secondsLeft が変わるたびに interval を再作成する必要はない。含めると毎秒 interval が再作成される問題が発生する。
   useEffect(() => {
+    // 既存の interval をクリーンアップ
+    if (intervalIdRef.current !== null) {
+      window.clearInterval(intervalIdRef.current);
+      intervalIdRef.current = null;
+    }
+
     if (!isRunning) return;
+    if (typeof window === "undefined") return;
 
     const id = window.setInterval(() => {
-      setSecondsLeft(prev => {
+      setSecondsLeft((prev) => {
         if (prev <= 1) {
           // 0 になるタイミング
           // ここで止めて onFinish を1回だけ呼ぶ
-          window.clearInterval(id);
+          if (intervalIdRef.current !== null) {
+            window.clearInterval(intervalIdRef.current);
+            intervalIdRef.current = null;
+          }
           setIsRunning(false);
-          if (onFinishRef.current) {
+          // onFinish が既に呼ばれていない場合のみ呼ぶ（React Strict Mode での重複呼び出しを防ぐ）
+          if (onFinishRef.current && !onFinishCalledRef.current) {
+            onFinishCalledRef.current = true;
             onFinishRef.current();
           }
           return 0;
@@ -84,32 +97,40 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
       });
     }, 1000);
 
+    intervalIdRef.current = id;
+
     return () => {
-      window.clearInterval(id);
+      if (intervalIdRef.current !== null) {
+        window.clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
     };
   }, [isRunning]);
 
-  const start = useCallback(() => {
-    // 0から再スタートしたい場合は reset → start の組み合わせで呼んでもらう前提
-    if (secondsLeftRef.current <= 0) {
+  const start = () => {
+    if (secondsLeft <= 0) {
+      // 0から再スタートしたい場合は reset → start の組み合わせで呼んでもらう前提
       return;
     }
+    onFinishCalledRef.current = false;
     setIsRunning(true);
-  }, []);
+  };
 
-  const pause = useCallback(() => {
+  const pause = () => {
     setIsRunning(false);
-  }, []);
+  };
 
-  const reset = useCallback((newInitialSeconds?: number) => {
+  const reset = (newInitialSeconds?: number) => {
     const next = Math.max(
       0,
-      newInitialSeconds ?? initialSecondsRef.current ?? 0,
+      newInitialSeconds ?? initialSecondsRef.current ?? 0
     );
     initialSecondsRef.current = next;
     setSecondsLeft(next);
     setIsRunning(false);
-  }, []);
+    // reset 時に onFinish 呼び出しフラグをリセット
+    onFinishCalledRef.current = false;
+  };
 
   return {
     secondsLeft,
