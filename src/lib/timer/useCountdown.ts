@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseCountdownOptions {
   /** 初期秒数（例: 60） */
@@ -45,6 +45,12 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   const safeInitialSeconds = Math.max(0, initialSeconds);
   const [secondsLeft, setSecondsLeft] = useState<number>(safeInitialSeconds);
   const [isRunning, setIsRunning] = useState<boolean>(autoStart);
+
+  // secondsLeft を ref で保持（start 関数で使用）
+  const secondsLeftRef = useRef(secondsLeft);
+  useEffect(() => {
+    secondsLeftRef.current = secondsLeft;
+  }, [secondsLeft]);
 
   // initialSeconds が外から変わった場合の追従（頻繁には変えない想定）
   // 注意: このuseEffectはinitialSecondsRefの更新のみを行い、
@@ -107,30 +113,31 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
     };
   }, [isRunning]);
 
-  const start = () => {
-    if (secondsLeft <= 0) {
+  const start = useCallback(() => {
+    if (secondsLeftRef.current <= 0) {
       // 0から再スタートしたい場合は reset → start の組み合わせで呼んでもらう前提
       return;
     }
     onFinishCalledRef.current = false;
     setIsRunning(true);
-  };
+  }, []);
 
-  const pause = () => {
+  const pause = useCallback(() => {
     setIsRunning(false);
-  };
+  }, []);
 
-  const reset = (newInitialSeconds?: number) => {
+  const reset = useCallback((newInitialSeconds?: number) => {
     const next = Math.max(
       0,
       newInitialSeconds ?? initialSecondsRef.current ?? 0
     );
     initialSecondsRef.current = next;
+    secondsLeftRef.current = next;
     setSecondsLeft(next);
     setIsRunning(false);
     // reset 時に onFinish 呼び出しフラグをリセット
     onFinishCalledRef.current = false;
-  };
+  }, []);
 
   return {
     secondsLeft,
