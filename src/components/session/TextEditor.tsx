@@ -86,7 +86,6 @@ export function TextEditor({
         onChange={handleChange}
         placeholder={placeholder}
         disabled={disabled}
-        autoFocus={autoFocus}
         maxLength={maxLength}
         aria-label={ariaLabel}
         className={textareaClass}
