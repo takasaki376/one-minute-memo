@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -89,7 +89,7 @@ export default function SessionPage() {
   const isLastTheme = themes.length > 0 && currentIndex === themes.length - 1;
 
   // 現在テーマのメモを保存する
-  const saveCurrentMemo = async () => {
+  const saveCurrentMemo = async (): Promise<number | null> => {
     if (!currentTheme || !sessionId) return;
 
     try {
@@ -105,11 +105,16 @@ export default function SessionPage() {
         updatedAt: new Date().toISOString(),
       });
 
-      setMemoCount((prev) => prev + 1);
+      const nextCount = memoCount + 1;
+      setMemoCount(nextCount);
+
+      return nextCount;
     } catch (e) {
       console.error("Failed to save memo", e);
       // エラーが発生してもセッションは続行する
     }
+
+    return null;
   };
 
   // タイマー終了で自動的に次へ進むとき
@@ -124,10 +129,11 @@ export default function SessionPage() {
     if (!currentTheme) return;
 
     // 現在のメモを保存
-    await saveCurrentMemo();
+    const savedCount = await saveCurrentMemo();
 
     if (isLastTheme) {
-      await handleSessionComplete();
+      const finalCount = savedCount ?? memoCount;
+      await handleSessionComplete(finalCount);
       return;
     }
 
@@ -143,12 +149,12 @@ export default function SessionPage() {
   };
 
   // セッション完了時の処理
-  const handleSessionComplete = async () => {
+  const handleSessionComplete = async (finalMemoCount: number) => {
     if (!sessionId) return;
 
     try {
       // 最後のメモも保存済みなので memoCount をそのまま使う
-      await completeSession(sessionId, memoCount);
+      await completeSession(sessionId, finalMemoCount);
     } catch (e) {
       console.error("Failed to complete session", e);
       // エラーが発生しても完了画面へ遷移する
@@ -264,7 +270,7 @@ export default function SessionPage() {
             onClick={() => void handleThemeFinished({ triggeredByUser: true })}
             disabled={secondsLeft === 0}
           >
-            このテーマを終了して次へ
+            このテーマを終えて次へ
           </Button>
         </div>
       </footer>
