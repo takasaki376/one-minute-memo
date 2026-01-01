@@ -88,6 +88,23 @@ vi.mock('@/lib/db/memosRepo', () => {
   return { saveMemo };
 });
 
+vi.mock('@/components/session/HandwritingCanvas', () => {
+  const HandwritingCanvas = ({
+    onChange,
+  }: {
+    onChange?: (dataUrl: string | null) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onChange?.('data:image/png;base64,handwriting')}
+    >
+      手書き入力
+    </button>
+  );
+
+  return { HandwritingCanvas };
+});
+
 import SessionPage from '../page';
 import * as sessionsRepo from '@/lib/db/sessionsRepo';
 import * as memosRepo from '@/lib/db/memosRepo';
@@ -133,6 +150,64 @@ describe('/session page', () => {
     await waitFor(() => {
       expect(screen.getByText('2 / 10')).toBeInTheDocument();
     });
+  });
+
+  it('saves text input memo with no handwriting data', async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByRole('textbox');
+    const nextButton = screen.getByRole('button', { name: /次へ/ });
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'text only memo' } });
+      fireEvent.click(nextButton);
+    });
+
+    await waitFor(() => {
+      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    });
+
+    const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
+    expect(savedArg.textContent).toBe('text only memo');
+    expect(savedArg.handwritingType).toBe('none');
+    expect(savedArg.handwritingDataUrl).toBeUndefined();
+  });
+
+  it('saves handwriting input data when provided', async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+    });
+
+    const handwritingButton = screen.getByRole('button', { name: '手書き入力' });
+    const nextButton = screen.getByRole('button', { name: /次へ/ });
+
+    await act(async () => {
+      fireEvent.click(handwritingButton);
+    });
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(nextButton);
+    });
+
+    await waitFor(() => {
+      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    });
+
+    const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
+    expect(savedArg.handwritingType).toBe('dataUrl');
+    expect(savedArg.handwritingDataUrl).toBe(
+      'data:image/png;base64,handwriting'
+    );
   });
 
   it('completes the session after 10 memos and navigates to complete page', async () => {
