@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
@@ -11,12 +11,6 @@ import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
 import { saveMemo } from "@/lib/db/memosRepo";
 import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
-import type { ThemeRecord } from "@/types/theme";
-
-// TODO: IndexedDB連携時に有効化する
-// import { getActiveThemes } from '@/lib/db/themesRepo';
-// import { createSession, completeSession } from '@/lib/db/sessionsRepo';
-// import { saveMemo } from '@/lib/db/memosRepo';
 
 type SessionStage = "loading" | "running" | "finished" | "error";
 
@@ -43,19 +37,6 @@ const MOCK_THEMES: SessionTheme[] = [
 
 const TOTAL_THEMES_PER_SESSION = 10;
 const SECONDS_PER_THEME = 60;
-
-/** 配列をシャッフルして先頭N件を返す */
-function pickRandomThemes(
-  allThemes: SessionTheme[],
-  count: number
-): SessionTheme[] {
-  const copy = [...allThemes];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, Math.min(count, copy.length));
-}
 
 export default function SessionPage() {
   const router = useRouter();
@@ -122,8 +103,7 @@ export default function SessionPage() {
     };
 
     void init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reset, start]);
 
   // 「次へ」ボタン or タイマー終了時の共通処理
   const isLastTheme = themes.length > 0 && currentIndex === themes.length - 1;
@@ -156,17 +136,6 @@ export default function SessionPage() {
 
     return null;
   };
-
-  // // セッション完了時の処理
-  // const handleSessionComplete = async () => {
-  //   setStage("finished");
-  //   // TODO: completeSession(sessionId, memoCount + 1) を呼ぶ（最後の分も含む）
-
-  //   console.log("SESSION COMPLETE", { sessionId, memoCount: memoCount + 1 });
-
-  //   // 完了画面へ遷移
-  //   router.push("/session/complete");
-  // };
 
   // 「次へ」ボタン or タイマー終了時の共通処理
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -217,58 +186,6 @@ export default function SessionPage() {
   const handleThemeFinishedAuto = async () => {
     await handleThemeFinished({ triggeredByUser: false });
   };
-
-  // // タイマー
-  // const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
-  //   initialSeconds: SECONDS_PER_THEME,
-  //   autoStart: false, // テーマ準備が終わってから start する
-  //   onFinish: handleThemeFinishedAuto,
-  // });
-
-  // // セッション開始時の初期化
-  // useEffect(() => {
-  //   const init = async () => {
-  //     try {
-  //       setStage("loading");
-
-  //       // TODO: 本番では IndexedDB から有効テーマを取得
-  //       // const activeThemes = await getActiveThemes();
-  //       // const selected = pickRandomThemes(activeThemes, TOTAL_THEMES_PER_SESSION);
-  //       const selected = pickRandomThemes(
-  //         MOCK_THEMES,
-  //         TOTAL_THEMES_PER_SESSION
-  //       );
-
-  //       if (selected.length === 0) {
-  //         setStage("error");
-  //         return;
-  //       }
-
-  //       setThemes(selected);
-  //       setCurrentIndex(0);
-
-  //       // TODO: DBにセッションを作成
-  //       // const session = await createSession(selected.map(t => t.id));
-  //       // setSessionId(session.id);
-  //       setSessionId(`debug-session-${Date.now()}`);
-
-  //       // 最初のテーマ用に入力状態をリセット
-  //       reset(SECONDS_PER_THEME);
-  //       setText("");
-  //       setHandwritingDataUrl(null);
-
-  //       // タイマー開始
-  //       start();
-  //       setStage("running");
-  //     } catch (e) {
-  //       console.error("Failed to init session", e);
-  //       setStage("error");
-  //     }
-  //   };
-
-  //   void init();
-  //   // reset と start は useCallback でメモ化されているため、依存配列に追加しても問題ない
-  // }, [reset, start]);
 
   // デバッグ & ガード
   if (stage === "loading") {
@@ -371,7 +288,7 @@ export default function SessionPage() {
           </Button>
           <Button
             variant="secondary"
-            onClick={() => void handleThemeFinished({ triggeredByUser: true })}
+            onClick={() => void handleThemeFinished()}
             disabled={secondsLeft === 0}
           >
             このテーマを終えて次へ
