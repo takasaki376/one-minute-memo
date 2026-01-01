@@ -90,7 +90,7 @@ export default function SessionPage() {
 
   // 現在テーマのメモを保存する
   const saveCurrentMemo = async (): Promise<number | null> => {
-    if (!currentTheme || !sessionId) return;
+    if (!currentTheme || !sessionId) return null;
 
     try {
       await saveMemo({
