@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
@@ -11,9 +11,29 @@ import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
 import { saveMemo } from "@/lib/db/memosRepo";
 import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
-import type { ThemeRecord } from "@/types/theme";
 
 type SessionStage = "loading" | "running" | "finished" | "error";
+
+interface SessionTheme {
+  id: string;
+  title: string;
+  category?: string;
+}
+
+/** MVP用: とりあえず固定テーマからランダムで10件選ぶ */
+const MOCK_THEMES: SessionTheme[] = [
+  { id: "t1", title: "今日やることを箇条書きで書き出す", category: "目標" },
+  { id: "t2", title: "今気になっていることを全部書く", category: "感情" },
+  { id: "t3", title: "今週の振り返りを書く", category: "振り返り" },
+  { id: "t4", title: "最近の仕事でうまくいったこと", category: "仕事" },
+  { id: "t5", title: "最近の仕事でうまくいかなかったこと", category: "仕事" },
+  { id: "t6", title: "今悩んでいることを具体的に書く", category: "感情" },
+  { id: "t7", title: "1年後にどうなっていたいか", category: "目標" },
+  { id: "t8", title: "大事にしたい価値観を書き出す", category: "自己理解" },
+  { id: "t9", title: "最近楽しかったこと", category: "生活・健康" },
+  { id: "t10", title: "最近モヤモヤした出来事", category: "感情" },
+  // …本番は200テーマ＋カテゴリマスタから取得
+];
 
 const TOTAL_THEMES_PER_SESSION = 10;
 const SECONDS_PER_THEME = 60;
@@ -23,7 +43,7 @@ export default function SessionPage() {
 
   // --- セッション全体の状態 ---
   const [stage, setStage] = useState<SessionStage>("loading");
-  const [themes, setThemes] = useState<ThemeRecord[]>([]);
+  const [themes, setThemes] = useState<SessionTheme[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0); // 0〜N-1
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [memoCount, setMemoCount] = useState(0);
@@ -83,9 +103,9 @@ export default function SessionPage() {
     };
 
     void init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reset, start]);
 
+  // 「次へ」ボタン or タイマー終了時の共通処理
   const isLastTheme = themes.length > 0 && currentIndex === themes.length - 1;
 
   // 現在テーマのメモを保存する
@@ -117,12 +137,8 @@ export default function SessionPage() {
     return null;
   };
 
-  // タイマー終了で自動的に次へ進むとき
-  const handleThemeFinishedAuto = async () => {
-    await handleThemeFinished({ triggeredByUser: false });
-  };
-
   // 「次へ」ボタン or タイマー終了時の共通処理
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleThemeFinished = async (options?: {
     triggeredByUser?: boolean;
   }) => {
@@ -164,6 +180,11 @@ export default function SessionPage() {
 
     // 完了画面へ遷移
     router.push("/session/complete");
+  };
+
+  // タイマー終了で自動的に次へ進むとき
+  const handleThemeFinishedAuto = async () => {
+    await handleThemeFinished({ triggeredByUser: false });
   };
 
   // デバッグ & ガード
@@ -267,7 +288,7 @@ export default function SessionPage() {
           </Button>
           <Button
             variant="secondary"
-            onClick={() => void handleThemeFinished({ triggeredByUser: true })}
+            onClick={() => void handleThemeFinished()}
             disabled={secondsLeft === 0}
           >
             このテーマを終えて次へ

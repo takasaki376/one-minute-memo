@@ -5,30 +5,16 @@ import { useEffect, useRef } from "react";
 import cc from "classcat";
 
 export interface TextEditorProps {
-  /** 現在のテキスト値（親コンポーネントで管理） */
   value: string;
-  /** テキスト変更時に呼ばれるコールバック */
   onChange: (value: string) => void;
-
-  /** プレースホルダ文言 */
   placeholder?: string;
-  /** 入力不可にするかどうか（タイマー終了後など） */
   disabled?: boolean;
-  /** 初回レンダリング時に自動フォーカスするかどうか */
   autoFocus?: boolean;
-  /** 最大文字数（必要なら） */
   maxLength?: number;
-
-  /** 外側のコンテナに追加するクラス */
   className?: string;
-  /** アクセシビリティ用のラベル（ラベル要素が別にある場合は不要） */
   ariaLabel?: string;
 }
 
-/**
- * セッション用テキスト入力エリア。
- * 完全に「親コンポーネント管理の Controlled Component」として設計。
- */
 export function TextEditor({
   value,
   onChange,
@@ -41,7 +27,6 @@ export function TextEditor({
 }: TextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // autoFocusの代替実装（アクセシビリティのため）
   useEffect(() => {
     if (autoFocus && textareaRef.current && !disabled) {
       textareaRef.current.focus();
@@ -52,7 +37,7 @@ export function TextEditor({
 
   const textareaClass = cc([
     "w-full",
-    "min-h-40", // お好みで高さは調整
+    "min-h-40",
     "rounded-md",
     "border",
     "border-slate-300",
@@ -68,7 +53,7 @@ export function TextEditor({
     "focus-visible:ring-2",
     "focus-visible:ring-blue-500",
     "focus-visible:ring-offset-1",
-    "resize-y", // 縦方向のリサイズは許可
+    "resize-y",
     disabled && "bg-slate-100 text-slate-400 cursor-not-allowed",
   ]);
 
