@@ -1,7 +1,7 @@
-// src/app/session/__tests__/SessionPage.test.tsx
+Ôªø// src/app/session/__tests__/SessionPage.test.tsx
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
 const mockThemes = Array.from({ length: 10 }, (_, index) => ({
   id: `theme-${index + 1}`,
@@ -94,27 +94,36 @@ import * as memosRepo from '@/lib/db/memosRepo';
 import { __routerPushMock } from 'next/navigation';
 import { __callLastOnFinish } from '@/lib/timer/useCountdown';
 
-describe.skip('/session page', () => {
+describe('/session page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('creates a session and saves a memo when moving to the next theme', async () => {
-    render(<SessionPage />);
+    await act(async () => {
+      render(<SessionPage />);
+    });
 
     await waitFor(() => {
       expect(screen.getByText('1 / 10')).toBeInTheDocument();
     });
 
+    await waitFor(() => {
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
+    });
+
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
 
     const textarea = screen.getByRole('textbox');
-    fireEvent.change(textarea, { target: { value: 'first memo' } });
+    const nextButton = screen.getByRole('button', { name: /Ê¨°„Å∏/ });
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'first memo' } });
+      fireEvent.click(nextButton);
+    });
 
-    const nextButton = screen.getByRole('button', { name: /éüÇ÷/ });
-    fireEvent.click(nextButton);
-
-    expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    });
     const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
 
     expect(savedArg.sessionId).toBe('session-1');
@@ -127,23 +136,41 @@ describe.skip('/session page', () => {
   });
 
   it('completes the session after 10 memos and navigates to complete page', async () => {
-    render(<SessionPage />);
+    await act(async () => {
+      render(<SessionPage />);
+    });
 
     await waitFor(() => {
       expect(screen.getByText('1 / 10')).toBeInTheDocument();
     });
 
+    await waitFor(() => {
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
+    });
+
     const textarea = screen.getByRole('textbox');
-    const nextButton = screen.getByRole('button', { name: /éüÇ÷/ });
+    const nextButton = screen.getByRole('button', { name: /Ê¨°„Å∏/ });
 
     for (let i = 1; i <= 10; i += 1) {
-      fireEvent.change(textarea, { target: { value: `memo ${i}` } });
-      fireEvent.click(nextButton);
+      await act(async () => {
+        fireEvent.change(textarea, { target: { value: `memo ${i}` } });
+        fireEvent.click(nextButton);
+      });
+
+      if (i < 10) {
+        await waitFor(() => {
+          expect(screen.getByText(`${i + 1} / 10`)).toBeInTheDocument();
+        });
+      }
     }
 
-    expect(memosRepo.saveMemo).toHaveBeenCalledTimes(10);
+    await waitFor(() => {
+      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(10);
+    });
 
-    expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
+    });
     const [sessionIdArg, memoCountArg] = (sessionsRepo.completeSession as unknown as Mock).mock.calls[0];
     expect(sessionIdArg).toBe('session-1');
     expect(memoCountArg).toBe(10);
@@ -152,16 +179,22 @@ describe.skip('/session page', () => {
   });
 
   it('saves memo when timer finishes automatically', async () => {
-    render(<SessionPage />);
+    await act(async () => {
+      render(<SessionPage />);
+    });
 
     await waitFor(() => {
       expect(screen.getByText('1 / 10')).toBeInTheDocument();
     });
 
     const textarea = screen.getByRole('textbox');
-    fireEvent.change(textarea, { target: { value: 'auto-finished memo' } });
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'auto-finished memo' } });
+    });
 
-    __callLastOnFinish();
+    await act(async () => {
+      __callLastOnFinish();
+    });
 
     await waitFor(() => {
       expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
@@ -175,3 +208,4 @@ describe.skip('/session page', () => {
     });
   });
 });
+
