@@ -3,17 +3,48 @@ import type { MemoRecord } from '@/types/memo';
 
 const MEMO_STORE = 'memos';
 
-export async function saveMemo(memo: MemoRecord): Promise<void> {
+// PJ1-99: タスク仕様に合わせてID生成関数を追加
+// 呼び出し側でidを指定しなくても自動生成されるようにする
+function generateId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `memo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * メモを保存（同じ id があれば上書き）
+ * 呼び出し側で id を決めてもいいし、任せてもOKなようにしている。
+ *
+ * PJ1-99: タスク仕様に合わせて以下の変更を実施
+ * - id, createdAt, updatedAtをオプショナル/自動生成に変更
+ * - 呼び出し側でidを指定しなくても自動生成されるように改善
+ * - 戻り値をMemoRecordに変更（保存したレコードを返す）
+ */
+export async function saveMemo(
+  memo: Omit<MemoRecord, 'id' | 'createdAt' | 'updatedAt'> & {
+    id?: string;
+  },
+): Promise<MemoRecord> {
   const db = await getDB();
   const now = new Date().toISOString();
 
-  const toSave: MemoRecord = {
+  // PJ1-99: idが指定されていない場合は自動生成、createdAt/updatedAtも自動設定
+  // 注意: ...memoを先に展開してから、createdAt/updatedAtを上書きすることで確実に設定
+  const record: MemoRecord = {
     ...memo,
-    createdAt: memo.createdAt ?? now,
+    id: memo.id ?? generateId(),
+    createdAt: now,
     updatedAt: now,
   };
 
-  await db.put(MEMO_STORE, toSave);
+  // PJ1-99: デバッグ用: createdAtが正しく設定されているか確認
+  if (!record.createdAt) {
+    console.error('[PJ1-99] saveMemo: createdAtが設定されていません', record);
+  }
+
+  await db.put(MEMO_STORE, record);
+  return record;
 }
 
 export async function getMemosBySession(
