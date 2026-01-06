@@ -38,9 +38,10 @@ const MOCK_THEMES: SessionTheme[] = [
 const TOTAL_THEMES_PER_SESSION = 10;
 // PJ1-99: 開発環境では10秒、本番環境では60秒
 // 環境変数 NEXT_PUBLIC_TEST_TIMER_SECONDS が設定されていればそれを使用（例: NEXT_PUBLIC_TEST_TIMER_SECONDS=5）
+// ??演算子を使用することで、空文字列の場合も0として扱われる（意図的に0を設定したい場合に対応）
 const SECONDS_PER_THEME =
-  process.env.NODE_ENV === 'development'
-    ? Number(process.env.NEXT_PUBLIC_TEST_TIMER_SECONDS) || 10
+  process.env.NODE_ENV === "development"
+    ? Number(process.env.NEXT_PUBLIC_TEST_TIMER_SECONDS ?? 10)
     : 60;
 
 export default function SessionPage() {
@@ -92,13 +93,15 @@ export default function SessionPage() {
 
         // DBにセッションを作成
         const session = await createSession(selected.map((t) => t.id));
-        // デバッグ用: 作成されたセッションをコンソールに出力
-        console.log("[PJ1-99] セッションを作成しました:", {
-          id: session.id,
-          themeIds: session.themeIds,
-          startedAt: session.startedAt,
-          memoCount: session.memoCount,
-        });
+        // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
+        if (process.env.NODE_ENV === "development") {
+          console.log("[PJ1-99] セッションを作成しました:", {
+            id: session.id,
+            themeIds: session.themeIds,
+            startedAt: session.startedAt,
+            memoCount: session.memoCount,
+          });
+        }
         setSessionId(session.id);
 
         // 最初のテーマ用に入力状態をリセット
@@ -121,20 +124,19 @@ export default function SessionPage() {
 
   // PJ1-99: 現在テーマのメモをIndexedDBに保存する
   // タスク仕様に合わせて、id/createdAt/updatedAtの指定を削除（saveMemo側で自動生成）
-  // 重複実行を防ぐため、isSavingMemoフラグで制御
-  // 戻り値: 保存に成功した場合はtrue、スキップまたはエラーの場合はfalse
-  const saveCurrentMemo = async (index: number): Promise<boolean> => {
-    if (!currentTheme || !sessionId || isSavingMemo) {
-      console.log("[PJ1-99] メモ保存をスキップ:", {
-        hasTheme: !!currentTheme,
-        hasSessionId: !!sessionId,
-        isSaving: isSavingMemo,
-        index,
-      });
-      return false;
+  // 注意: isSavingMemoフラグはhandleThemeFinishedで設定されるため、ここではチェックのみ
+  const saveCurrentMemo = async (index: number): Promise<void> => {
+    if (!currentTheme || !sessionId) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] メモ保存をスキップ:", {
+          hasTheme: !!currentTheme,
+          hasSessionId: !!sessionId,
+          index,
+        });
+      }
+      return;
     }
 
-    setIsSavingMemo(true);
     try {
       const savedMemo = await saveMemo({
         sessionId,
@@ -145,29 +147,27 @@ export default function SessionPage() {
         handwritingDataUrl: handwritingDataUrl ?? undefined,
       });
 
-      // デバッグ用: 保存されたメモをコンソールに出力
-      console.log("[PJ1-99] メモを保存しました:", {
-        id: savedMemo.id,
-        sessionId: savedMemo.sessionId,
-        themeId: savedMemo.themeId,
-        order: savedMemo.order,
-        textLength: savedMemo.textContent.length,
-        hasHandwriting: savedMemo.handwritingType !== "none",
-        currentIndex: index,
-        createdAt: savedMemo.createdAt,
-        updatedAt: savedMemo.updatedAt,
-        totalThemes: themes.length,
-        isLastTheme: index === themes.length - 1,
-      });
+      // デバッグ用: 開発環境でのみ保存されたメモをコンソールに出力
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] メモを保存しました:", {
+          id: savedMemo.id,
+          sessionId: savedMemo.sessionId,
+          themeId: savedMemo.themeId,
+          order: savedMemo.order,
+          textLength: savedMemo.textContent.length,
+          hasHandwriting: savedMemo.handwritingType !== "none",
+          currentIndex: index,
+          createdAt: savedMemo.createdAt,
+          updatedAt: savedMemo.updatedAt,
+          totalThemes: themes.length,
+          isLastTheme: index === themes.length - 1,
+        });
+      }
 
       setMemoCount((prev) => prev + 1);
-      return true;
     } catch (e) {
       console.error("Failed to save memo", e);
       // エラーが発生してもセッションは続行する
-      return false;
-    } finally {
-      setIsSavingMemo(false);
     }
   };
 
@@ -183,50 +183,62 @@ export default function SessionPage() {
     triggeredByUser?: boolean;
   }) => {
     if (!currentTheme || isSavingMemo) {
-      console.log("[PJ1-99] handleThemeFinishedをスキップ:", {
-        hasTheme: !!currentTheme,
-        isSaving: isSavingMemo,
-        currentIndex,
-        sessionId,
-      });
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] handleThemeFinishedをスキップ:", {
+          hasTheme: !!currentTheme,
+          isSaving: isSavingMemo,
+          currentIndex,
+          sessionId,
+        });
+      }
       return;
     }
 
-    // 現在のindexを保存（非同期処理中にcurrentIndexが変わる可能性があるため）
-    const currentIndexToSave = currentIndex;
-    // PJ1-99: 最後のテーマかどうかを現在のindexで判定
-    const isLastThemeToSave =
-      themes.length > 0 && currentIndexToSave === themes.length - 1;
+    // PJ1-99: 重複実行を防ぐため、処理開始時にフラグを設定
+    setIsSavingMemo(true);
 
-    // デバッグ用: テーマ終了処理の開始をログ出力
-    console.log("[PJ1-99] handleThemeFinished開始:", {
-      currentIndex: currentIndexToSave,
-      themeId: currentTheme.id,
-      sessionId,
-      isLastTheme: isLastThemeToSave,
-      totalThemes: themes.length,
-      triggeredByUser: options?.triggeredByUser,
-    });
+    try {
+      // 現在のindexを保存（非同期処理中にcurrentIndexが変わる可能性があるため）
+      const currentIndexToSave = currentIndex;
+      // PJ1-99: 最後のテーマかどうかを現在のindexで判定
+      const isLastThemeToSave =
+        themes.length > 0 && currentIndexToSave === themes.length - 1;
 
-    // 現在のメモをIndexedDBに保存（現在のindexを引数として渡す）
-    const saved = await saveCurrentMemo(currentIndexToSave);
+      // デバッグ用: 開発環境でのみテーマ終了処理の開始をログ出力
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] handleThemeFinished開始:", {
+          currentIndex: currentIndexToSave,
+          themeId: currentTheme.id,
+          sessionId,
+          isLastTheme: isLastThemeToSave,
+          totalThemes: themes.length,
+          triggeredByUser: options?.triggeredByUser,
+        });
+      }
 
-    if (isLastThemeToSave) {
-      // PJ1-99: 最後のテーマなので、セッションを完了
-      // themes.lengthを直接使用して確実に10件として扱う
-      await handleSessionComplete(themes.length);
-      return;
+      // 現在のメモをIndexedDBに保存（現在のindexを引数として渡す）
+      await saveCurrentMemo(currentIndexToSave);
+
+      if (isLastThemeToSave) {
+        // PJ1-99: 最後のテーマなので、セッションを完了
+        // themes.lengthを直接使用して確実に10件として扱う
+        await handleSessionComplete(themes.length);
+        return;
+      }
+
+      // 次のテーマへ
+      const nextIndex = currentIndexToSave + 1;
+      setCurrentIndex(nextIndex);
+      setText("");
+      setHandwritingDataUrl(null);
+
+      // タイマーをリセットして開始
+      reset(SECONDS_PER_THEME);
+      start();
+    } finally {
+      // PJ1-99: 処理完了時にフラグをリセット（エラーが発生しても確実にリセット）
+      setIsSavingMemo(false);
     }
-
-    // 次のテーマへ
-    const nextIndex = currentIndexToSave + 1;
-    setCurrentIndex(nextIndex);
-    setText("");
-    setHandwritingDataUrl(null);
-
-    // タイマーをリセットして開始
-    reset(SECONDS_PER_THEME);
-    start();
   };
 
   // PJ1-99: セッション完了時の処理
@@ -239,13 +251,15 @@ export default function SessionPage() {
       // これにより、memoCountの状態更新タイミングに依存しない
       const finalMemoCount = expectedMemoCount ?? memoCount + 1;
       await completeSession(sessionId, finalMemoCount);
-      // デバッグ用: 完了したセッションをコンソールに出力
-      console.log("[PJ1-99] セッションを完了しました:", {
-        sessionId,
-        finalMemoCount,
-        expectedMemoCount,
-        currentMemoCount: memoCount,
-      });
+      // デバッグ用: 開発環境でのみ完了したセッションをコンソールに出力
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] セッションを完了しました:", {
+          sessionId,
+          finalMemoCount,
+          expectedMemoCount,
+          currentMemoCount: memoCount,
+        });
+      }
     } catch (e) {
       console.error("Failed to complete session", e);
       // エラーが発生しても完了画面へ遷移する

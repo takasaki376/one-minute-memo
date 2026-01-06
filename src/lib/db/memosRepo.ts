@@ -29,19 +29,23 @@ export async function saveMemo(
   const db = await getDB();
   const now = new Date().toISOString();
 
-  // PJ1-99: idが指定されていない場合は自動生成、createdAt/updatedAtも自動設定
-  // 注意: ...memoを先に展開してから、createdAt/updatedAtを上書きすることで確実に設定
+  // PJ1-99: 既存レコードがある場合はcreatedAtを保持、新規の場合は現在時刻を設定
+  let existingRecord: MemoRecord | undefined;
+  if (memo.id) {
+    const tx = db.transaction(MEMO_STORE, "readonly");
+    existingRecord = (await tx.store.get(memo.id)) as MemoRecord | undefined;
+    await tx.done;
+  }
+
+  // PJ1-99: idが指定されていない場合は自動生成
+  // 既存レコードがある場合はcreatedAtを保持、新規の場合は現在時刻を設定
+  // メモ: 型定義でmemoからcreatedAt/updatedAtを除外しているため、ここでid/createdAt/updatedAtを明示的に設定している
   const record: MemoRecord = {
     ...memo,
     id: memo.id ?? generateId(),
-    createdAt: now,
+    createdAt: existingRecord?.createdAt ?? now,
     updatedAt: now,
   };
-
-  // PJ1-99: デバッグ用: createdAtが正しく設定されているか確認
-  if (!record.createdAt) {
-    console.error('[PJ1-99] saveMemo: createdAtが設定されていません', record);
-  }
 
   await db.put(MEMO_STORE, record);
   return record;
