@@ -6,9 +6,11 @@ const MEMO_STORE = 'memos';
 // PJ1-99: タスク仕様に合わせてID生成関数を追加
 // 呼び出し側でidを指定しなくても自動生成されるようにする
 function generateId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
+  // globalThis.cryptoを使用することで、TypeScript環境での型エラーを回避
+  if (typeof globalThis !== 'undefined' && 'crypto' in globalThis && 'randomUUID' in globalThis.crypto) {
+    return globalThis.crypto.randomUUID();
   }
+  // フォールバック: 古い環境での互換性
   return `memo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
