@@ -23,13 +23,16 @@ interface SessionTheme {
 const TOTAL_THEMES_PER_SESSION = 10;
 // PJ1-99: 開発環境では10秒、本番環境では60秒
 // 環境変数 NEXT_PUBLIC_TEST_TIMER_SECONDS が設定されていればそれを使用（例: NEXT_PUBLIC_TEST_TIMER_SECONDS=5）
-// ??演算子を使用することで、空文字列の場合も0として扱われる（意図的に0を設定したい場合に対応）
 // 注意: process.env.NODE_ENV と NEXT_PUBLIC_* はビルド時に置換されるため、ランタイムで切り替えられません
 // 開発モードか本番モードかはビルド時に固定されます
-const SECONDS_PER_THEME =
-  process.env.NODE_ENV === "development"
-    ? Number(process.env.NEXT_PUBLIC_TEST_TIMER_SECONDS ?? 10)
-    : 60;
+// NaN ガード: 非数値が設定された場合はデフォルト値（開発: 10秒、本番: 60秒）を使用
+const SECONDS_PER_THEME = (() => {
+  if (process.env.NODE_ENV === "development") {
+    const parsed = Number(process.env.NEXT_PUBLIC_TEST_TIMER_SECONDS);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+  }
+  return 60;
+})();
 
 export default function SessionPage() {
   const router = useRouter();
