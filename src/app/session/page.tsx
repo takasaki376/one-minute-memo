@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
@@ -9,7 +9,7 @@ import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
 import { ThemeHeader } from "@/components/session/ThemeHeader";
 import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
-import { saveMemo } from "@/lib/db/memosRepo";
+import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
 import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
 
 type SessionStage = "loading" | "running" | "finished" | "error";
@@ -20,23 +20,19 @@ interface SessionTheme {
   category?: string;
 }
 
-/** MVP用: とりあえず固定テーマからランダムで10件選ぶ */
-const MOCK_THEMES: SessionTheme[] = [
-  { id: "t1", title: "今日やることを箇条書きで書き出す", category: "目標" },
-  { id: "t2", title: "今気になっていることを全部書く", category: "感情" },
-  { id: "t3", title: "今週の振り返りを書く", category: "振り返り" },
-  { id: "t4", title: "最近の仕事でうまくいったこと", category: "仕事" },
-  { id: "t5", title: "最近の仕事でうまくいかなかったこと", category: "仕事" },
-  { id: "t6", title: "今悩んでいることを具体的に書く", category: "感情" },
-  { id: "t7", title: "1年後にどうなっていたいか", category: "目標" },
-  { id: "t8", title: "大事にしたい価値観を書き出す", category: "自己理解" },
-  { id: "t9", title: "最近楽しかったこと", category: "生活・健康" },
-  { id: "t10", title: "最近モヤモヤした出来事", category: "感情" },
-  // …本番は200テーマ＋カテゴリマスタから取得
-];
-
 const TOTAL_THEMES_PER_SESSION = 10;
-const SECONDS_PER_THEME = 60;
+// PJ1-99: 開発環境では10秒、本番環境では60秒
+// 環境変数 NEXT_PUBLIC_TEST_TIMER_SECONDS が設定されていればそれを使用（例: NEXT_PUBLIC_TEST_TIMER_SECONDS=5）
+// 注意: process.env.NODE_ENV と NEXT_PUBLIC_* はビルド時に置換されるため、ランタイムで切り替えられません
+// 開発モードか本番モードかはビルド時に固定されます
+// NaN ガード: 非数値が設定された場合はデフォルト値（開発: 10秒、本番: 60秒）を使用
+const SECONDS_PER_THEME = (() => {
+  if (process.env.NODE_ENV === "development") {
+    const parsed = Number(process.env.NEXT_PUBLIC_TEST_TIMER_SECONDS);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+  }
+  return 60;
+})();
 
 export default function SessionPage() {
   const router = useRouter();
@@ -47,6 +43,11 @@ export default function SessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0); // 0〜N-1
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [memoCount, setMemoCount] = useState(0);
+  // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isSavingMemo, setIsSavingMemo] = useState(false);
+  // PJ1-99: レースコンディション対策: useRefで同期的なロックを実装
+  const savingRef = useRef(false);
 
   // --- 現在テーマの入力状態 ---
   const [text, setText] = useState("");
@@ -85,6 +86,15 @@ export default function SessionPage() {
 
         // DBにセッションを作成
         const session = await createSession(selected.map((t) => t.id));
+        // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
+        if (process.env.NODE_ENV === "development") {
+          console.log("[PJ1-99] セッションを作成しました:", {
+            id: session.id,
+            themeIds: session.themeIds,
+            startedAt: session.startedAt,
+            memoCount: session.memoCount,
+          });
+        }
         setSessionId(session.id);
 
         // 最初のテーマ用に入力状態をリセット
@@ -105,72 +115,160 @@ export default function SessionPage() {
     void init();
   }, [reset, start]);
 
-  // 「次へ」ボタン or タイマー終了時の共通処理
-  const isLastTheme = themes.length > 0 && currentIndex === themes.length - 1;
-
-  // 現在テーマのメモを保存する
-  const saveCurrentMemo = async (): Promise<number | null> => {
-    if (!currentTheme || !sessionId) return null;
+  // PJ1-99: 現在テーマのメモをIndexedDBに保存する
+  // タスク仕様に合わせて、id/createdAt/updatedAtの指定を削除（saveMemo側で自動生成）
+  // themeIdは引数として受け取ることで、非同期処理中にcurrentThemeが変わる可能性に対応
+  const saveCurrentMemo = async (
+    index: number,
+    themeId: string
+  ): Promise<void> => {
+    if (!sessionId) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] メモ保存をスキップ:", {
+          hasSessionId: !!sessionId,
+          index,
+          themeId,
+        });
+      }
+      return;
+    }
 
     try {
-      await saveMemo({
-        id: `memo-${sessionId}-${currentIndex}-${Date.now()}`,
+      const savedMemo = await saveMemo({
         sessionId,
-        themeId: currentTheme.id,
-        order: currentIndex + 1,
+        themeId,
+        order: index + 1, // 引数として受け取ったindexを使用
         textContent: text,
         handwritingType: handwritingDataUrl ? "dataUrl" : "none",
         handwritingDataUrl: handwritingDataUrl ?? undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       });
 
-      const nextCount = memoCount + 1;
-      setMemoCount(nextCount);
+      // デバッグ用: 開発環境でのみ保存されたメモをコンソールに出力
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] メモを保存しました:", {
+          id: savedMemo.id,
+          sessionId: savedMemo.sessionId,
+          themeId: savedMemo.themeId,
+          order: savedMemo.order,
+          textLength: savedMemo.textContent.length,
+          hasHandwriting: savedMemo.handwritingType !== "none",
+          currentIndex: index,
+          createdAt: savedMemo.createdAt,
+          updatedAt: savedMemo.updatedAt,
+          totalThemes: themes.length,
+          isLastTheme: index === themes.length - 1,
+        });
+      }
 
-      return nextCount;
+      setMemoCount((prev) => prev + 1);
     } catch (e) {
       console.error("Failed to save memo", e);
       // エラーが発生してもセッションは続行する
     }
-
-    return null;
   };
 
-  // 「次へ」ボタン or タイマー終了時の共通処理
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // PJ1-99: タイマー終了で自動的に次へ進むとき
+  const handleThemeFinishedAuto = async () => {
+    await handleThemeFinished({ triggeredByUser: false });
+  };
+
+  // PJ1-99: 「次へ」ボタン or タイマー終了時の共通処理
+  // タスク仕様に合わせて、メモ保存→次テーマ/完了の流れを実装
+  // 重複実行を防ぐため、useRefを使った同期的なロックを実装
   const handleThemeFinished = async (options?: {
     triggeredByUser?: boolean;
   }) => {
-    if (!currentTheme) return;
-
-    // 現在のメモを保存
-    const savedCount = await saveCurrentMemo();
-
-    if (isLastTheme) {
-      const finalCount = savedCount ?? memoCount;
-      await handleSessionComplete(finalCount);
+    // PJ1-99: レースコンディション対策: useRefで同期的にロックをチェック
+    if (savingRef.current) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] handleThemeFinishedをスキップ（既に保存中）:", {
+          currentIndex,
+          sessionId,
+        });
+      }
       return;
     }
 
-    // 次のテーマへ
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex);
-    setText("");
-    setHandwritingDataUrl(null);
+    if (!currentTheme) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] handleThemeFinishedをスキップ（テーマなし）:", {
+          currentIndex,
+          sessionId,
+        });
+      }
+      return;
+    }
 
-    // タイマーをリセットして開始
-    reset(SECONDS_PER_THEME);
-    start();
+    // PJ1-99: 同期的にロックを取得（レースコンディション対策）
+    savingRef.current = true;
+    setIsSavingMemo(true);
+
+    try {
+      // 現在のindexとthemeIdをローカル変数に保持（非同期処理中に変わる可能性があるため）
+      const currentIndexToSave = currentIndex;
+      const themeIdToSave = currentTheme.id;
+      // PJ1-99: 最後のテーマかどうかを現在のindexで判定
+      const isLastThemeToSave =
+        themes.length > 0 && currentIndexToSave === themes.length - 1;
+
+      // デバッグ用: 開発環境でのみテーマ終了処理の開始をログ出力
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] handleThemeFinished開始:", {
+          currentIndex: currentIndexToSave,
+          themeId: themeIdToSave,
+          sessionId,
+          isLastTheme: isLastThemeToSave,
+          totalThemes: themes.length,
+          triggeredByUser: options?.triggeredByUser,
+        });
+      }
+
+      // 現在のメモをIndexedDBに保存（indexとthemeIdを引数として渡す）
+      await saveCurrentMemo(currentIndexToSave, themeIdToSave);
+
+      if (isLastThemeToSave) {
+        // PJ1-99: 最後のテーマなので、セッションを完了
+        // DBから実際のメモ数を取得して使用（保存に失敗した場合にも対応）
+        await handleSessionComplete();
+        return;
+      }
+
+      // 次のテーマへ
+      const nextIndex = currentIndexToSave + 1;
+      setCurrentIndex(nextIndex);
+      setText("");
+      setHandwritingDataUrl(null);
+
+      // タイマーをリセットして開始
+      reset(SECONDS_PER_THEME);
+      start();
+    } finally {
+      // PJ1-99: 処理完了時にロックをリセット（エラーが発生しても確実にリセット）
+      savingRef.current = false;
+      setIsSavingMemo(false);
+    }
   };
 
-  // セッション完了時の処理
-  const handleSessionComplete = async (finalMemoCount: number) => {
+  // PJ1-99: セッション完了時の処理
+  // IndexedDBのsessionsストアを完了状態に更新（endedAt, memoCountを更新）
+  // DBから実際のメモ数を取得して使用することで、保存に失敗した場合にも対応
+  const handleSessionComplete = async () => {
     if (!sessionId) return;
 
     try {
-      // 最後のメモも保存済みなので memoCount をそのまま使う
-      await completeSession(sessionId, finalMemoCount);
+      // PJ1-99: DBから実際のメモ数を取得（保存に失敗した場合にも対応）
+      const actualMemos = await getMemosBySession(sessionId);
+      const actualMemoCount = actualMemos.length;
+
+      await completeSession(sessionId, actualMemoCount);
+      // デバッグ用: 開発環境でのみ完了したセッションをコンソールに出力
+      if (process.env.NODE_ENV === "development") {
+        console.log("[PJ1-99] セッションを完了しました:", {
+          sessionId,
+          actualMemoCount,
+          stateMemoCount: memoCount,
+        });
+      }
     } catch (e) {
       console.error("Failed to complete session", e);
       // エラーが発生しても完了画面へ遷移する
@@ -180,11 +278,6 @@ export default function SessionPage() {
 
     // 完了画面へ遷移
     router.push("/session/complete");
-  };
-
-  // タイマー終了で自動的に次へ進むとき
-  const handleThemeFinishedAuto = async () => {
-    await handleThemeFinished({ triggeredByUser: false });
   };
 
   // デバッグ & ガード
