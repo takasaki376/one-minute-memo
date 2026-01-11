@@ -13,61 +13,56 @@ const mockThemes = Array.from({ length: 10 }, (_, index) => ({
   updatedAt: '2025-01-01T00:00:00.000Z',
 }));
 
-vi.mock('@/lib/utils/selectRandomThemes', () => {
-  const pickRandomActiveThemes = vi.fn(async (count: number = 10) =>
-    mockThemes.slice(0, count),
+vi.mock("@/lib/utils/selectRandomThemes", () => {
+  const pickRandomActiveThemes = vi.fn(async (count = 10) =>
+    mockThemes.slice(0, count)
   );
   return {
     pickRandomActiveThemes,
   };
 });
 
-vi.mock('next/navigation', () => {
-  const push = vi.fn();
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => {
   return {
-    useRouter: () => ({ push }),
-    __routerPushMock: push,
+    useRouter: () => ({ push: mockPush }),
   };
 });
 
-vi.mock('@/lib/timer/useCountdown', () => {
-  const startMock = vi.fn();
-  const resetMock = vi.fn();
+let lastOnFinish: (() => void) | undefined;
+const startMock = vi.fn();
+const resetMock = vi.fn();
 
-  let lastOnFinish: (() => void) | undefined;
-
-  function useCountdown({
-    initialSeconds,
-    onFinish,
-  }: {
-    initialSeconds: number;
-    autoStart?: boolean;
-    onFinish?: () => void;
-  }) {
-    lastOnFinish = onFinish;
-    return {
-      secondsLeft: initialSeconds,
-      isRunning: true,
-      start: startMock,
-      reset: resetMock,
-    };
-  }
-
-  function __callLastOnFinish() {
-    if (lastOnFinish) lastOnFinish();
-  }
-
+vi.mock("@/lib/timer/useCountdown", () => {
   return {
-    useCountdown,
-    __callLastOnFinish,
+    useCountdown: ({
+      initialSeconds,
+      onFinish,
+    }: {
+      initialSeconds: number;
+      autoStart?: boolean;
+      onFinish?: () => void;
+    }) => {
+      lastOnFinish = onFinish;
+      return {
+        secondsLeft: initialSeconds,
+        isRunning: true,
+        start: startMock,
+        reset: resetMock,
+      };
+    },
   };
 });
 
-vi.mock('@/lib/db/sessionsRepo', () => {
+function callLastOnFinish() {
+  if (lastOnFinish) lastOnFinish();
+}
+
+vi.mock("@/lib/db/sessionsRepo", () => {
   const createSession = vi.fn(async (themeIds: string[]) => ({
-    id: 'session-1',
+    id: "session-1",
     themeIds,
-    startedAt: '2025-01-01T00:00:00.000Z',
+    startedAt: "2025-01-01T00:00:00.000Z",
     endedAt: null,
     memoCount: 0,
   }));
@@ -77,18 +72,18 @@ vi.mock('@/lib/db/sessionsRepo', () => {
   return { createSession, completeSession };
 });
 
-vi.mock('@/lib/db/memosRepo', () => {
-  const saveMemo = vi.fn(async memo => ({
+vi.mock("@/lib/db/memosRepo", () => {
+  const saveMemo = vi.fn(async (memo) => ({
     ...memo,
-    id: memo.id ?? 'memo-mocked-id',
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
+    id: memo.id ?? "memo-mocked-id",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
   }));
 
   return { saveMemo };
 });
 
-vi.mock('@/components/session/HandwritingCanvas', () => {
+vi.mock("@/components/session/HandwritingCanvas", () => {
   const HandwritingCanvas = ({
     onChange,
   }: {
@@ -96,7 +91,7 @@ vi.mock('@/components/session/HandwritingCanvas', () => {
   }) => (
     <button
       type="button"
-      onClick={() => onChange?.('data:image/png;base64,handwriting')}
+      onClick={() => onChange?.("data:image/png;base64,handwriting")}
     >
       手書き入力
     </button>
@@ -105,24 +100,22 @@ vi.mock('@/components/session/HandwritingCanvas', () => {
   return { HandwritingCanvas };
 });
 
-import SessionPage from '../page';
-import * as sessionsRepo from '@/lib/db/sessionsRepo';
-import * as memosRepo from '@/lib/db/memosRepo';
-import { __routerPushMock } from 'next/navigation';
-import { __callLastOnFinish } from '@/lib/timer/useCountdown';
+import SessionPage from "../page";
+import * as sessionsRepo from "@/lib/db/sessionsRepo";
+import * as memosRepo from "@/lib/db/memosRepo";
 
-describe('/session page', () => {
+describe("/session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('creates a session and saves a memo when moving to the next theme', async () => {
+  it("creates a session and saves a memo when moving to the next theme", async () => {
     await act(async () => {
       render(<SessionPage />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -131,10 +124,10 @@ describe('/session page', () => {
 
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
 
-    const textarea = screen.getByRole('textbox');
-    const nextButton = screen.getByRole('button', { name: /次へ/ });
+    const textarea = screen.getByRole("textbox");
+    const nextButton = screen.getByRole("button", { name: /次へ/ });
     await act(async () => {
-      fireEvent.change(textarea, { target: { value: 'first memo' } });
+      fireEvent.change(textarea, { target: { value: "first memo" } });
       fireEvent.click(nextButton);
     });
 
@@ -143,29 +136,29 @@ describe('/session page', () => {
     });
     const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
 
-    expect(savedArg.sessionId).toBe('session-1');
+    expect(savedArg.sessionId).toBe("session-1");
     expect(savedArg.order).toBe(1);
-    expect(savedArg.textContent).toBe('first memo');
+    expect(savedArg.textContent).toBe("first memo");
 
     await waitFor(() => {
-      expect(screen.getByText('2 / 10')).toBeInTheDocument();
+      expect(screen.getByText("2 / 10")).toBeInTheDocument();
     });
   });
 
-  it('saves text input memo with no handwriting data', async () => {
+  it("saves text input memo with no handwriting data", async () => {
     await act(async () => {
       render(<SessionPage />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    const textarea = screen.getByRole('textbox');
-    const nextButton = screen.getByRole('button', { name: /次へ/ });
+    const textarea = screen.getByRole("textbox");
+    const nextButton = screen.getByRole("button", { name: /次へ/ });
 
     await act(async () => {
-      fireEvent.change(textarea, { target: { value: 'text only memo' } });
+      fireEvent.change(textarea, { target: { value: "text only memo" } });
       fireEvent.click(nextButton);
     });
 
@@ -174,22 +167,24 @@ describe('/session page', () => {
     });
 
     const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
-    expect(savedArg.textContent).toBe('text only memo');
-    expect(savedArg.handwritingType).toBe('none');
+    expect(savedArg.textContent).toBe("text only memo");
+    expect(savedArg.handwritingType).toBe("none");
     expect(savedArg.handwritingDataUrl).toBeUndefined();
   });
 
-  it('saves handwriting input data when provided', async () => {
+  it("saves handwriting input data when provided", async () => {
     await act(async () => {
       render(<SessionPage />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    const handwritingButton = screen.getByRole('button', { name: '手書き入力' });
-    const nextButton = screen.getByRole('button', { name: /次へ/ });
+    const handwritingButton = screen.getByRole("button", {
+      name: "手書き入力",
+    });
+    const nextButton = screen.getByRole("button", { name: /次へ/ });
 
     await act(async () => {
       fireEvent.click(handwritingButton);
@@ -204,27 +199,27 @@ describe('/session page', () => {
     });
 
     const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
-    expect(savedArg.handwritingType).toBe('dataUrl');
+    expect(savedArg.handwritingType).toBe("dataUrl");
     expect(savedArg.handwritingDataUrl).toBe(
-      'data:image/png;base64,handwriting'
+      "data:image/png;base64,handwriting"
     );
   });
 
-  it('completes the session after 10 memos and navigates to complete page', async () => {
+  it("completes the session after 10 memos and navigates to complete page", async () => {
     await act(async () => {
       render(<SessionPage />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
     await waitFor(() => {
       expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
     });
 
-    const textarea = screen.getByRole('textbox');
-    const nextButton = screen.getByRole('button', { name: /次へ/ });
+    const textarea = screen.getByRole("textbox");
+    const nextButton = screen.getByRole("button", { name: /次へ/ });
 
     for (let i = 1; i <= 10; i += 1) {
       await act(async () => {
@@ -246,29 +241,33 @@ describe('/session page', () => {
     await waitFor(() => {
       expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
     });
-    const [sessionIdArg, memoCountArg] = (sessionsRepo.completeSession as unknown as Mock).mock.calls[0];
-    expect(sessionIdArg).toBe('session-1');
+    const [sessionIdArg, memoCountArg] = (
+      sessionsRepo.completeSession as unknown as Mock
+    ).mock.calls[0];
+    expect(sessionIdArg).toBe("session-1");
     expect(memoCountArg).toBe(10);
 
-    expect(__routerPushMock).toHaveBeenCalledWith('/session/complete');
+    expect(mockPush).toHaveBeenCalledWith(
+      "/session/complete?sessionId=session-1"
+    );
   });
 
-  it('saves memo when timer finishes automatically', async () => {
+  it("saves memo when timer finishes automatically", async () => {
     await act(async () => {
       render(<SessionPage />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1 / 10')).toBeInTheDocument();
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    const textarea = screen.getByRole('textbox');
+    const textarea = screen.getByRole("textbox");
     await act(async () => {
-      fireEvent.change(textarea, { target: { value: 'auto-finished memo' } });
+      fireEvent.change(textarea, { target: { value: "auto-finished memo" } });
     });
 
     await act(async () => {
-      __callLastOnFinish();
+      callLastOnFinish();
     });
 
     await waitFor(() => {
@@ -276,11 +275,10 @@ describe('/session page', () => {
     });
 
     const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
-    expect(savedArg.textContent).toBe('auto-finished memo');
+    expect(savedArg.textContent).toBe("auto-finished memo");
 
     await waitFor(() => {
-      expect(screen.getByText('2 / 10')).toBeInTheDocument();
+      expect(screen.getByText("2 / 10")).toBeInTheDocument();
     });
   });
 });
-
