@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
@@ -9,7 +9,7 @@ import type { SessionRecord } from "@/types/session";
 
 type PageStage = "loading" | "success" | "error";
 
-export default function SessionCompletePage() {
+function SessionCompleteContent() {
   const searchParams = useSearchParams();
   const [stage, setStage] = useState<PageStage>("loading");
   const [session, setSession] = useState<SessionRecord | null>(null);
@@ -188,5 +188,24 @@ export default function SessionCompletePage() {
         </Button>
       </div>
     </main>
+  );
+}
+
+export default function SessionCompletePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-3xl px-4 py-8">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+            セッション情報を読み込んでいます…
+          </h1>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            お待ちください。
+          </p>
+        </main>
+      }
+    >
+      <SessionCompleteContent />
+    </Suspense>
   );
 }
