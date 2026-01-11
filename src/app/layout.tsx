@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body
-        className="antialiased min-h-screen bg-slate-50 text-slate-900"
+        className="antialiased min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
       >
         <ThemeSeedProvider>
           <div className="min-h-screen flex flex-col">
@@ -26,8 +26,8 @@ export default function RootLayout({
                 {children}
               </div>
             </main>
-            <footer className="border-t bg-white">
-              <div className="max-w-4xl mx-auto px-4 py-3 text-xs text-slate-500">
+            <footer className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <div className="max-w-4xl mx-auto px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
                 © {new Date().getFullYear()} one-minute-memo
               </div>
             </footer>
