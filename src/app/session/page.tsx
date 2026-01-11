@@ -276,8 +276,8 @@ export default function SessionPage() {
 
     setStage("finished");
 
-    // 完了画面へ遷移
-    router.push("/session/complete");
+    // 完了画面へ遷移（sessionIdをクエリパラメータで渡す）
+    router.push(`/session/complete?sessionId=${sessionId}`);
   };
 
   // デバッグ & ガード
