@@ -80,7 +80,22 @@ vi.mock("@/lib/db/memosRepo", () => {
     updatedAt: "2025-01-01T00:00:00.000Z",
   }));
 
-  return { saveMemo };
+  const getMemosBySession = vi.fn(async (sessionId: string) => {
+    // saveMemoが何回呼ばれたかに基づいてメモ数を返す
+    const saveCallCount = (saveMemo as unknown as Mock).mock.calls.length;
+    return Array.from({ length: saveCallCount }, (_, i) => ({
+      id: `memo-${i + 1}`,
+      sessionId,
+      themeId: `theme-${i + 1}`,
+      order: i + 1,
+      textContent: `memo ${i + 1}`,
+      handwritingType: "none" as const,
+      createdAt: "2025-01-01T00:00:00.000Z",
+      updatedAt: "2025-01-01T00:00:00.000Z",
+    }));
+  });
+
+  return { saveMemo, getMemosBySession };
 });
 
 vi.mock("@/components/session/HandwritingCanvas", () => {
@@ -234,22 +249,28 @@ describe("/session page", () => {
       }
     }
 
+    // 最後のメモ保存を待つ
     await waitFor(() => {
       expect(memosRepo.saveMemo).toHaveBeenCalledTimes(10);
     });
 
+    // セッション完了処理を待つ
     await waitFor(() => {
       expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
     });
+
     const [sessionIdArg, memoCountArg] = (
       sessionsRepo.completeSession as unknown as Mock
     ).mock.calls[0];
     expect(sessionIdArg).toBe("session-1");
     expect(memoCountArg).toBe(10);
 
-    expect(mockPush).toHaveBeenCalledWith(
-      "/session/complete?sessionId=session-1"
-    );
+    // router.pushの呼び出しを確認
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        "/session/complete?sessionId=session-1"
+      );
+    });
   });
 
   it("saves memo when timer finishes automatically", async () => {
