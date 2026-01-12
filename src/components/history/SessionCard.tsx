@@ -3,6 +3,7 @@
 import cc from "classcat";
 
 import { Button } from "@/components/ui/Button";
+import { formatSessionDateTime } from "@/lib/utils/dateFormatters";
 import type { SessionRecord } from "@/types/session";
 
 export interface SessionCardProps {
@@ -18,24 +19,8 @@ export function SessionCard({ session, href, className }: SessionCardProps) {
   const started = session.startedAt ? new Date(session.startedAt) : null;
   const ended = session.endedAt ? new Date(session.endedAt) : null;
 
-  const startedLabel = started
-    ? started.toLocaleString("ja-JP", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "不明";
-  const endedLabel = ended
-    ? ended.toLocaleString("ja-JP", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "未完了";
+  const startedLabel = formatSessionDateTime(started);
+  const endedLabel = ended ? formatSessionDateTime(ended) : "未完了";
 
   const themeCount = session.themeIds.length;
 

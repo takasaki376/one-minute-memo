@@ -49,7 +49,12 @@ export async function completeSession(
     return;
   }
 
-  const updated: SessionRecord = fromDB(existing)!;
+  const updated = fromDB(existing);
+  if (!updated) {
+    console.warn('session not found for update:', sessionId);
+    await tx.done;
+    return;
+  }
   const updatedForSave: SessionRecord = {
     ...updated,
     memoCount,
@@ -68,6 +73,16 @@ export async function getSessionById(
   return fromDB(data as SessionRecordDB | undefined);
 }
 
+export async function getAllSessions(): Promise<SessionRecord[]> {
+  const db = await getDB();
+  const tx = db.transaction(SESSION_STORE);
+  const store = tx.store;
+  const sessions = await store.getAll();
+  return sessions
+    .map(s => fromDB(s as SessionRecordDB))
+    .filter((s): s is SessionRecord => s !== undefined);
+}
+
 export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
   const db = await getDB();
   const tx = db.transaction(SESSION_STORE);
@@ -77,5 +92,7 @@ export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
   const sessions = await index.getAll();
   // index で昇順になることが多いので手動で逆順にしたければここでソート
   sessions.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
-  return sessions.map(s => fromDB(s as SessionRecordDB)!);
+  return sessions
+    .map(s => fromDB(s as SessionRecordDB))
+    .filter((s): s is SessionRecord => s !== undefined);
 }

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { getSessionById } from "@/lib/db/sessionsRepo";
+import { formatSessionDateTime } from "@/lib/utils/dateFormatters";
 import type { SessionRecord } from "@/types/session";
 
 type PageStage = "loading" | "success" | "error";
@@ -93,24 +94,12 @@ function SessionCompleteContent() {
   const started = session.startedAt ? new Date(session.startedAt) : null;
   const ended = session.endedAt ? new Date(session.endedAt) : null;
 
-  const startedLabel = started
-    ? started.toLocaleString("ja-JP", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "不明";
-  const endedLabel = ended
-    ? ended.toLocaleString("ja-JP", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "進行中";
+  const startedLabel = formatSessionDateTime(started);
+  const endedLabel = ended ? formatSessionDateTime(ended) : "進行中";
+
+  // 同じ日かどうかをチェック
+  const isSameDay =
+    started && ended && started.toDateString() === ended.toDateString();
 
   // 所要時間（分）の計算（endedAt がある場合のみ）
   let durationMinutes: number | null = null;
@@ -152,7 +141,8 @@ function SessionCompleteContent() {
             </dt>
             <dd className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               {startedLabel}
-              {ended && startedLabel !== endedLabel && ` 〜 ${endedLabel}`}
+              {ended && !isSameDay && ` 〜 ${endedLabel}`}
+              {ended && isSameDay && ` 〜 ${ended.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}`}
             </dd>
           </div>
 

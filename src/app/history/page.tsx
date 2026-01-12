@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { SessionCard } from "@/components/history/SessionCard";
-import { getAllSessionsSorted } from "@/lib/db/sessionsRepo";
+import { getAllSessions } from "@/lib/db/sessionsRepo";
 import type { SessionRecord } from "@/types/session";
 
 type LoadStage = "idle" | "loading" | "loaded" | "error";
@@ -20,7 +20,7 @@ export default function HistoryPage() {
         setStage("loading");
         setError(null);
 
-        const all = await getAllSessionsSorted();
+        const all = await getAllSessions();
         setSessions(all);
         setStage("loaded");
       } catch (e) {
@@ -75,7 +75,6 @@ export default function HistoryPage() {
         )}
         <div className="mt-6 flex flex-wrap gap-3">
           <Button
-            href="/session"
             variant="primary"
             onClick={() => {
               // ページを再読み込み
