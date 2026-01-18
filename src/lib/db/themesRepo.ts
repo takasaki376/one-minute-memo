@@ -38,11 +38,13 @@ export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]>
   if (themeIds.length === 0) {
     return [];
   }
+  // 重複したIDを除去してパフォーマンスを向上
+  const uniqueIds = Array.from(new Set(themeIds));
   const db = await getDB();
   const tx = db.transaction(THEME_STORE, 'readonly');
   const store = tx.store;
   // 全てのget操作を並列実行してパフォーマンスを向上
-  const themePromises = themeIds.map(id => store.get(id));
+  const themePromises = uniqueIds.map(id => store.get(id));
   const themeResults = await Promise.all(themePromises);
   // 存在するテーマのみを抽出
   const themes = themeResults
