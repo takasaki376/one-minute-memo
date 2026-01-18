@@ -29,6 +29,29 @@ export async function getActiveThemes(): Promise<ThemeRecord[]> {
   return active.map(stripIndex);
 }
 
+/**
+ * 指定されたIDのテーマ一覧を取得
+ * @param themeIds 取得したいテーマIDの配列
+ * @returns 該当するテーマレコードの配列（IDの順序は保証されない）
+ */
+export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]> {
+  if (themeIds.length === 0) {
+    return [];
+  }
+  const db = await getDB();
+  const tx = db.transaction(THEME_STORE, 'readonly');
+  const store = tx.store;
+  const themes: ThemeRecord[] = [];
+  for (const id of themeIds) {
+    const theme = await store.get(id);
+    if (theme) {
+      themes.push(stripIndex(theme));
+    }
+  }
+  await tx.done;
+  return themes;
+}
+
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(THEME_STORE, 'readwrite');
