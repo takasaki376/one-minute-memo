@@ -41,13 +41,13 @@ export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]>
   const db = await getDB();
   const tx = db.transaction(THEME_STORE, 'readonly');
   const store = tx.store;
-  const themes: ThemeRecord[] = [];
-  for (const id of themeIds) {
-    const theme = await store.get(id);
-    if (theme) {
-      themes.push(stripIndex(theme));
-    }
-  }
+  // 全てのget操作を並列実行してパフォーマンスを向上
+  const themePromises = themeIds.map(id => store.get(id));
+  const themeResults = await Promise.all(themePromises);
+  // 存在するテーマのみを抽出
+  const themes = themeResults
+    .filter((theme): theme is ThemeRecordWithIndex => theme !== undefined)
+    .map(stripIndex);
   await tx.done;
   return themes;
 }
