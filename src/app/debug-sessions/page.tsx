@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react';
 import { getAllSessionsSorted } from '@/lib/db/sessionsRepo';
 import type { SessionRecord } from '@/types/session';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function DebugSessionsPage() {
+  const router = useRouter();
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 開発環境でのみアクセス可能にする
+    if (process.env.NODE_ENV !== 'development') {
+      router.push('/');
+      return;
+    }
     const loadSessions = async () => {
       try {
         const data = await getAllSessionsSorted();
@@ -21,7 +28,7 @@ export default function DebugSessionsPage() {
       }
     };
     loadSessions();
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (

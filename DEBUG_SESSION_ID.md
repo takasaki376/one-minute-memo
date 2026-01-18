@@ -14,10 +14,21 @@
 
 ```javascript
 // IndexedDBからセッション一覧を取得
-const db = await indexedDB.open('one-minute-memo-db', 2);
+// indexedDB.openはPromiseを直接返さないため、Promiseラッパーを使用
+const request = indexedDB.open('one-minute-memo-db', 2);
+const db = await new Promise((resolve, reject) => {
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
+
 const tx = db.transaction('sessions', 'readonly');
 const store = tx.objectStore('sessions');
-const sessions = await store.getAll();
+const sessions = await new Promise((resolve, reject) => {
+  const req = store.getAll();
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+
 console.log('セッション一覧:', sessions);
 console.log('セッションID:', sessions.map(s => s.id));
 ```
@@ -30,16 +41,30 @@ console.log('セッションID:', sessions.map(s => s.id));
 
 ```javascript
 // 最新のセッションIDを取得
-const db = await indexedDB.open('one-minute-memo-db', 2);
+// indexedDB.openはPromiseを直接返さないため、Promiseラッパーを使用
+const request = indexedDB.open('one-minute-memo-db', 2);
+const db = await new Promise((resolve, reject) => {
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
+
 const tx = db.transaction('sessions', 'readonly');
 const store = tx.objectStore('sessions');
 const index = store.index('by_startedAt');
-const sessions = await index.getAll();
+
+const sessions = await new Promise((resolve, reject) => {
+  const req = index.getAll();
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+
 sessions.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 const latestSession = sessions[0];
 console.log('最新のセッションID:', latestSession.id);
 console.log('URL:', `http://localhost:3000/history/${latestSession.id}`);
 ```
+
+**推奨方法**: アプリケーション内で実行する場合は、`getAllSessionsSorted()` 関数を使用することを推奨します（`src/lib/db/sessionsRepo.ts` を参照）。
 
 ## URL形式
 
