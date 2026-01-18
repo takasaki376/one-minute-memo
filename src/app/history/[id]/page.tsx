@@ -36,9 +36,24 @@ export default function HistoryDetailPage({ params }: PageProps) {
 
   // params を解決
   useEffect(() => {
-    params.then(({ id }) => {
-      setSessionId(id);
-    });
+    let isMounted = true;
+    (async () => {
+      try {
+        const { id } = await params;
+        if (!isMounted) return;
+        setSessionId(id);
+      } catch (err) {
+        console.error("Failed to resolve params:", err);
+        if (!isMounted) return;
+        setError(
+          err instanceof Error ? err.message : "パラメータの解決に失敗しました"
+        );
+        setStage("error");
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
   }, [params]);
 
   // データ取得
