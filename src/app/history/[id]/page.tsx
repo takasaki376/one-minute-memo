@@ -26,6 +26,15 @@ interface DisplayMemo {
   handwritingDataUrl?: string;
 }
 
+/**
+ * テーマタイトルが取得できない場合のフォールバック文字列を生成
+ * @param order メモの順序
+ * @returns フォールバックタイトル
+ */
+function getThemeFallbackTitle(order: number): string {
+  return `テーマ ${order}`;
+}
+
 export default function HistoryDetailPage({ params }: PageProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [session, setSession] = useState<SessionRecord | null>(null);
@@ -115,7 +124,7 @@ export default function HistoryDetailPage({ params }: PageProps) {
           id: memo.id,
           order: memo.order,
           themeId: memo.themeId,
-          themeTitle: theme?.title ?? `テーマ ${memo.order}`,
+          themeTitle: theme?.title ?? getThemeFallbackTitle(memo.order),
           themeCategory: theme?.category,
           textContent: memo.textContent,
           handwritingDataUrl: memo.handwritingDataUrl,
@@ -307,7 +316,7 @@ export default function HistoryDetailPage({ params }: PageProps) {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={memo.handwritingDataUrl}
-                        alt={`テーマ ${memo.order} の手書きメモ`}
+                        alt={`${getThemeFallbackTitle(memo.order)} の手書きメモ`}
                         className="w-full h-auto max-h-64 object-contain"
                       />
                     </div>
