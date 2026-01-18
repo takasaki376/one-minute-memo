@@ -42,7 +42,7 @@ export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]>
   const tx = db.transaction(THEME_STORE, 'readonly');
   const store = tx.store;
   
-  // 複数のget操作を並列化してパフォーマンスを向上
+  // N+1クエリ問題を解決するため、複数のget操作を並列化
   const themePromises = themeIds.map((id) => store.get(id));
   const results = await Promise.all(themePromises);
   const themes = results
