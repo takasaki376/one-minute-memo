@@ -2,32 +2,80 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useSettings } from "@/hooks/useSettings";
 
 /**
  * 設定画面
  * セッションの進め方をカスタマイズできます。
  */
 export default function SettingPage() {
-  // TODO: useSettings フックを実装後に連携
-  // const { settings, isLoading, error, updateSettings, resetSettings } = useSettings();
+  const { settings, isLoading, error, updateSettings, resetSettings } = useSettings();
 
-  const [isLoading] = useState(false);
-  const [error] = useState<string | null>(null);
+  // ローカルstate（入力中の値を保持、onBlurで保存）
+  const [localThemeCount, setLocalThemeCount] = useState<number | null>(null);
+  const [localTimeLimit, setLocalTimeLimit] = useState<number | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
-  // プレースホルダー: 後でuseSettingsから取得
-  const [localThemeCount, setLocalThemeCount] = useState(10);
-  const [localTimeLimit, setLocalTimeLimit] = useState(60);
+  // settingsから初期値を取得（ローカルstateがnullの場合のみ使用）
+  const themeCount = localThemeCount ?? settings.theme_count;
+  const timeLimit = localTimeLimit ?? Number.parseInt(settings.time_limit, 10);
+
+  // resetSettingsが呼ばれたときにローカルstateをリセット
+  const handleResetInternal = async () => {
+    try {
+      setUpdateError(null);
+      setLocalThemeCount(null); // nullにすることでsettingsの値を使用
+      setLocalTimeLimit(null);
+      await resetSettings();
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "設定のリセットに失敗しました");
+    }
+  };
 
   // 推定所要時間の計算（秒）
-  const estimatedSeconds = localThemeCount * localTimeLimit;
+  const estimatedSeconds = themeCount * timeLimit;
   // 分換算
   const estimatedMinutes = Math.floor(estimatedSeconds / 60);
   const remainingSeconds = estimatedSeconds % 60;
 
-  const handleReset = () => {
-    // TODO: resetSettings() を呼び出す
-    setLocalThemeCount(10);
-    setLocalTimeLimit(60);
+  const handleThemeCountBlur = async () => {
+    if (localThemeCount === null) return;
+    
+    const clamped = Math.max(1, Math.min(100, localThemeCount));
+    
+    // 現在の設定値と異なる場合のみ更新
+    if (clamped !== settings.theme_count) {
+      try {
+        setUpdateError(null);
+        await updateSettings({ theme_count: clamped });
+        setLocalThemeCount(null); // 更新成功後はsettingsの値を使用
+      } catch (err) {
+        setUpdateError(err instanceof Error ? err.message : "設定の更新に失敗しました");
+      }
+    } else {
+      // 値が同じ場合はローカルstateをクリア
+      setLocalThemeCount(null);
+    }
+  };
+
+  const handleTimeLimitBlur = async () => {
+    if (localTimeLimit === null) return;
+    
+    const clamped = Math.max(1, Math.min(3600, localTimeLimit));
+    
+    // 現在の設定値と異なる場合のみ更新
+    if (clamped.toString() !== settings.time_limit) {
+      try {
+        setUpdateError(null);
+        await updateSettings({ time_limit: clamped.toString() });
+        setLocalTimeLimit(null); // 更新成功後はsettingsの値を使用
+      } catch (err) {
+        setUpdateError(err instanceof Error ? err.message : "設定の更新に失敗しました");
+      }
+    } else {
+      // 値が同じ場合はローカルstateをクリア
+      setLocalTimeLimit(null);
+    }
   };
 
   // ローディング表示
@@ -90,6 +138,13 @@ export default function SettingPage() {
         セッションの進め方をカスタマイズできます。
       </p>
 
+      {/* 更新エラー表示（初期ロードエラーとは別） */}
+      {updateError && (
+        <div className="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3">
+          <p className="text-sm text-red-700 dark:text-red-300">{updateError}</p>
+        </div>
+      )}
+
       {/* 設定フォーム */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 左カラム: 入力フォーム */}
@@ -115,7 +170,7 @@ export default function SettingPage() {
                     type="number"
                     min={1}
                     max={100}
-                    value={localThemeCount}
+                    value={themeCount}
                     onChange={(e) => {
                       const value = Number.parseInt(e.target.value, 10);
                       if (!Number.isNaN(value)) {
@@ -123,14 +178,7 @@ export default function SettingPage() {
                         setLocalThemeCount(clamped);
                       }
                     }}
-                    onBlur={(e) => {
-                      // TODO: updateSettings({ theme_count: localThemeCount }) を呼び出す
-                      const value = Number.parseInt(e.target.value, 10);
-                      if (!Number.isNaN(value)) {
-                        const clamped = Math.max(1, Math.min(100, value));
-                        setLocalThemeCount(clamped);
-                      }
-                    }}
+                    onBlur={handleThemeCountBlur}
                     className="w-24 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-sm text-slate-600 dark:text-slate-400">
@@ -156,7 +204,7 @@ export default function SettingPage() {
                     type="number"
                     min={1}
                     max={3600}
-                    value={localTimeLimit}
+                    value={timeLimit}
                     onChange={(e) => {
                       const value = Number.parseInt(e.target.value, 10);
                       if (!Number.isNaN(value)) {
@@ -164,14 +212,7 @@ export default function SettingPage() {
                         setLocalTimeLimit(clamped);
                       }
                     }}
-                    onBlur={(e) => {
-                      // TODO: updateSettings({ time_limit: localTimeLimit.toString() }) を呼び出す
-                      const value = Number.parseInt(e.target.value, 10);
-                      if (!Number.isNaN(value)) {
-                        const clamped = Math.max(1, Math.min(3600, value));
-                        setLocalTimeLimit(clamped);
-                      }
-                    }}
+                    onBlur={handleTimeLimitBlur}
                     className="w-24 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-sm text-slate-600 dark:text-slate-400">
@@ -203,13 +244,13 @@ export default function SettingPage() {
                 </p>
               )}
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                {localThemeCount} テーマ × {localTimeLimit} 秒
+                {themeCount} テーマ × {timeLimit} 秒
               </p>
             </div>
 
             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
               <Button
-                onClick={handleReset}
+                onClick={handleResetInternal}
                 variant="outline"
                 size="sm"
                 fullWidth

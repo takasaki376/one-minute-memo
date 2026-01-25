@@ -93,6 +93,7 @@ export function getDB() {
         }
 
         // settings
+        // バージョン2から3へのマイグレーション: settingsストアを追加
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'id' });
         }
