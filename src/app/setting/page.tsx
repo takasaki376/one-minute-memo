@@ -105,7 +105,7 @@ export default function SettingPage() {
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
           設定
         </h1>
-        <Button href="/" variant="ghost" size="sm" aria-label="設定を閉じる">
+        <Button href="/" variant="ghost" size="sm">
           {/* TODO: MdOutlineClose アイコンを追加 */}
           閉じる
         </Button>
