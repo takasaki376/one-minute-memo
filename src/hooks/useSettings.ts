@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getSettings, updateSettings, resetSettings } from "@/lib/db/settingsRepo";
 import type { SettingsRecord } from "@/types/settings";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 
 export interface UseSettingsResult {
   settings: SettingsRecord;
@@ -89,8 +90,7 @@ export function useSettings(): UseSettingsResult {
   // 初回レンダリング時やエラー時の型安全性を確保
   const safeSettings: SettingsRecord = settings ?? {
     id: "default",
-    theme_count: 10,
-    time_limit: "60",
+    ...DEFAULT_SETTINGS,
     updatedAt: new Date().toISOString(),
   };
 

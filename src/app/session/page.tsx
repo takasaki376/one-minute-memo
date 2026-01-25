@@ -36,7 +36,8 @@ export default function SessionPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [memoCount, setMemoCount] = useState(0);
   // セッション開始時の設定値（このセッションで固定）
-  const [themeCount, setThemeCount] = useState(DEFAULT_THEME_COUNT);
+  // themeCountは未使用だが、将来的に使用する可能性があるため保持
+  const [, setThemeCount] = useState(DEFAULT_THEME_COUNT);
   const [secondsPerTheme, setSecondsPerTheme] = useState(DEFAULT_TIME_LIMIT_SECONDS);
   // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -75,7 +76,15 @@ export default function SessionPage() {
         let settingsTimeLimit = DEFAULT_TIME_LIMIT_SECONDS;
         try {
           const settings = await getSettings();
-          settingsThemeCount = settings.theme_count;
+          // theme_countの値検証
+          const parsedThemeCount = Number.parseInt(
+            String(settings.theme_count),
+            10,
+          );
+          if (!Number.isNaN(parsedThemeCount) && parsedThemeCount > 0) {
+            settingsThemeCount = parsedThemeCount;
+          }
+          // time_limitの値検証
           const parsedTimeLimit = Number.parseInt(settings.time_limit, 10);
           if (!Number.isNaN(parsedTimeLimit) && parsedTimeLimit > 0) {
             settingsTimeLimit = parsedTimeLimit;
