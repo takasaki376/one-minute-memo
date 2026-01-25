@@ -205,7 +205,7 @@ describe("SettingPage", () => {
 
       // 値を変更してblur
       fireEvent.change(themeCountInput, { target: { value: "25" } });
-      
+
       // blurイベントでエラーが発生するが、コンポーネント側でキャッチされる
       // エラーは親側でキャッチされてupdateErrorに設定される
       await act(async () => {

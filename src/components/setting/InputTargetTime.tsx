@@ -25,7 +25,7 @@ export function InputTargetTime({
   disabled = false,
   description = "1テーマあたりの制限時間を設定します（1〜3600秒）",
 }: InputTargetTimeProps) {
-  // 内部state: localTime（string）を保持
+  // 内部state: localTime（string）を保持（空文字も許可）
   const [localTime, setLocalTime] = useState<string>(value);
 
   // valueが外から変わったらlocalTimeを更新
@@ -33,41 +33,56 @@ export function InputTargetTime({
     setLocalTime(value);
   }, [value]);
 
-  // 画面表示用の数値（NaN対策）
+  // 画面表示用の数値（空文字の場合は空文字、数値の場合は数値）
   const displayValue = (() => {
+    if (localTime === "") return "";
     const num = Number.parseInt(localTime, 10);
     return Number.isNaN(num) ? "" : num;
   })();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    if (inputValue === "") {
-      // 空の場合は直前値を維持
+    const newValue = e.target.value;
+    // 空文字を許可（ユーザーが値をクリアできるようにする）
+    if (newValue === "") {
+      setLocalTime("");
       return;
     }
 
-    const parsed = Number.parseInt(inputValue, 10);
+    const parsed = Number.parseInt(newValue, 10);
     if (!Number.isNaN(parsed)) {
-      // min/maxでクランプしてstring化
-      const clamped = Math.max(min, Math.min(max, parsed));
-      setLocalTime(String(clamped));
+      // 入力中はクランプせず、そのまま表示（blur時にクランプ）
+      setLocalTime(newValue);
     }
   };
 
   const handleBlur = async () => {
-    // valueとlocalTimeが異なる場合のみonUpdateを呼ぶ
-    if (value !== localTime) {
-      // クランプした結果をstring化して渡す
-      const num = Number.parseInt(localTime, 10);
-      if (!Number.isNaN(num)) {
-        const clamped = Math.max(min, Math.min(max, num));
-        try {
-          await onUpdate(String(clamped));
-        } catch (err) {
-          // エラーは親で処理されるため、ここではログ出力のみ
-          // localTimeはそのまま維持（フォームは維持）
-          console.error("Failed to update time limit:", err);
-        }
+    // 空文字の場合は最小値にフォールバック
+    let finalValue: string;
+    if (localTime === "") {
+      finalValue = String(min);
+      setLocalTime(String(min));
+    } else {
+      const parsed = Number.parseInt(localTime, 10);
+      if (Number.isNaN(parsed)) {
+        // パースできない場合は最小値にフォールバック
+        finalValue = String(min);
+        setLocalTime(String(min));
+      } else {
+        // min/maxでクランプ
+        const clamped = Math.max(min, Math.min(max, parsed));
+        finalValue = String(clamped);
+        setLocalTime(String(clamped));
+      }
+    }
+
+    // valueとfinalValueが異なる場合のみonUpdateを呼ぶ
+    if (value !== finalValue) {
+      try {
+        await onUpdate(finalValue);
+      } catch (err) {
+        // エラーは親で処理されるため、ここではログ出力のみ
+        // localTimeはそのまま維持（フォームは維持）
+        console.error("Failed to update time limit:", err);
       }
     }
   };
