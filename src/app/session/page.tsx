@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,8 @@ import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
 import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
 import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
+import { getSettings } from "@/lib/db/settingsRepo";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 
 type SessionStage = "loading" | "running" | "finished" | "error";
 
@@ -20,19 +22,9 @@ interface SessionTheme {
   category?: string;
 }
 
-const TOTAL_THEMES_PER_SESSION = 10;
-// PJ1-99: 開発環境では10秒、本番環境では60秒
-// 環境変数 NEXT_PUBLIC_TEST_TIMER_SECONDS が設定されていればそれを使用（例: NEXT_PUBLIC_TEST_TIMER_SECONDS=5）
-// 注意: process.env.NODE_ENV と NEXT_PUBLIC_* はビルド時に置換されるため、ランタイムで切り替えられません
-// 開発モードか本番モードかはビルド時に固定されます
-// NaN ガード: 非数値が設定された場合はデフォルト値（開発: 10秒、本番: 60秒）を使用
-const SECONDS_PER_THEME = (() => {
-  if (process.env.NODE_ENV === "development") {
-    const parsed = Number(process.env.NEXT_PUBLIC_TEST_TIMER_SECONDS);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
-  }
-  return 60;
-})();
+// デフォルト値（設定取得失敗時のフォールバック）
+const DEFAULT_THEME_COUNT = DEFAULT_SETTINGS.theme_count;
+const DEFAULT_TIME_LIMIT_SECONDS = Number.parseInt(DEFAULT_SETTINGS.time_limit, 10);
 
 export default function SessionPage() {
   const router = useRouter();
@@ -43,6 +35,9 @@ export default function SessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0); // 0〜N-1
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [memoCount, setMemoCount] = useState(0);
+  // セッション開始時の設定値（このセッションで固定）
+  const [themeCount, setThemeCount] = useState(DEFAULT_THEME_COUNT);
+  const [secondsPerTheme, setSecondsPerTheme] = useState(DEFAULT_TIME_LIMIT_SECONDS);
   // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSavingMemo, setIsSavingMemo] = useState(false);
@@ -55,9 +50,9 @@ export default function SessionPage() {
     null
   );
 
-  // タイマー
+  // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
-    initialSeconds: SECONDS_PER_THEME,
+    initialSeconds: secondsPerTheme,
     autoStart: false, // テーマ準備が終わってから start する
     onFinish: () => {
       void handleThemeFinishedAuto();
@@ -75,7 +70,27 @@ export default function SessionPage() {
       try {
         setStage("loading");
 
-        const selected = await pickRandomActiveThemes(TOTAL_THEMES_PER_SESSION);
+        // 設定を取得（失敗時はデフォルト値を使用）
+        let settingsThemeCount = DEFAULT_THEME_COUNT;
+        let settingsTimeLimit = DEFAULT_TIME_LIMIT_SECONDS;
+        try {
+          const settings = await getSettings();
+          settingsThemeCount = settings.theme_count;
+          const parsedTimeLimit = Number.parseInt(settings.time_limit, 10);
+          if (!Number.isNaN(parsedTimeLimit) && parsedTimeLimit > 0) {
+            settingsTimeLimit = parsedTimeLimit;
+          }
+        } catch (err) {
+          console.error("Failed to load settings, using defaults:", err);
+          // デフォルト値を使用（既に設定済み）
+        }
+
+        // 設定値をstateとして保持（このセッションで固定）
+        setThemeCount(settingsThemeCount);
+        setSecondsPerTheme(settingsTimeLimit);
+
+        // テーマ抽選（設定値を使用）
+        const selected = await pickRandomActiveThemes(settingsThemeCount);
 
         if (selected.length === 0) {
           setStage("error");
@@ -88,18 +103,20 @@ export default function SessionPage() {
         const session = await createSession(selected.map((t) => t.id));
         // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
         if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] セッションを作成しました:", {
+          console.log("[PJ1-117] セッションを作成しました:", {
             id: session.id,
             themeIds: session.themeIds,
             startedAt: session.startedAt,
             memoCount: session.memoCount,
+            themeCount: settingsThemeCount,
+            secondsPerTheme: settingsTimeLimit,
           });
         }
         setSessionId(session.id);
 
         // 最初のテーマ用に入力状態をリセット
         setCurrentIndex(0);
-        reset(SECONDS_PER_THEME);
+        reset(settingsTimeLimit);
         setText("");
         setHandwritingDataUrl(null);
 
@@ -239,8 +256,8 @@ export default function SessionPage() {
       setText("");
       setHandwritingDataUrl(null);
 
-      // タイマーをリセットして開始
-      reset(SECONDS_PER_THEME);
+      // タイマーをリセットして開始（設定値を使用）
+      reset(secondsPerTheme);
       start();
     } finally {
       // PJ1-99: 処理完了時にロックをリセット（エラーが発生しても確実にリセット）

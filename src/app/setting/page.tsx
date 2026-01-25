@@ -40,9 +40,9 @@ export default function SettingPage() {
 
   const handleThemeCountBlur = async () => {
     if (localThemeCount === null) return;
-    
+
     const clamped = Math.max(1, Math.min(100, localThemeCount));
-    
+
     // 現在の設定値と異なる場合のみ更新
     if (clamped !== settings.theme_count) {
       try {
@@ -60,9 +60,9 @@ export default function SettingPage() {
 
   const handleTimeLimitBlur = async () => {
     if (localTimeLimit === null) return;
-    
+
     const clamped = Math.max(1, Math.min(3600, localTimeLimit));
-    
+
     // 現在の設定値と異なる場合のみ更新
     if (clamped.toString() !== settings.time_limit) {
       try {

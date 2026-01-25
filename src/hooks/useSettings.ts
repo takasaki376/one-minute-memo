@@ -14,7 +14,7 @@ export interface UseSettingsResult {
 
 /**
  * 設定を管理するカスタムフック
- * 
+ *
  * @returns 設定データ、ローディング状態、エラー、更新関数
  */
 export function useSettings(): UseSettingsResult {
