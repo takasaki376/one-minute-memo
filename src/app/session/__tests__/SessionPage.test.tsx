@@ -1,4 +1,4 @@
-﻿// src/app/session/__tests__/SessionPage.test.tsx
+// src/app/session/__tests__/SessionPage.test.tsx
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
@@ -13,12 +13,21 @@ const mockThemes = Array.from({ length: 10 }, (_, index) => ({
   updatedAt: '2025-01-01T00:00:00.000Z',
 }));
 
+// vi.mock の hoisting を考慮して、factory 内で定義
 vi.mock("@/lib/utils/selectRandomThemes", () => {
-  const pickRandomActiveThemes = vi.fn(async (count = 10) =>
-    mockThemes.slice(0, count)
+  const mockPickRandomActiveThemes = vi.fn(async (count = 10) =>
+    Array.from({ length: 10 }, (_, index) => ({
+      id: `theme-${index + 1}`,
+      title: `theme ${index + 1}`,
+      category: 'general',
+      isActive: true,
+      source: 'builtin' as const,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    })).slice(0, count)
   );
   return {
-    pickRandomActiveThemes,
+    pickRandomActiveThemes: mockPickRandomActiveThemes,
   };
 });
 
@@ -98,6 +107,14 @@ vi.mock("@/lib/db/memosRepo", () => {
   return { saveMemo, getMemosBySession };
 });
 
+// settingsRepo をモック
+const mockGetSettings = vi.fn();
+vi.mock("@/lib/db/settingsRepo", () => {
+  return {
+    getSettings: () => mockGetSettings(),
+  };
+});
+
 vi.mock("@/components/session/HandwritingCanvas", () => {
   const HandwritingCanvas = ({
     onChange,
@@ -118,10 +135,19 @@ vi.mock("@/components/session/HandwritingCanvas", () => {
 import SessionPage from "../page";
 import * as sessionsRepo from "@/lib/db/sessionsRepo";
 import * as memosRepo from "@/lib/db/memosRepo";
+import type { SettingsRecord } from "@/types/settings";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 
 describe("/session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // デフォルト設定をモック
+    const defaultSettings: SettingsRecord = {
+      id: "default",
+      ...DEFAULT_SETTINGS,
+      updatedAt: "2025-01-01T00:00:00.000Z",
+    };
+    mockGetSettings.mockResolvedValue(defaultSettings);
   });
 
   it("creates a session and saves a memo when moving to the next theme", async () => {
@@ -300,6 +326,121 @@ describe("/session page", () => {
 
     await waitFor(() => {
       expect(screen.getByText("2 / 10")).toBeInTheDocument();
+    });
+  });
+
+  describe("settings integration", () => {
+    it("uses theme_count from settings for theme selection", async () => {
+      const customSettings: SettingsRecord = {
+        id: "default",
+        theme_count: 3,
+        time_limit: "60",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      };
+      mockGetSettings.mockResolvedValue(customSettings);
+
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 3")).toBeInTheDocument();
+      });
+
+      // pickRandomActiveThemes が theme_count=3 で呼ばれることを確認
+      const { pickRandomActiveThemes } = await import("@/lib/utils/selectRandomThemes");
+      expect(pickRandomActiveThemes).toHaveBeenCalledWith(3);
+    });
+
+    it("uses time_limit from settings for useCountdown initialSeconds", async () => {
+      const customSettings: SettingsRecord = {
+        id: "default",
+        theme_count: 10,
+        time_limit: "30",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      };
+      mockGetSettings.mockResolvedValue(customSettings);
+
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      // useCountdown が initialSeconds=30 で呼ばれることを確認
+      // resetMock が 30 で呼ばれることを確認（初期化時に reset が呼ばれる）
+      expect(resetMock).toHaveBeenCalledWith(30);
+    });
+
+    it("falls back to default values when getSettings fails", async () => {
+      mockGetSettings.mockRejectedValue(new Error("Failed to load settings"));
+
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      // デフォルト値（10テーマ、60秒）で進行できることを確認
+      const { pickRandomActiveThemes } = await import("@/lib/utils/selectRandomThemes");
+      expect(pickRandomActiveThemes).toHaveBeenCalledWith(10);
+      expect(resetMock).toHaveBeenCalledWith(60);
+    });
+
+    it("completes session after theme_count memos when using custom theme_count", async () => {
+      const customSettings: SettingsRecord = {
+        id: "default",
+        theme_count: 3,
+        time_limit: "60",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      };
+      mockGetSettings.mockResolvedValue(customSettings);
+
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 3")).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByRole("textbox");
+      const nextButton = screen.getByRole("button", { name: /次へ/ });
+
+      // 3回進める
+      for (let i = 1; i <= 3; i += 1) {
+        await act(async () => {
+          fireEvent.change(textarea, { target: { value: `memo ${i}` } });
+          fireEvent.click(nextButton);
+        });
+
+        if (i < 3) {
+          await waitFor(() => {
+            expect(screen.getByText(`${i + 1} / 3`)).toBeInTheDocument();
+          });
+        }
+      }
+
+      // 3回目のメモ保存を待つ
+      await waitFor(() => {
+        expect(memosRepo.saveMemo).toHaveBeenCalledTimes(3);
+      });
+
+      // セッション完了処理を待つ
+      await waitFor(() => {
+        expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
+      });
+
+      // router.pushの呼び出しを確認
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith(
+          "/session/complete?sessionId=session-1"
+        );
+      });
     });
   });
 });
