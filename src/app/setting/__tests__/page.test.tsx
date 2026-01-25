@@ -120,8 +120,8 @@ describe("SettingPage", () => {
     it("has close button linking to home", () => {
       render(<SettingPage />);
 
-      // aria-labelが設定されているため、nameで検索する
-      const closeButton = screen.getByRole("link", { name: "設定を閉じる" });
+      // リンクのテキストコンテンツで検索
+      const closeButton = screen.getByRole("link", { name: "閉じる" });
       expect(closeButton).toHaveAttribute("href", "/");
     });
   });
