@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
+import type { ReactNode } from "react";
 import SettingPage from "../page";
 import type { SettingsRecord } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/types/settings";
@@ -203,7 +204,14 @@ describe("SettingPage", () => {
 
       // 値を変更してblur
       fireEvent.change(themeCountInput, { target: { value: "25" } });
-      fireEvent.blur(themeCountInput);
+      
+      // blurイベントでエラーが発生するが、コンポーネント側でキャッチされる
+      // エラーは親側でキャッチされてupdateErrorに設定される
+      await act(async () => {
+        fireEvent.blur(themeCountInput);
+        // エラーが処理されるまで少し待つ
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
 
       await waitFor(() => {
         expect(screen.getByText(errorMessage)).toBeInTheDocument();

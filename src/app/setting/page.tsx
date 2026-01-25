@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
+import { InputTargetCount } from "@/components/setting/InputTargetCount";
+import { InputTargetTime } from "@/components/setting/InputTargetTime";
 
 /**
  * 設定画面
@@ -10,71 +12,47 @@ import { useSettings } from "@/hooks/useSettings";
  */
 export default function SettingPage() {
   const { settings, isLoading, error, updateSettings, resetSettings } = useSettings();
-
-  // ローカルstate（入力中の値を保持、onBlurで保存）
-  const [localThemeCount, setLocalThemeCount] = useState<number | null>(null);
-  const [localTimeLimit, setLocalTimeLimit] = useState<number | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
-  // settingsから初期値を取得（ローカルstateがnullの場合のみ使用）
-  const themeCount = localThemeCount ?? settings.theme_count;
-  const timeLimit = localTimeLimit ?? Number.parseInt(settings.time_limit, 10);
-
-  // resetSettingsが呼ばれたときにローカルstateをリセット
-  const handleResetInternal = async () => {
-    try {
-      setUpdateError(null);
-      setLocalThemeCount(null); // nullにすることでsettingsの値を使用
-      setLocalTimeLimit(null);
-      await resetSettings();
-    } catch (err) {
-      setUpdateError(err instanceof Error ? err.message : "設定のリセットに失敗しました");
-    }
-  };
-
   // 推定所要時間の計算（秒）
+  const themeCount = settings.theme_count;
+  const timeLimit = Number.parseInt(settings.time_limit, 10);
   const estimatedSeconds = themeCount * timeLimit;
   // 分換算
   const estimatedMinutes = Math.floor(estimatedSeconds / 60);
   const remainingSeconds = estimatedSeconds % 60;
 
-  const handleThemeCountBlur = async () => {
-    if (localThemeCount === null) return;
-
-    const clamped = Math.max(1, Math.min(100, localThemeCount));
-
-    // 現在の設定値と異なる場合のみ更新
-    if (clamped !== settings.theme_count) {
-      try {
-        setUpdateError(null);
-        await updateSettings({ theme_count: clamped });
-        setLocalThemeCount(null); // 更新成功後はsettingsの値を使用
-      } catch (err) {
-        setUpdateError(err instanceof Error ? err.message : "設定の更新に失敗しました");
-      }
-    } else {
-      // 値が同じ場合はローカルstateをクリア
-      setLocalThemeCount(null);
+  // テーマ件数の更新ハンドラ
+  const handleThemeCountUpdate = async (count: number) => {
+    try {
+      setUpdateError(null);
+      await updateSettings({ theme_count: count });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "設定の更新に失敗しました";
+      setUpdateError(errorMessage);
+      // エラーはコンポーネント側でキャッチされるため、再throwしない
     }
   };
 
-  const handleTimeLimitBlur = async () => {
-    if (localTimeLimit === null) return;
+  // 入力時間の更新ハンドラ
+  const handleTimeLimitUpdate = async (time: string) => {
+    try {
+      setUpdateError(null);
+      await updateSettings({ time_limit: time });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "設定の更新に失敗しました";
+      setUpdateError(errorMessage);
+      // エラーはコンポーネント側でキャッチされるため、再throwしない
+    }
+  };
 
-    const clamped = Math.max(1, Math.min(3600, localTimeLimit));
-
-    // 現在の設定値と異なる場合のみ更新
-    if (clamped.toString() !== settings.time_limit) {
-      try {
-        setUpdateError(null);
-        await updateSettings({ time_limit: clamped.toString() });
-        setLocalTimeLimit(null); // 更新成功後はsettingsの値を使用
-      } catch (err) {
-        setUpdateError(err instanceof Error ? err.message : "設定の更新に失敗しました");
-      }
-    } else {
-      // 値が同じ場合はローカルstateをクリア
-      setLocalTimeLimit(null);
+  // resetSettingsが呼ばれたときのハンドラ
+  const handleResetInternal = async () => {
+    try {
+      setUpdateError(null);
+      await resetSettings();
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "設定のリセットに失敗しました");
     }
   };
 
@@ -157,72 +135,26 @@ export default function SettingPage() {
 
             <div className="space-y-6">
               {/* テーマ件数 */}
-              <div>
-                <label
-                  htmlFor="theme-count"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-                >
-                  テーマ件数
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="theme-count"
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={themeCount}
-                    onChange={(e) => {
-                      const value = Number.parseInt(e.target.value, 10);
-                      if (!Number.isNaN(value)) {
-                        const clamped = Math.max(1, Math.min(100, value));
-                        setLocalThemeCount(clamped);
-                      }
-                    }}
-                    onBlur={handleThemeCountBlur}
-                    className="w-24 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-slate-600 dark:text-slate-400">
-                    件
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  1セッションあたりのテーマの出題数を設定します（1〜100件）
-                </p>
-              </div>
+              <InputTargetCount
+                value={settings.theme_count}
+                onUpdate={handleThemeCountUpdate}
+                min={1}
+                max={100}
+                id="theme-count"
+                disabled={isLoading}
+                description="1セッションあたりのテーマの出題数を設定します（1〜100件）"
+              />
 
               {/* 入力時間 */}
-              <div>
-                <label
-                  htmlFor="time-limit"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-                >
-                  入力する時間
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="time-limit"
-                    type="number"
-                    min={1}
-                    max={3600}
-                    value={timeLimit}
-                    onChange={(e) => {
-                      const value = Number.parseInt(e.target.value, 10);
-                      if (!Number.isNaN(value)) {
-                        const clamped = Math.max(1, Math.min(3600, value));
-                        setLocalTimeLimit(clamped);
-                      }
-                    }}
-                    onBlur={handleTimeLimitBlur}
-                    className="w-24 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-slate-600 dark:text-slate-400">
-                    秒
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  1テーマあたりの制限時間を設定します（1〜3600秒）
-                </p>
-              </div>
+              <InputTargetTime
+                value={settings.time_limit}
+                onUpdate={handleTimeLimitUpdate}
+                min={1}
+                max={3600}
+                id="time-limit"
+                disabled={isLoading}
+                description="1テーマあたりの制限時間を設定します（1〜3600秒）"
+              />
             </div>
           </section>
         </div>
