@@ -159,17 +159,19 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
-    });
-
-    expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
+    // セッションはまだ作成されていない（最初のメモ保存時に作成される）
+    expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     const textarea = screen.getByRole("textbox");
     const nextButton = screen.getByRole("button", { name: /次へ/ });
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "first memo" } });
       fireEvent.click(nextButton);
+    });
+
+    // 最初のメモ保存時にセッションが作成される
+    await waitFor(() => {
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
     });
 
     await waitFor(() => {
@@ -255,9 +257,8 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
-    });
+    // セッションはまだ作成されていない（最初のメモ保存時に作成される）
+    expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     const textarea = screen.getByRole("textbox");
     const nextButton = screen.getByRole("button", { name: /次へ/ });
@@ -278,6 +279,11 @@ describe("/session page", () => {
     // 最後のメモ保存を待つ
     await waitFor(() => {
       expect(memosRepo.saveMemo).toHaveBeenCalledTimes(10);
+    });
+
+    // 最初のメモ保存時にセッションが作成されることを確認
+    await waitFor(() => {
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
     });
 
     // セッション完了処理を待つ
@@ -308,6 +314,9 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
+    // セッションはまだ作成されていない
+    expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
+
     const textarea = screen.getByRole("textbox");
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "auto-finished memo" } });
@@ -315,6 +324,11 @@ describe("/session page", () => {
 
     await act(async () => {
       callLastOnFinish();
+    });
+
+    // 最初のメモ保存時にセッションが作成される
+    await waitFor(() => {
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
     });
 
     await waitFor(() => {
@@ -347,6 +361,9 @@ describe("/session page", () => {
         expect(screen.getByText("1 / 3")).toBeInTheDocument();
       });
 
+      // セッションはまだ作成されていない（最初のメモ保存時に作成される）
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
+
       // pickRandomActiveThemes が theme_count=3 で呼ばれることを確認
       const { pickRandomActiveThemes } = await import("@/lib/utils/selectRandomThemes");
       expect(pickRandomActiveThemes).toHaveBeenCalledWith(3);
@@ -369,6 +386,9 @@ describe("/session page", () => {
         expect(screen.getByText("1 / 10")).toBeInTheDocument();
       });
 
+      // セッションはまだ作成されていない（最初のメモ保存時に作成される）
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
+
       // useCountdown が initialSeconds=30 で呼ばれることを確認
       // resetMock が 30 で呼ばれることを確認（初期化時に reset が呼ばれる）
       expect(resetMock).toHaveBeenCalledWith(30);
@@ -384,6 +404,9 @@ describe("/session page", () => {
       await waitFor(() => {
         expect(screen.getByText("1 / 10")).toBeInTheDocument();
       });
+
+      // セッションはまだ作成されていない（最初のメモ保存時に作成される）
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
       // デフォルト値（10テーマ、60秒）で進行できることを確認
       const { pickRandomActiveThemes } = await import("@/lib/utils/selectRandomThemes");
@@ -408,6 +431,9 @@ describe("/session page", () => {
         expect(screen.getByText("1 / 3")).toBeInTheDocument();
       });
 
+      // セッションはまだ作成されていない（最初のメモ保存時に作成される）
+      expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
+
       const textarea = screen.getByRole("textbox");
       const nextButton = screen.getByRole("button", { name: /次へ/ });
 
@@ -428,6 +454,11 @@ describe("/session page", () => {
       // 3回目のメモ保存を待つ
       await waitFor(() => {
         expect(memosRepo.saveMemo).toHaveBeenCalledTimes(3);
+      });
+
+      // 最初のメモ保存時にセッションが作成されることを確認
+      await waitFor(() => {
+        expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
       });
 
       // セッション完了処理を待つ

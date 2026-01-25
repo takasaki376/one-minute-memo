@@ -108,20 +108,8 @@ export default function SessionPage() {
 
         setThemes(selected);
 
-        // DBにセッションを作成
-        const session = await createSession(selected.map((t) => t.id));
-        // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
-        if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-117] セッションを作成しました:", {
-            id: session.id,
-            themeIds: session.themeIds,
-            startedAt: session.startedAt,
-            memoCount: session.memoCount,
-            themeCount: settingsThemeCount,
-            secondsPerTheme: settingsTimeLimit,
-          });
-        }
-        setSessionId(session.id);
+        // セッションは最初のメモ保存時に作成する（メモ0件のセッションを防ぐため）
+        // sessionIdはnullのままにしておく
 
         // 最初のテーマ用に入力状態をリセット
         setCurrentIndex(0);
@@ -148,20 +136,31 @@ export default function SessionPage() {
     index: number,
     themeId: string
   ): Promise<void> => {
-    if (!sessionId) {
+    // セッションがまだ作成されていない場合は、最初のメモ保存時に作成する
+    // これにより、メモ0件のセッションが作成されることを防ぐ
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      if (themes.length === 0) {
+        console.error("[PJ1-99] テーマが設定されていないためセッションを作成できません");
+        return;
+      }
+      const session = await createSession(themes.map((t) => t.id));
+      currentSessionId = session.id;
+      setSessionId(session.id);
+      // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] メモ保存をスキップ:", {
-          hasSessionId: !!sessionId,
-          index,
-          themeId,
+        console.log("[PJ1-99] 最初のメモ保存時にセッションを作成しました:", {
+          id: session.id,
+          themeIds: session.themeIds,
+          startedAt: session.startedAt,
+          memoCount: session.memoCount,
         });
       }
-      return;
     }
 
     try {
       const savedMemo = await saveMemo({
-        sessionId,
+        sessionId: currentSessionId,
         themeId,
         order: index + 1, // 引数として受け取ったindexを使用
         textContent: text,
