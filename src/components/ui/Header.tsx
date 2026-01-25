@@ -34,6 +34,12 @@ export function Header() {
           >
             テーマ管理
           </Link>
+          <Link
+            href="/setting"
+            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+          >
+            設定
+          </Link>
         </nav>
       </div>
     </header>

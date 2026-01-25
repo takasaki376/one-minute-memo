@@ -61,6 +61,14 @@ export default function HomePage() {
         >
           テーマを管理
         </Button>
+        <Button
+          href="/setting"
+          variant="secondary"
+          className="w-full"
+          disabled={!isReady}
+        >
+          設定
+        </Button>
       </div>
 
       {/* 将来的に統計を置くスペース */}
