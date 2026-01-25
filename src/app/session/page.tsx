@@ -36,7 +36,8 @@ export default function SessionPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [memoCount, setMemoCount] = useState(0);
   // セッション開始時の設定値（このセッションで固定）
-  // themeCountは未使用だが、将来的に使用する可能性があるため保持
+  // themeCountは現時点では未使用だが、将来的に「セッション結果画面／分析機能」で
+  // 1セッションあたりのテーマ数を表示・保存する際に利用する予定のため state として保持しておく
   const [, setThemeCount] = useState(DEFAULT_THEME_COUNT);
   const [secondsPerTheme, setSecondsPerTheme] = useState(DEFAULT_TIME_LIMIT_SECONDS);
   // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
