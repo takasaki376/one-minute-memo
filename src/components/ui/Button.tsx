@@ -28,7 +28,9 @@ export interface ButtonProps {
   /** 左アイコン・右アイコン（必要なら） */
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  /** aria-label など追加属性を渡すための拡張用 */
+  /** aria-label（アクセシビリティ用） */
+  "aria-label"?: string;
+  /** その他の追加属性を渡すための拡張用 */
   className?: string;
 }
 
@@ -44,6 +46,7 @@ export function Button({
   fullWidth = false,
   leftIcon,
   rightIcon,
+  "aria-label": ariaLabel,
   className,
 }: ButtonProps) {
   const isDisabled = disabled || isLoading;
@@ -101,6 +104,7 @@ export function Button({
       <Link
         href={href}
         aria-disabled={isDisabled}
+        aria-label={ariaLabel}
         tabIndex={isDisabled ? -1 : undefined}
         className={classes}
         onClick={(e) => {
@@ -122,6 +126,7 @@ export function Button({
       type={type}
       onClick={isDisabled ? undefined : onClick}
       disabled={isDisabled}
+      aria-label={ariaLabel}
       className={classes}
     >
       {content}
