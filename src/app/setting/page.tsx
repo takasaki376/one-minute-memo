@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/Button";
 export default function SettingPage() {
   // TODO: useSettings フックを実装後に連携
   // const { settings, isLoading, error, updateSettings, resetSettings } = useSettings();
-  
+
   const [isLoading] = useState(false);
   const [error] = useState<string | null>(null);
-  
+
   // プレースホルダー: 後でuseSettingsから取得
   const [localThemeCount, setLocalThemeCount] = useState(10);
   const [localTimeLimit, setLocalTimeLimit] = useState(60);
@@ -54,9 +54,7 @@ export default function SettingPage() {
           <h2 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">
             設定の読み込みに失敗しました
           </h2>
-          <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-            {error}
-          </p>
+          <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
           <div className="flex gap-3">
             <Button
               onClick={() => window.location.reload()}
@@ -81,12 +79,7 @@ export default function SettingPage() {
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
           設定
         </h1>
-        <Button
-          href="/"
-          variant="ghost"
-          size="sm"
-          aria-label="設定を閉じる"
-        >
+        <Button href="/" variant="ghost" size="sm" aria-label="設定を閉じる">
           {/* TODO: MdOutlineClose アイコンを追加 */}
           閉じる
         </Button>
@@ -106,7 +99,7 @@ export default function SettingPage() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
               セッション設定
             </h2>
-            
+
             <div className="space-y-6">
               {/* テーマ件数 */}
               <div>
@@ -231,7 +224,8 @@ export default function SettingPage() {
       {/* 適用ルール注記 */}
       <div className="mt-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
         <p className="text-sm text-blue-800 dark:text-blue-200">
-          ⓘ 設定は次回セッション開始から適用されます。現在進行中のセッションには影響しません。
+          ⓘ
+          設定は次回セッション開始から適用されます。現在進行中のセッションには影響しません。
         </p>
       </div>
     </main>

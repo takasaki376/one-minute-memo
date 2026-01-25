@@ -2,10 +2,14 @@ import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { ThemeRecord } from '@/types/theme';
 import type { SessionRecord } from '@/types/session';
 import type { MemoRecord } from '@/types/memo';
+import type { SettingsRecord } from '@/types/settings';
 
 export type SessionRecordDB = Omit<SessionRecord, 'endedAt'> & {
   endedAt: string; // '' means "not finished yet"
 };
+
+// Empty indexes type for stores that don't need indexes
+type EmptyIndexes = Record<string, never>;
 
 export interface OneMinuteMemoDB extends DBSchema {
   themes: {
@@ -35,10 +39,16 @@ export interface OneMinuteMemoDB extends DBSchema {
       by_createdAt: string;
     };
   };
+
+  settings: {
+    key: SettingsRecord['id'];
+    value: SettingsRecord;
+    indexes: EmptyIndexes;
+  };
 }
 
 const DB_NAME = 'one-minute-memo-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<OneMinuteMemoDB>> | null = null;
 
@@ -80,6 +90,11 @@ export function getDB() {
           store.createIndex('by_sessionId', 'sessionId', { unique: false });
           store.createIndex('by_themeId', 'themeId', { unique: false });
           store.createIndex('by_createdAt', 'createdAt', { unique: false });
+        }
+
+        // settings
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'id' });
         }
       },
     });
