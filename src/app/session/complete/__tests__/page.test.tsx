@@ -148,19 +148,37 @@ describe("/session/complete page", () => {
       expect(restartButton).toHaveAttribute("href", "/session");
     });
 
-    it("成功状態では2つのボタン（履歴一覧と再開）のみ表示される", async () => {
+    it("「このセッションの詳細を見る」ボタンが表示され /history/:id へ遷移する", async () => {
       render(<SessionCompletePage />);
 
       await waitFor(() => {
         expect(sessionsRepo.getSessionById).toHaveBeenCalledWith("session-1");
       });
 
+      const detailButton = await screen.findByRole("link", {
+        name: /このセッションの詳細を見る/,
+      });
+      expect(detailButton).toBeInTheDocument();
+      expect(detailButton).toHaveAttribute("href", "/history/session-1");
+    });
+
+    it("成功状態では3つのボタン（詳細・履歴一覧・再開）が表示される", async () => {
+      render(<SessionCompletePage />);
+
+      await waitFor(() => {
+        expect(sessionsRepo.getSessionById).toHaveBeenCalledWith("session-1");
+      });
+
+      const detailButton = await screen.findByRole("link", {
+        name: /このセッションの詳細を見る/,
+      });
       const historyButton = await screen.findByRole("link", {
         name: /履歴一覧を見る/,
       });
       const restartButton = await screen.findByRole("link", {
         name: /もう一度セッションを始める/,
       });
+      expect(detailButton).toBeInTheDocument();
       expect(historyButton).toBeInTheDocument();
       expect(restartButton).toBeInTheDocument();
     });
@@ -238,14 +256,14 @@ describe("/session/complete page", () => {
       render(<SessionCompletePage />);
 
       await waitFor(() => {
+        const startButton = screen.getByRole("link", {
+          name: /新しくセッションを始める/,
+        });
         const historyButton = screen.getByRole("link", {
           name: /履歴一覧を見る/,
         });
-        const restartButton = screen.getByRole("link", {
-          name: /もう一度セッションを始める/,
-        });
+        expect(startButton).toBeInTheDocument();
         expect(historyButton).toBeInTheDocument();
-        expect(restartButton).toBeInTheDocument();
       });
     });
   });

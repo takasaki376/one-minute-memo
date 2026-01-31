@@ -74,11 +74,11 @@ function SessionCompleteContent() {
           </p>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button href="/history" variant="primary">
-            履歴一覧を見る
+          <Button href="/session" variant="primary">
+            新しくセッションを始める
           </Button>
-          <Button href="/session" variant="secondary">
-            もう一度セッションを始める
+          <Button href="/history" variant="secondary">
+            履歴一覧を見る
           </Button>
           <Button href="/" variant="ghost">
             トップへ戻る
@@ -168,15 +168,18 @@ function SessionCompleteContent() {
         </dl>
       </div>
 
-      {/* ナビゲーションボタン */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Button href="/history" variant="primary" fullWidth>
+      {/* アクションボタン（PJ1-104: このセッションの詳細を見るを primary に） */}
+      <section className="mt-8 flex flex-wrap gap-3">
+        <Button href={`/history/${session.id}`} variant="primary">
+          このセッションの詳細を見る
+        </Button>
+        <Button href="/history" variant="secondary">
           履歴一覧を見る
         </Button>
-        <Button href="/session" variant="secondary" fullWidth>
+        <Button href="/session" variant="ghost">
           もう一度セッションを始める
         </Button>
-      </div>
+      </section>
     </main>
   );
 }
