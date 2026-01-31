@@ -68,9 +68,8 @@ test.describe("設定変更フロー", () => {
 
     // 設定リンクをクリック
     const settingsLink = page.getByRole("link", { name: /設定/ });
-    if (await settingsLink.isVisible()) {
-      await settingsLink.click();
-      await expect(page).toHaveURL(/\/setting/);
-    }
+    await expect(settingsLink).toBeVisible();
+    await settingsLink.click();
+    await expect(page).toHaveURL(/\/setting/);
   });
 });
