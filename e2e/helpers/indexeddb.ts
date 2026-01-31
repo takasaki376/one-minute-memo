@@ -7,11 +7,27 @@ import type { Page } from "@playwright/test";
 export async function clearIndexedDB(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const databases = await indexedDB.databases();
+    const deletePromises: Promise<void>[] = [];
     for (const db of databases) {
       if (db.name) {
-        indexedDB.deleteDatabase(db.name);
+        deletePromises.push(
+          new Promise<void>((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(db.name!);
+            request.onsuccess = () => {
+              resolve();
+            };
+            request.onerror = () => {
+              reject(request.error);
+            };
+            request.onblocked = () => {
+              // Treat blocked as an error so tests can surface issues.
+              reject(new Error(`Deletion of IndexedDB database "${db.name}" was blocked`));
+            };
+          })
+        );
       }
     }
+    await Promise.all(deletePromises);
   });
 }
 
