@@ -53,6 +53,11 @@ export async function saveMemo(
   return record;
 }
 
+/**
+ * 指定セッションに紐づくメモをすべて取得する
+ * - セッション詳細画面 `/history/[id]` 用
+ * - order 昇順に並び替えて返す
+ */
 export async function getMemosBySession(
   sessionId: string,
 ): Promise<MemoRecord[]> {
@@ -62,6 +67,17 @@ export async function getMemosBySession(
   // order でソートしておくとUI側が楽
   memos.sort((a, b) => a.order - b.order);
   return memos;
+}
+
+/**
+ * 指定セッションに紐づくメモをすべて取得する（getMemosBySession のエイリアス）
+ * - 履歴詳細・セッション完了画面などで利用
+ * - PJ1-103: タスク仕様の名前で公開
+ */
+export async function getMemosBySessionId(
+  sessionId: string,
+): Promise<MemoRecord[]> {
+  return getMemosBySession(sessionId);
 }
 
 export async function getMemosByTheme(
