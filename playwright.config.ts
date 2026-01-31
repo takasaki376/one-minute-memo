@@ -11,7 +11,7 @@ export default defineConfig({
   // テストの並列実行
   fullyParallel: true,
 
-  // CI環境では失敗時のリトライなし
+  // CI環境では失敗時に2回リトライし、ローカルではリトライなし
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
 
