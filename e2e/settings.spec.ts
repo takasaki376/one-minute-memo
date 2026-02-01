@@ -12,7 +12,7 @@ test.describe("設定変更フロー", () => {
     await page.goto("/setting");
 
     // 設定画面のタイトル
-    await expect(page.locator("text=/設定/")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "設定", level: 1 })).toBeVisible();
   });
 
   test("テーマ数を変更できる", async ({ page }) => {
@@ -51,8 +51,8 @@ test.describe("設定変更フロー", () => {
   test("トップ画面から設定画面に遷移できる", async ({ page }) => {
     await page.goto("/");
 
-    // 設定リンクをクリック
-    const settingsLink = page.getByRole("link", { name: /設定/ });
+    // 設定リンクをクリック（ヘッダーとメインの2つあるので先頭をクリック）
+    const settingsLink = page.getByRole("link", { name: "設定" }).first();
     await expect(settingsLink).toBeVisible();
     await settingsLink.click();
     await expect(page).toHaveURL(/\/setting/);

@@ -30,15 +30,15 @@ test.describe("セッション実行フロー", () => {
     // セッション画面に遷移
     await expect(page).toHaveURL(/\/session/);
 
-    // テーマ表示があることを確認
-    await expect(page.locator("text=/テーマ|Theme/i")).toBeVisible();
+    // テーマ表示があることを確認（1/10 などのインジケータ）
+    await expect(page.locator("text=/1\\s*\\/\\s*10/")).toBeVisible();
   });
 
   test("セッション画面でタイマーが表示される", async ({ page }) => {
     await page.goto("/session");
 
-    // タイマー表示を確認（秒数表示）
-    await expect(page.locator("text=/\\d+/")).toBeVisible();
+    // タイマー表示を確認（秒数 60 が表示される）
+    await expect(page.getByText("60", { exact: true })).toBeVisible();
   });
 
   test("セッション画面でテキスト入力ができる", async ({ page }) => {

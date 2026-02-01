@@ -77,8 +77,8 @@ test.describe("履歴確認フロー", () => {
     // 履歴詳細画面
     await expect(page).toHaveURL(/\/history\/.+/);
 
-    // メモ一覧が表示される
-    await expect(page.locator("text=/メモ|#1/")).toBeVisible();
+    // メモ一覧が表示される（見出しで一意に特定）
+    await expect(page.getByRole("heading", { name: "メモ一覧" })).toBeVisible();
   });
 
   test("履歴詳細から履歴一覧に戻れる", async ({ page }) => {
