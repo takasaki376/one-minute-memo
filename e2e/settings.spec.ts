@@ -41,11 +41,13 @@ test.describe("設定変更フロー", () => {
 
     await themeCountInput.fill("5");
     await themeCountInput.blur();
-    await page.waitForTimeout(500);
 
     await page.goto("/session");
 
-    await expect(page.locator("text=/\\/\\s*5|5.*件/")).toBeVisible();
+    // 設定が反映されていればテーマインジケータが 1 / 5 になる
+    await expect(page.locator("text=/1\\s*\\/\\s*5/")).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test("トップ画面から設定画面に遷移できる", async ({ page }) => {
