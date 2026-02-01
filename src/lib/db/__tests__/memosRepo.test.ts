@@ -142,6 +142,9 @@ describe("memosRepo", () => {
 
       const first = await saveMemo(base);
 
+      // updatedAt が異なることを確実にするため、少し待機
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       const second = await saveMemo({
         ...base,
         textContent: "上書き後のテキスト",
@@ -151,6 +154,13 @@ describe("memosRepo", () => {
       expect(second.id).toBe(first.id);
       // テキストは上書きされている
       expect(second.textContent).toBe("上書き後のテキスト");
+      // createdAt は最初のレコードから保持される
+      expect(second.createdAt).toBe(first.createdAt);
+      // updatedAt は更新される（新しい値になる）
+      expect(second.updatedAt).not.toBe(first.updatedAt);
+      expect(new Date(second.updatedAt).getTime()).toBeGreaterThan(
+        new Date(first.updatedAt).getTime(),
+      );
     });
   });
 
@@ -307,7 +317,7 @@ describe("memosRepo", () => {
 
     it("存在しないセッションを指定しても例外にならない", async () => {
       await expect(
-        deleteMemosBySession("non-existent-session")
+        deleteMemosBySession("non-existent-session"),
       ).resolves.toBeUndefined();
     });
   });
