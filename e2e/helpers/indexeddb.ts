@@ -45,8 +45,8 @@ export async function clearIndexedDB(page: Page): Promise<void> {
               reject(request.error);
             };
             request.onblocked = () => {
-              // ブロックされた場合は一定時間待ってから解決
-              setTimeout(() => resolve(), 1000);
+              // 接続が開いているためブロックされた場合は無視（BrowserContext はテストごとに分離されている）
+              resolve();
             };
           }),
         );
