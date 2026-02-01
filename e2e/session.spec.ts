@@ -17,15 +17,15 @@ test.describe("セッション実行フロー", () => {
 
     // セッション開始ボタンが表示される
     await expect(
-      page.getByRole("link", { name: /セッションを始める|セッション/ })
+      page.getByRole("link", { name: /セッションを開始/ }),
     ).toBeVisible();
   });
 
   test("トップからセッション画面に遷移できる", async ({ page }) => {
     await page.goto("/");
 
-    // セッション開始ボタンをクリック
-    await page.getByRole("link", { name: /セッションを始める|セッション/ }).click();
+    // セッション開始ボタンをクリック（トップページのボタンのみを対象）
+    await page.getByRole("link", { name: /セッションを開始/ }).click();
 
     // セッション画面に遷移
     await expect(page).toHaveURL(/\/session/);
@@ -91,7 +91,9 @@ test.describe("セッション実行フロー", () => {
     // 完了画面に遷移
     await expect(page).toHaveURL(/\/session\/complete/);
 
-    // 完了メッセージを確認
-    await expect(page.locator("text=/完了|おつかれさま/")).toBeVisible();
+    // 完了メッセージを確認（見出しとして表示されている）
+    await expect(
+      page.getByRole("heading", { name: /完了|おつかれさま/ }),
+    ).toBeVisible();
   });
 });

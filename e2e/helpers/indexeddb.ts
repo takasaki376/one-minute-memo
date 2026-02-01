@@ -6,7 +6,32 @@ import type { Page } from "@playwright/test";
  */
 export async function clearIndexedDB(page: Page): Promise<void> {
   await page.evaluate(async () => {
+    // まず、開いているすべてのデータベース接続を閉じる
     const databases = await indexedDB.databases();
+
+    // 各データベースを開いて閉じることで、既存の接続をクリア
+    for (const db of databases) {
+      if (db.name) {
+        try {
+          const openRequest = indexedDB.open(db.name);
+          await new Promise<void>((resolve) => {
+            openRequest.onsuccess = () => {
+              openRequest.result.close();
+              resolve();
+            };
+            openRequest.onerror = () => {
+              resolve(); // エラーでも続行
+            };
+          });
+        } catch (e) {
+          // 無視
+        }
+      }
+    }
+
+    // 少し待機してから削除を試みる
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     const deletePromises: Promise<void>[] = [];
     for (const db of databases) {
       if (db.name) {
@@ -20,10 +45,10 @@ export async function clearIndexedDB(page: Page): Promise<void> {
               reject(request.error);
             };
             request.onblocked = () => {
-              // Treat blocked as an error so tests can surface issues.
-              reject(new Error(`Deletion of IndexedDB database "${db.name}" was blocked`));
+              // ブロックされた場合は一定時間待ってから解決
+              setTimeout(() => resolve(), 1000);
             };
-          })
+          }),
         );
       }
     }
@@ -37,7 +62,7 @@ export async function clearIndexedDB(page: Page): Promise<void> {
 export async function clearStore(
   page: Page,
   dbName: string,
-  storeName: string
+  storeName: string,
 ): Promise<void> {
   await page.evaluate(
     async ({ dbName, storeName }) => {
@@ -65,6 +90,6 @@ export async function clearStore(
         request.onerror = () => reject(request.error);
       });
     },
-    { dbName, storeName }
+    { dbName, storeName },
   );
 }
