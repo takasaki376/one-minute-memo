@@ -43,8 +43,6 @@ describe("TextEditor", () => {
       "テキストメモ入力"
     ) as HTMLTextAreaElement;
     expect(textarea).toBeDisabled();
-    // disabled 属性が正しく設定されていることを確認
-    expect(textarea).toHaveAttribute("disabled");
   });
 
   it("placeholder が表示される", () => {
