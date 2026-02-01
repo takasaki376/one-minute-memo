@@ -13,7 +13,9 @@ export interface SessionCardProps {
 }
 
 /**
- * セッション履歴一覧で使うカードコンポーネント
+ * セッション履歴一覧で使うカードコンポーネント（PJ1-107）
+ * - session を渡し、href で詳細画面へ遷移
+ * - classcat / Tailwind、未完了時は「未完了」表示
  */
 export function SessionCard({ session, href, className }: SessionCardProps) {
   const started = session.startedAt ? new Date(session.startedAt) : null;

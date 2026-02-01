@@ -1,37 +1,40 @@
-<!-- I want to review in Japanese. -->
+<!-- Review must be performed in Japanese. -->
 
 ## 概要
 
-xxxxxx
+（この PR の目的・背景を 1〜2 行で）
 
 ## 実装内容
 
-xxxxxx
+（変更の概要・方針）
 
 ## 主な機能
 
-- xxxxxx
-  以下略
+- （箇条書き）
+- 
+- 
 
 ## 動作確認
 
-- [x] xxxxxx
-    以下略
-<!-- I want to review in Japanese. -->
+- [ ] （確認した項目）
+- [ ] 
+- [ ] 
+
+---
 
 ## レビューに関して
 
-レビューする際には、以下の prefix(接頭辞)を付けましょう。
+レビューする際には、以下の prefix（接頭辞）を付けましょう。
 
 <!-- for GitHub Copilot review rule -->
 
 [must] → かならず変更してね  
-[imo] → 自分の意見だとこうだけど修正必須ではないよ(in my opinion)  
-[nits] → ささいな指摘(nitpick)
+[imo] → 自分の意見だとこうだけど修正必須ではないよ (in my opinion)  
+[nits] → ささいな指摘 (nitpick)  
 [ask] → 質問  
 [fyi] → 参考情報
 
-<!-- for GitHub Copilot review rule-->
+<!-- for GitHub Copilot review rule -->
 
 ## PR のルール
 

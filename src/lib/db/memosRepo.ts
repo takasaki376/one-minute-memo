@@ -53,6 +53,11 @@ export async function saveMemo(
   return record;
 }
 
+/**
+ * 指定セッションに紐づくメモをすべて取得する
+ * - セッション詳細画面 `/history/[id]` 用
+ * - order 昇順に並び替えて返す
+ */
 export async function getMemosBySession(
   sessionId: string,
 ): Promise<MemoRecord[]> {
