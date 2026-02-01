@@ -21,16 +21,19 @@ test.describe("履歴確認フロー", () => {
     // まずセッションを完了させる
     await page.goto("/session");
 
-    // 10回「次へ」をクリック
+    // 10回「次へ」をクリック（各クリック後にインジケータ更新を待つ）
     for (let i = 0; i < 10; i++) {
       const nextButton = page.getByRole("button", {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
-      await page.waitForTimeout(50);
+      if (i < 9) {
+        const nextIndex = i + 2;
+        await expect(
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+        ).toBeVisible({ timeout: 5000 });
+      }
     }
-
-    // 完了画面に遷移したことを確認
     await expect(page).toHaveURL(/\/session\/complete/);
 
     // 履歴一覧に遷移
@@ -56,10 +59,13 @@ test.describe("履歴確認フロー", () => {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
-      await page.waitForTimeout(50);
+      if (i < 9) {
+        const nextIndex = i + 2;
+        await expect(
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+        ).toBeVisible({ timeout: 5000 });
+      }
     }
-
-    // 完了画面から履歴詳細へ
     await expect(page).toHaveURL(/\/session\/complete/);
 
     // 「このセッションの詳細を見る」または履歴一覧経由で詳細へ
@@ -90,8 +96,14 @@ test.describe("履歴確認フロー", () => {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
-      await page.waitForTimeout(50);
+      if (i < 9) {
+        const nextIndex = i + 2;
+        await expect(
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+        ).toBeVisible({ timeout: 5000 });
+      }
     }
+    await expect(page).toHaveURL(/\/session\/complete/);
 
     // 履歴一覧へ
     await page.goto("/history");
