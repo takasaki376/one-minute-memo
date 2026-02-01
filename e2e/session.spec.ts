@@ -37,8 +37,8 @@ test.describe("セッション実行フロー", () => {
   test("セッション画面でタイマーが表示される", async ({ page }) => {
     await page.goto("/session");
 
-    // タイマー表示を確認（秒数 60 が表示される）
-    await expect(page.getByText("60", { exact: true })).toBeVisible();
+    // タイマー表示を確認（「残り時間」「秒」に挟まれた秒数表示）
+    await expect(page.getByText(/残り時間\s*\d+\s*秒/)).toBeVisible();
   });
 
   test("セッション画面でテキスト入力ができる", async ({ page }) => {
@@ -75,16 +75,19 @@ test.describe("セッション実行フロー", () => {
   test("10テーマ完了後、完了画面に遷移する", async ({ page }) => {
     await page.goto("/session");
 
-    // 10回「次へ」ボタンをクリックして全テーマを完了
+    // 10回「次へ」ボタンをクリックして全テーマを完了（各クリック後にインジケータ更新を待つ）
     for (let i = 0; i < 10; i++) {
       const nextButton = page.getByRole("button", {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
 
-      // 最後のテーマ以外は少し待機
       if (i < 9) {
-        await page.waitForTimeout(100);
+        // 次のテーマ（n+1 / 10）に進んだことを待つ
+        const nextIndex = i + 2;
+        await expect(
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+        ).toBeVisible({ timeout: 5000 });
       }
     }
 
