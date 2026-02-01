@@ -53,8 +53,8 @@ export default defineConfig({
   webServer: {
     command: "yarn dev",
     url: "http://localhost:3000",
-    // 既存サーバーがあれば再利用（ローカル開発時）
-    reuseExistingServer: true,
+    // ローカル開発時のみ既存サーバーを再利用（CIでは常に新規起動）
+    reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
 });
