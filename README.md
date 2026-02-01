@@ -136,6 +136,11 @@ yarn dev
 http://localhost:3000
 ```
 
+### 4. テスト
+
+- **単体・コンポーネントテスト（Vitest）**: `yarn test` または `yarn test:watch`
+- **E2E テスト（Playwright）**: 初回のみ `yarn playwright install` でブラウザをインストールしてから、`yarn test:e2e` で実行
+
 ---
 
 ## 📌 今後のロードマップ
