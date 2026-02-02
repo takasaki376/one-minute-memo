@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clearIndexedDB } from "./helpers/indexeddb";
+import { getThemeTotal } from "./helpers/session";
 
 test.describe("セッション実行フロー", () => {
   test.beforeEach(async ({ page }) => {
@@ -30,8 +31,8 @@ test.describe("セッション実行フロー", () => {
     // セッション画面に遷移
     await expect(page).toHaveURL(/\/session/);
 
-    // テーマ表示があることを確認（1/10 などのインジケータ）
-    await expect(page.locator("text=/1\\s*\\/\\s*10/")).toBeVisible();
+    // テーマ表示があることを確認（1/N のインジケータ、N は設定で可変）
+    await expect(page.locator("text=/1\\s*\\/\\s*\\d+/")).toBeVisible();
   });
 
   test("セッション画面でタイマーが表示される", async ({ page }) => {
@@ -74,19 +75,19 @@ test.describe("セッション実行フロー", () => {
 
   test("10テーマ完了後、完了画面に遷移する", async ({ page }) => {
     await page.goto("/session");
+    const total = await getThemeTotal(page);
 
-    // 10回「次へ」ボタンをクリックして全テーマを完了（各クリック後にインジケータ更新を待つ）
-    for (let i = 0; i < 10; i++) {
+    // 全テーマ分「次へ」をクリック（各クリック後にインジケータ更新を待つ）
+    for (let i = 0; i < total; i++) {
       const nextButton = page.getByRole("button", {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
 
-      if (i < 9) {
-        // 次のテーマ（n+1 / 10）に進んだことを待つ
+      if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
         ).toBeVisible({ timeout: 5000 });
       }
     }

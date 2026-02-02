@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clearIndexedDB } from "./helpers/indexeddb";
+import { getThemeTotal } from "./helpers/session";
 
 test.describe("履歴確認フロー", () => {
   test.beforeEach(async ({ page }) => {
@@ -18,19 +19,18 @@ test.describe("履歴確認フロー", () => {
   });
 
   test("セッション完了後、履歴一覧に表示される", async ({ page }) => {
-    // まずセッションを完了させる
     await page.goto("/session");
+    const total = await getThemeTotal(page);
 
-    // 10回「次へ」をクリック（各クリック後にインジケータ更新を待つ）
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < total; i++) {
       const nextButton = page.getByRole("button", {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
-      if (i < 9) {
+      if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
         ).toBeVisible({ timeout: 5000 });
       }
     }
@@ -47,22 +47,21 @@ test.describe("履歴確認フロー", () => {
   });
 
   test("履歴詳細画面でメモ一覧が表示される", async ({ page }) => {
-    // セッションを完了
     await page.goto("/session");
+    const total = await getThemeTotal(page);
 
-    // テキストを入力してから次へ
     const textarea = page.locator("textarea");
     await textarea.fill("テスト用メモ内容");
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < total; i++) {
       const nextButton = page.getByRole("button", {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
-      if (i < 9) {
+      if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
         ).toBeVisible({ timeout: 5000 });
       }
     }
@@ -88,18 +87,18 @@ test.describe("履歴確認フロー", () => {
   });
 
   test("履歴詳細から履歴一覧に戻れる", async ({ page }) => {
-    // セッションを完了
     await page.goto("/session");
+    const total = await getThemeTotal(page);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < total; i++) {
       const nextButton = page.getByRole("button", {
         name: /次へ|終了して次へ|このテーマを終了/,
       });
       await nextButton.click();
-      if (i < 9) {
+      if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*10/`),
+          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
         ).toBeVisible({ timeout: 5000 });
       }
     }
