@@ -13,11 +13,11 @@ describe("TextEditor", () => {
         value="初期テキスト"
         onChange={handleChange}
         ariaLabel="テキストメモ入力"
-      />
+      />,
     );
 
     const textarea = screen.getByLabelText(
-      "テキストメモ入力"
+      "テキストメモ入力",
     ) as HTMLTextAreaElement;
     expect(textarea.value).toBe("初期テキスト");
 
@@ -36,11 +36,11 @@ describe("TextEditor", () => {
         onChange={handleChange}
         ariaLabel="テキストメモ入力"
         disabled
-      />
+      />,
     );
 
     const textarea = screen.getByLabelText(
-      "テキストメモ入力"
+      "テキストメモ入力",
     ) as HTMLTextAreaElement;
     expect(textarea).toBeDisabled();
   });
@@ -54,7 +54,7 @@ describe("TextEditor", () => {
         onChange={handleChange}
         ariaLabel="テキストメモ入力"
         placeholder="プレースホルダテキスト"
-      />
+      />,
     );
 
     const textarea = screen.getByPlaceholderText("プレースホルダテキスト");
@@ -67,7 +67,7 @@ describe("TextEditor", () => {
     render(<TextEditor value="" onChange={handleChange} />);
 
     const textarea = screen.getByPlaceholderText(
-      "思いつくことを自由に書き出してみましょう"
+      "思いつくことを自由に書き出してみましょう",
     );
     expect(textarea).toBeInTheDocument();
   });
@@ -81,11 +81,11 @@ describe("TextEditor", () => {
         onChange={handleChange}
         ariaLabel="テキストメモ入力"
         maxLength={100}
-      />
+      />,
     );
 
     const textarea = screen.getByLabelText(
-      "テキストメモ入力"
+      "テキストメモ入力",
     ) as HTMLTextAreaElement;
     expect(textarea).toHaveAttribute("maxLength", "100");
   });
@@ -94,11 +94,7 @@ describe("TextEditor", () => {
     const handleChange = vi.fn();
 
     const { container } = render(
-      <TextEditor
-        value=""
-        onChange={handleChange}
-        className="custom-class"
-      />
+      <TextEditor value="" onChange={handleChange} className="custom-class" />,
     );
 
     expect(container.firstChild).toHaveClass("custom-class");
