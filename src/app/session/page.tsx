@@ -339,7 +339,7 @@ export default function SessionPage() {
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
+    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8 md:max-w-6xl">
       {/* ヘッダー（テーマ情報） */}
       <ThemeHeader
         currentIndex={currentNumber}
@@ -348,33 +348,10 @@ export default function SessionPage() {
         category={currentTheme.category}
       />
 
-      {/* タイマー表示 */}
-      <div className="flex items-center justify-center">
-        <div className="rounded-lg bg-slate-100 px-6 py-3">
-          <p className="text-center text-sm text-slate-600">残り時間</p>
-          <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
-            {secondsLeft}
-          </p>
-          <p className="text-center text-xs text-slate-500">秒</p>
-        </div>
-      </div>
-
-      {/* 入力エリア */}
-      <section className="flex flex-col gap-6">
-        <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">
-            テキストメモ
-          </h2>
-          <TextEditor
-            value={text}
-            onChange={setText}
-            autoFocus
-            disabled={isInputDisabled}
-            placeholder="思いつくことをできるだけ書き出してみましょう"
-          />
-        </div>
-
-        <div>
+      {/* md以上: 2ペインレイアウト（Canvas主役 7:3）/ スマホ: 縦積み */}
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-[7fr_3fr] md:gap-6 md:items-start">
+        {/* 手書きCanvas（md以上で左ペイン・主領域） */}
+        <div className="order-2 md:order-1">
           <h2 className="mb-2 text-sm font-medium text-slate-700">
             手書きメモ（任意）
           </h2>
@@ -384,7 +361,35 @@ export default function SessionPage() {
             disabled={isInputDisabled}
           />
         </div>
-      </section>
+
+        {/* タイマー + テキスト（md以上で右ペイン・サブ領域） */}
+        <div className="order-1 flex flex-col gap-6 md:order-2">
+          {/* タイマー表示 */}
+          <div className="flex items-center justify-center">
+            <div className="rounded-lg bg-slate-100 px-6 py-3">
+              <p className="text-center text-sm text-slate-600">残り時間</p>
+              <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
+                {secondsLeft}
+              </p>
+              <p className="text-center text-xs text-slate-500">秒</p>
+            </div>
+          </div>
+
+          {/* テキストメモ */}
+          <div>
+            <h2 className="mb-2 text-sm font-medium text-slate-700">
+              テキストメモ
+            </h2>
+            <TextEditor
+              value={text}
+              onChange={setText}
+              autoFocus
+              disabled={isInputDisabled}
+              placeholder="思いつくことをできるだけ書き出してみましょう"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* フッター操作 */}
       <footer className="mt-2 flex items-center justify-between gap-4 border-t border-slate-200 pt-4">

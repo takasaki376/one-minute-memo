@@ -38,8 +38,10 @@ export function HandwritingCanvas({
     canvas.width = width * dpr;
     canvas.height = height * dpr;
 
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    // レスポンシブ: 親コンテナの幅に合わせて表示サイズを自動調整
+    canvas.style.width = "100%";
+    canvas.style.height = "auto";
+    canvas.style.aspectRatio = `${width} / ${height}`;
 
     ctx.scale(dpr, dpr);
     ctx.lineJoin = "round";
@@ -81,8 +83,11 @@ export function HandwritingCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    // 表示サイズと論理サイズの比率で座標をスケーリング
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
     return { x, y };
   };
 
