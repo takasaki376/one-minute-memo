@@ -1,0 +1,926 @@
+{
+  "version": "2.7",
+  "children": [
+    {
+      "type": "frame",
+      "id": "bi8Au",
+      "x": 0,
+      "y": 0,
+      "name": "Session Screen",
+      "enabled": false,
+      "clip": true,
+      "width": 1024,
+      "height": 768,
+      "fill": "#F8FAFC",
+      "layout": "vertical",
+      "gap": 24,
+      "padding": 32,
+      "children": [
+        {
+          "type": "frame",
+          "id": "uRMjf",
+          "name": "Header",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "cornerRadius": 8,
+          "gap": 12,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "Lmm9h",
+              "name": "Progress",
+              "fill": "#64748B",
+              "content": "1 / 10",
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "aCi80",
+              "name": "Theme Title",
+              "fill": "#0F172A",
+              "content": "今日の出来事について",
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "PmSU2",
+              "name": "Category Badge",
+              "fill": "#E0E7FF",
+              "cornerRadius": 4,
+              "padding": [
+                6,
+                12
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "FSrjx",
+                  "name": "categoryText",
+                  "fill": "#4338CA",
+                  "content": "日常",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "svXBH",
+          "name": "Content Area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "MI2TP",
+              "name": "Canvas Pane",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ulOxV",
+                  "name": "canvasLabel",
+                  "fill": "#475569",
+                  "content": "手書きメモ（任意）",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "frame",
+                  "id": "2t6lt",
+                  "name": "Canvas Area",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Tdymi",
+                      "name": "canvasPlaceholder",
+                      "fill": "#CBD5E1",
+                      "content": "マウスやタッチで描画してください",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UekbS",
+              "name": "Right Pane",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 24,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "2suWi",
+                  "name": "Timer Section",
+                  "width": "fill_container",
+                  "fill": "#F1F5F9",
+                  "cornerRadius": 8,
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 24,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "XLqNk",
+                      "name": "timerLabel",
+                      "fill": "#64748B",
+                      "content": "残り時間",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "HBqty",
+                      "name": "timerValue",
+                      "fill": "#0F172A",
+                      "content": "60",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 48,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "T3o1J",
+                      "name": "timerUnit",
+                      "fill": "#94A3B8",
+                      "content": "秒",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "UZyTM",
+                  "name": "Text Section",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "GkFf2",
+                      "name": "textLabel",
+                      "fill": "#475569",
+                      "content": "テキストメモ",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "GwG24",
+                      "name": "Text Area",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "#FFFFFF",
+                      "cornerRadius": 8,
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "2SMrF",
+                          "name": "textPlaceholder",
+                          "fill": "#94A3B8",
+                          "content": "思いつくことをできるだけ書き出してみましょう",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "GzfU2",
+          "name": "Footer",
+          "width": "fill_container",
+          "gap": 16,
+          "padding": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "RqnEh",
+              "name": "statusText",
+              "fill": "#94A3B8",
+              "content": "入力中…",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "ILKe2",
+              "name": "Button Group",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ghe65",
+                  "name": "Pause Button",
+                  "fill": "#F1F5F9",
+                  "cornerRadius": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "1GES3",
+                      "name": "pauseText",
+                      "fill": "#475569",
+                      "content": "一時停止",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Nl98u",
+                  "name": "Next Button",
+                  "fill": "#3B82F6",
+                  "cornerRadius": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "2TPtT",
+                      "name": "nextText",
+                      "fill": "#FFFFFF",
+                      "content": "このテーマを終えて次へ",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "uv8SP",
+      "x": 1074,
+      "y": 0,
+      "name": "Session Screen (Tab Ver)",
+      "width": 1024,
+      "height": 768,
+      "fill": "#F8FAFC",
+      "layout": "vertical",
+      "gap": 16,
+      "padding": 32,
+      "children": [
+        {
+          "type": "frame",
+          "id": "OCcjg",
+          "name": "Header",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "cornerRadius": 8,
+          "gap": 12,
+          "padding": 16,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "gfDc0",
+              "name": "Header Left",
+              "width": "fill_container",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "rf6AE",
+                  "name": "Progress",
+                  "fill": "#64748B",
+                  "content": "1 / 10",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "R6VgR",
+                  "name": "Theme Title",
+                  "fill": "#0F172A",
+                  "content": "今日の出来事について",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "Uim3n",
+                  "name": "Category Badge",
+                  "fill": "#E0E7FF",
+                  "cornerRadius": 4,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lIf8M",
+                      "name": "badgeText2",
+                      "fill": "#4338CA",
+                      "content": "日常",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "W5sxx",
+              "name": "Timer Compact",
+              "fill": "#F1F5F9",
+              "cornerRadius": 6,
+              "gap": 8,
+              "padding": [
+                8,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "4amKJ",
+                  "name": "timerLabelC",
+                  "fill": "#64748B",
+                  "content": "残り",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "uWib4",
+                  "name": "timerValueC",
+                  "fill": "#0F172A",
+                  "content": "60",
+                  "fontFamily": "Inter",
+                  "fontSize": 24,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "l3uqv",
+                  "name": "timerUnitC",
+                  "fill": "#64748B",
+                  "content": "秒",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "28m0K",
+          "name": "Footer",
+          "width": "fill_container",
+          "gap": 12,
+          "padding": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "fNZst",
+              "name": "Tab Bar",
+              "fill": "#F1F5F9",
+              "cornerRadius": 8,
+              "gap": 4,
+              "padding": 2,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "U5bm0",
+                  "name": "Tab Handwriting Active",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "nvjBw",
+                      "name": "tabHandText",
+                      "fill": "#0F172A",
+                      "content": "手書き入力",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "mGvtl",
+                  "name": "Tab Text Inactive",
+                  "fill": "transparent",
+                  "cornerRadius": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "CoMUx",
+                      "name": "tabTextText",
+                      "fill": "#64748B",
+                      "content": "テキスト入力",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "XLR9K",
+              "name": "Border Top",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#E2E8F0"
+            },
+            {
+              "type": "text",
+              "id": "EX15f",
+              "name": "status2",
+              "fill": "#94A3B8",
+              "content": "入力中…",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "KT6j2",
+              "name": "Button Group",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "0QBs7",
+                  "name": "Pause Button",
+                  "fill": "#F1F5F9",
+                  "cornerRadius": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "8CkXM",
+                      "name": "pauseTxt2",
+                      "fill": "#475569",
+                      "content": "一時停止",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "bcglR",
+                  "name": "Next Button",
+                  "fill": "#3B82F6",
+                  "cornerRadius": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "UROeE",
+                      "name": "nextTxt2",
+                      "fill": "#FFFFFF",
+                      "content": "このテーマを終えて次へ",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "eS0kA",
+          "name": "Input Area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#FFFFFF",
+          "cornerRadius": 8,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "vgqL5",
+              "name": "inputPlaceholder",
+              "fill": "#CBD5E1",
+              "content": "マウスやタッチで描画してください",
+              "textAlign": "center",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ytsKw",
+      "x": 2148,
+      "y": 0,
+      "name": "Session Screen (Text Tab Ver)",
+      "width": 1024,
+      "height": 768,
+      "fill": "#F8FAFC",
+      "layout": "vertical",
+      "gap": 16,
+      "padding": 32,
+      "children": [
+        {
+          "type": "frame",
+          "id": "ZfWJX",
+          "name": "Header",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "cornerRadius": 8,
+          "gap": 12,
+          "padding": 16,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "IC7Kj",
+              "name": "Header Left",
+              "width": "fill_container",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "5HCZx",
+                  "name": "Progress",
+                  "fill": "#64748B",
+                  "content": "1 / 10",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "3QrfB",
+                  "name": "Theme Title",
+                  "fill": "#0F172A",
+                  "content": "今日の出来事について",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "rycJl",
+                  "name": "Category Badge",
+                  "fill": "#E0E7FF",
+                  "cornerRadius": 4,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "UOVAu",
+                      "name": "badgeText2",
+                      "fill": "#4338CA",
+                      "content": "日常",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gVUJc",
+              "name": "Timer Compact",
+              "fill": "#F1F5F9",
+              "cornerRadius": 6,
+              "gap": 8,
+              "padding": [
+                8,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "kbRGh",
+                  "name": "timerLabel2C",
+                  "fill": "#64748B",
+                  "content": "残り",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "0HY42",
+                  "name": "timerValue2C",
+                  "fill": "#0F172A",
+                  "content": "60",
+                  "fontFamily": "Inter",
+                  "fontSize": 24,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "kAOcq",
+                  "name": "timerUnit2C",
+                  "fill": "#64748B",
+                  "content": "秒",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "WYNc7",
+          "name": "Footer",
+          "width": "fill_container",
+          "gap": 12,
+          "padding": [
+            16,
+            0,
+            0,
+            0
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "q0yUa",
+              "name": "Tab Bar",
+              "fill": "#F1F5F9",
+              "cornerRadius": 8,
+              "gap": 4,
+              "padding": 2,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "0QI5J",
+                  "name": "Tab Handwriting Inactive",
+                  "fill": "transparent",
+                  "cornerRadius": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "u6ShO",
+                      "name": "tabHandText",
+                      "fill": "#64748B",
+                      "content": "手書き入力",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "LQYQ8",
+                  "name": "Tab Text Active",
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "9iLjl",
+                      "name": "tabTextText",
+                      "fill": "#0F172A",
+                      "content": "テキスト入力",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "o1PXV",
+              "name": "Border Top",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#E2E8F0"
+            },
+            {
+              "type": "text",
+              "id": "68S79",
+              "name": "status2",
+              "fill": "#94A3B8",
+              "content": "入力中…",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "OcSde",
+              "name": "Button Group",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Bvotn",
+                  "name": "Pause Button",
+                  "fill": "#F1F5F9",
+                  "cornerRadius": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "vCrjS",
+                      "name": "pauseTxt2",
+                      "fill": "#475569",
+                      "content": "一時停止",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "7ZaTV",
+                  "name": "Next Button",
+                  "fill": "#3B82F6",
+                  "cornerRadius": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "vcsS5",
+                      "name": "nextTxt2",
+                      "fill": "#FFFFFF",
+                      "content": "このテーマを終えて次へ",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "qDVAz",
+          "name": "Text Input Area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#FFFFFF",
+          "cornerRadius": 8,
+          "layout": "vertical",
+          "gap": 4,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "NR7FY",
+              "name": "textLine1",
+              "fill": "#0F172A",
+              "content": "今日は天気が良かったので公園に散歩に行きました。",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "iO6NE",
+              "name": "textLine2",
+              "fill": "#0F172A",
+              "content": "桜の花が少しずつ咲き始めていて、春の訪れを感じました。",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "FLebj",
+              "name": "textLine3",
+              "fill": "#0F172A",
+              "content": "帰りにカフェで休憩して、ゆっくりとした時間を過ごしました。",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
