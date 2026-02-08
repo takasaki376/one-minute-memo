@@ -51,6 +51,10 @@ export default function SessionPage() {
   const [handwritingDataUrl, setHandwritingDataUrl] = useState<string | null>(
     null
   );
+  // タブレット（md以上）でのタブ切り替え: 手書き / テキスト
+  const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
+    "handwriting",
+  );
 
   // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
@@ -348,38 +352,58 @@ export default function SessionPage() {
         category={currentTheme.category}
       />
 
-      {/* md以上: 2ペインレイアウト（Canvas主役 7:3）/ スマホ: 縦積み */}
-      <div className="flex flex-col gap-6 md:grid md:grid-cols-[7fr_3fr] md:gap-6 md:items-start">
-        {/* 手書きCanvas（md以上で左ペイン・主領域） */}
-        <div className="order-2 md:order-1">
-          <h2 className="mb-2 text-sm font-medium text-slate-700">
-            手書きメモ（任意）
-          </h2>
-          <HandwritingCanvas
-            value={handwritingDataUrl}
-            onChange={setHandwritingDataUrl}
-            disabled={isInputDisabled}
-          />
+      {/* タイマー表示 */}
+      <div className="flex items-center justify-center">
+        <div className="rounded-lg bg-slate-100 px-6 py-3">
+          <p className="text-center text-sm text-slate-600">残り時間</p>
+          <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
+            {secondsLeft}
+          </p>
+          <p className="text-center text-xs text-slate-500">秒</p>
+        </div>
+      </div>
+
+      {/* ===== タブ切り替え（全画面サイズ共通） ===== */}
+      <section>
+        {/* タブバー */}
+        <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeInputTab === "handwriting"}
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              activeInputTab === "handwriting"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveInputTab("handwriting")}
+          >
+            手書き入力
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeInputTab === "text"}
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              activeInputTab === "text"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveInputTab("text")}
+          >
+            テキスト入力
+          </button>
         </div>
 
-        {/* タイマー + テキスト（md以上で右ペイン・サブ領域） */}
-        <div className="order-1 flex flex-col gap-6 md:order-2">
-          {/* タイマー表示 */}
-          <div className="flex items-center justify-center">
-            <div className="rounded-lg bg-slate-100 px-6 py-3">
-              <p className="text-center text-sm text-slate-600">残り時間</p>
-              <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
-                {secondsLeft}
-              </p>
-              <p className="text-center text-xs text-slate-500">秒</p>
-            </div>
-          </div>
-
-          {/* テキストメモ */}
-          <div>
-            <h2 className="mb-2 text-sm font-medium text-slate-700">
-              テキストメモ
-            </h2>
+        {/* タブコンテンツ */}
+        <div role="tabpanel">
+          {activeInputTab === "handwriting" ? (
+            <HandwritingCanvas
+              value={handwritingDataUrl}
+              onChange={setHandwritingDataUrl}
+              disabled={isInputDisabled}
+            />
+          ) : (
             <TextEditor
               value={text}
               onChange={setText}
@@ -387,9 +411,9 @@ export default function SessionPage() {
               disabled={isInputDisabled}
               placeholder="思いつくことをできるだけ書き出してみましょう"
             />
-          </div>
+          )}
         </div>
-      </div>
+      </section>
 
       {/* フッター操作 */}
       <footer className="mt-2 flex items-center justify-between gap-4 border-t border-slate-200 pt-4">

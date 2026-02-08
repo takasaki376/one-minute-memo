@@ -50,6 +50,9 @@ test.describe("履歴確認フロー", () => {
     await page.goto("/session");
     const total = await getThemeTotal(page);
 
+    // デフォルトは手書きタブなので、テキスト入力タブに切り替え
+    await page.getByRole("tab", { name: "テキスト入力" }).click();
+
     const textarea = page.locator("textarea");
     await textarea.fill("テスト用メモ内容");
 
