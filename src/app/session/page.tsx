@@ -49,7 +49,7 @@ export default function SessionPage() {
   const [handwritingDataUrl, setHandwritingDataUrl] = useState<string | null>(
     null
   );
-  // タブレット（md以上）でのタブ切り替え: 手書き / テキスト
+  // 入力モードのタブ切り替え: 手書き / テキスト
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
     "handwriting",
   );
