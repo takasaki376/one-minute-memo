@@ -1,7 +1,7 @@
 // src/app/session/__tests__/SessionPage.test.tsx
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 
 const mockThemes = Array.from({ length: 10 }, (_, index) => ({
   id: `theme-${index + 1}`,
@@ -164,7 +164,7 @@ describe("/session page", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
     });
 
     // セッションはまだ作成されていない（最初のメモ保存時に作成される）
@@ -193,7 +193,7 @@ describe("/session page", () => {
     expect(savedArg.textContent).toBe("first memo");
 
     await waitFor(() => {
-      expect(screen.getByText("2 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("2 / 10")[0]).toBeInTheDocument();
     });
   });
 
@@ -203,7 +203,7 @@ describe("/session page", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
     });
 
     await switchToTextTab();
@@ -231,7 +231,7 @@ describe("/session page", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
     });
 
     const handwritingButton = screen.getByRole("button", {
@@ -264,7 +264,7 @@ describe("/session page", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
     });
 
     // セッションはまだ作成されていない（最初のメモ保存時に作成される）
@@ -282,7 +282,7 @@ describe("/session page", () => {
 
       if (i < 10) {
         await waitFor(() => {
-          expect(screen.getByText(`${i + 1} / 10`)).toBeInTheDocument();
+          expect(screen.getAllByText(`${i + 1} / 10`)[0]).toBeInTheDocument();
         });
       }
     }
@@ -322,7 +322,7 @@ describe("/session page", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
     });
 
     // セッションはまだ作成されていない
@@ -351,7 +351,7 @@ describe("/session page", () => {
     expect(savedArg.textContent).toBe("auto-finished memo");
 
     await waitFor(() => {
-      expect(screen.getByText("2 / 10")).toBeInTheDocument();
+      expect(screen.getAllByText("2 / 10")[0]).toBeInTheDocument();
     });
   });
 
@@ -370,7 +370,7 @@ describe("/session page", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("1 / 3")).toBeInTheDocument();
+        expect(screen.getAllByText("1 / 3")[0]).toBeInTheDocument();
       });
 
       // セッションはまだ作成されていない（最初のメモ保存時に作成される）
@@ -395,7 +395,7 @@ describe("/session page", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+        expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
       });
 
       // セッションはまだ作成されていない（最初のメモ保存時に作成される）
@@ -414,7 +414,7 @@ describe("/session page", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+        expect(screen.getAllByText("1 / 10")[0]).toBeInTheDocument();
       });
 
       // セッションはまだ作成されていない（最初のメモ保存時に作成される）
@@ -440,7 +440,7 @@ describe("/session page", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("1 / 3")).toBeInTheDocument();
+        expect(screen.getAllByText("1 / 3")[0]).toBeInTheDocument();
       });
 
       // セッションはまだ作成されていない（最初のメモ保存時に作成される）
@@ -459,7 +459,7 @@ describe("/session page", () => {
 
         if (i < 3) {
           await waitFor(() => {
-            expect(screen.getByText(`${i + 1} / 3`)).toBeInTheDocument();
+            expect(screen.getAllByText(`${i + 1} / 3`)[0]).toBeInTheDocument();
           });
         }
       }

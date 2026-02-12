@@ -22,7 +22,10 @@ interface SessionTheme {
 
 // デフォルト値（設定取得失敗時のフォールバック）
 const DEFAULT_THEME_COUNT = DEFAULT_SETTINGS.theme_count;
-const DEFAULT_TIME_LIMIT_SECONDS = Number.parseInt(DEFAULT_SETTINGS.time_limit, 10);
+const DEFAULT_TIME_LIMIT_SECONDS = Number.parseInt(
+  DEFAULT_SETTINGS.time_limit,
+  10,
+);
 
 export default function SessionPage() {
   const router = useRouter();
@@ -37,7 +40,9 @@ export default function SessionPage() {
   // themeCountは現時点では未使用だが、将来的に「セッション結果画面／分析機能」で
   // 1セッションあたりのテーマ数を表示・保存する際に利用する予定のため state として保持しておく
   const [, setThemeCount] = useState(DEFAULT_THEME_COUNT);
-  const [secondsPerTheme, setSecondsPerTheme] = useState(DEFAULT_TIME_LIMIT_SECONDS);
+  const [secondsPerTheme, setSecondsPerTheme] = useState(
+    DEFAULT_TIME_LIMIT_SECONDS,
+  );
   // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSavingMemo, setIsSavingMemo] = useState(false);
@@ -47,7 +52,7 @@ export default function SessionPage() {
   // --- 現在テーマの入力状態 ---
   const [text, setText] = useState("");
   const [handwritingDataUrl, setHandwritingDataUrl] = useState<string | null>(
-    null
+    null,
   );
   // 入力モードのタブ切り替え: 手書き / テキスト
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
@@ -67,12 +72,17 @@ export default function SessionPage() {
 
   const currentTheme = useMemo(
     () => themes[currentIndex] ?? null,
-    [themes, currentIndex]
+    [themes, currentIndex],
   );
 
   // テキストタブに切り替わった際に自動フォーカス
   useEffect(() => {
-    if (activeInputTab === "text" && textareaRef.current && stage === "running" && secondsLeft > 0) {
+    if (
+      activeInputTab === "text" &&
+      textareaRef.current &&
+      stage === "running" &&
+      secondsLeft > 0
+    ) {
       textareaRef.current.focus();
     }
   }, [activeInputTab, stage, secondsLeft]);
@@ -146,14 +156,16 @@ export default function SessionPage() {
   // themeIdは引数として受け取ることで、非同期処理中にcurrentThemeが変わる可能性に対応
   const saveCurrentMemo = async (
     index: number,
-    themeId: string
+    themeId: string,
   ): Promise<void> => {
     // セッションがまだ作成されていない場合は、最初のメモ保存時に作成する
     // これにより、メモ0件のセッションが作成されることを防ぐ
     let currentSessionId = sessionId;
     if (!currentSessionId) {
       if (themes.length === 0) {
-        console.error("[PJ1-99] テーマが設定されていないためセッションを作成できません");
+        console.error(
+          "[PJ1-99] テーマが設定されていないためセッションを作成できません",
+        );
         return;
       }
       const session = await createSession(themes.map((t) => t.id));
