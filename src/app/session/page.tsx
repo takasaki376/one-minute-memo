@@ -469,9 +469,14 @@ export default function SessionPage() {
         ) : (
           <div id="panel-text" role="tabpanel" aria-labelledby="tab-text">
             <textarea
+              ref={(el) => {
+                // テキストタブに切り替わった際に自動フォーカス
+                if (el && !isInputDisabled) {
+                  el.focus();
+                }
+              }}
               value={text}
               onChange={(event) => setText(event.target.value)}
-              autoFocus
               disabled={isInputDisabled}
               placeholder="思いつくことをできるだけ書き出してみましょう"
               aria-label="テキストメモ入力"
