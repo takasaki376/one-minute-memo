@@ -340,24 +340,14 @@ export default function SessionPage() {
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-      {/* ヘッダー（テーマ情報） */}
+      {/* ヘッダー（テーマ情報 + タイマー） */}
       <ThemeHeader
         currentIndex={currentNumber}
         total={total}
         title={currentTheme.title}
         category={currentTheme.category}
+        secondsLeft={secondsLeft}
       />
-
-      {/* タイマー表示 */}
-      <div className="flex items-center justify-center">
-        <div className="rounded-lg bg-slate-100 px-6 py-3">
-          <p className="text-center text-sm text-slate-600">残り時間</p>
-          <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
-            {secondsLeft}
-          </p>
-          <p className="text-center text-xs text-slate-500">秒</p>
-        </div>
-      </div>
 
       {/* 入力エリア */}
       <section className="flex flex-col gap-6">
