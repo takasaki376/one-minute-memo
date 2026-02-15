@@ -53,6 +53,7 @@ export default function SessionPage() {
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
     "handwriting",
   );
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
@@ -67,6 +68,13 @@ export default function SessionPage() {
     () => themes[currentIndex] ?? null,
     [themes, currentIndex]
   );
+
+  // テキストタブに切り替わった際に自動フォーカス
+  useEffect(() => {
+    if (activeInputTab === "text" && textareaRef.current && stage === "running" && secondsLeft > 0) {
+      textareaRef.current.focus();
+    }
+  }, [activeInputTab, stage, secondsLeft]);
 
   // セッション開始時の初期化
   useEffect(() => {
@@ -457,12 +465,7 @@ export default function SessionPage() {
           hidden={activeInputTab !== "text"}
         >
           <textarea
-            ref={(el) => {
-              // テキストタブに切り替わった際に自動フォーカス
-              if (el && !isInputDisabled) {
-                el.focus();
-              }
-            }}
+            ref={textareaRef}
             value={text}
             onChange={(event) => setText(event.target.value)}
             disabled={isInputDisabled}
