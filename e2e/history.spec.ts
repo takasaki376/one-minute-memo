@@ -70,17 +70,10 @@ test.describe("履歴確認フロー", () => {
     }
     await expect(page).toHaveURL(/\/session\/complete/);
 
-    // 「このセッションの詳細を見る」または履歴一覧経由で詳細へ
-    const detailLink = page.getByRole("link", {
-      name: /詳細を見る|このセッションの詳細/,
-    });
-    if (await detailLink.isVisible()) {
-      await detailLink.click();
-    } else {
-      // 履歴一覧経由
-      await page.getByRole("link", { name: /履歴一覧/ }).click();
-      await page.getByRole("link", { name: /詳細を見る/ }).first().click();
-    }
+    // 完了画面から直接、当該セッションの詳細へ遷移
+    await page
+      .getByRole("link", { name: "このセッションの詳細を見る" })
+      .click();
 
     // 履歴詳細画面
     await expect(page).toHaveURL(/\/history\/.+/);
