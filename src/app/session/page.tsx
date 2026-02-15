@@ -53,6 +53,7 @@ export default function SessionPage() {
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
     "handwriting",
   );
+  // テキスト入力エリアへの参照（タブ切り替え時のフォーカス制御に使用）
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // タイマー（secondsPerThemeは初期化時に設定される）
