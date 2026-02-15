@@ -48,3 +48,4 @@ next-env.d.ts
 
 # cursor debug logs
 .cursor/debug.log
+package-lock.json
