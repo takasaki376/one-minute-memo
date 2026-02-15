@@ -53,12 +53,16 @@ export function HandwritingCanvas({
     const logicalHeight = logicalSizeRef.current.height;
     const img = new Image();
     img.onload = () => {
+      // Avoid race conditions: only draw if this dataUrl is still the latest value
+      if (dataUrl !== latestValueRef.current) {
+        return;
+      }
       clearCanvas(ctx);
       ctx.drawImage(img, 0, 0, logicalWidth, logicalHeight);
       applyCanvasStyle(ctx);
     };
     img.src = dataUrl;
-  }, [applyCanvasStyle, clearCanvas]);
+  }, [applyCanvasStyle, clearCanvas, latestValueRef]);
 
   // props 経由での value 更新時に描画を反映
   useEffect(() => {
