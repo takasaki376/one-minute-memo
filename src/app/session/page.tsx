@@ -480,7 +480,7 @@ export default function SessionPage() {
               disabled={isInputDisabled}
               placeholder="思いつくことをできるだけ書き出してみましょう"
               aria-label="テキストメモ入力"
-              className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none"
+              className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             />
           </div>
         )}
