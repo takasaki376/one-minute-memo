@@ -374,56 +374,36 @@ export default function SessionPage() {
             role="tablist"
             aria-label="入力方式"
           >
-            {activeInputTab === "handwriting" ? (
-              <button
-                type="button"
-                id="tab-handwriting"
-                role="tab"
-                aria-controls="panel-handwriting"
-                aria-selected="true"
-                className="rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
-                onClick={() => setActiveInputTab("handwriting")}
-              >
-                手書き入力
-              </button>
-            ) : (
-              <button
-                type="button"
-                id="tab-handwriting"
-                role="tab"
-                aria-controls="panel-handwriting"
-                aria-selected="false"
-                className="rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
-                onClick={() => setActiveInputTab("handwriting")}
-              >
-                手書き入力
-              </button>
-            )}
-            {activeInputTab === "text" ? (
-              <button
-                type="button"
-                id="tab-text"
-                role="tab"
-                aria-controls="panel-text"
-                aria-selected="true"
-                className="rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
-                onClick={() => setActiveInputTab("text")}
-              >
-                テキスト入力
-              </button>
-            ) : (
-              <button
-                type="button"
-                id="tab-text"
-                role="tab"
-                aria-controls="panel-text"
-                aria-selected="false"
-                className="rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
-                onClick={() => setActiveInputTab("text")}
-              >
-                テキスト入力
-              </button>
-            )}
+            <button
+              type="button"
+              id="tab-handwriting"
+              role="tab"
+              aria-controls="panel-handwriting"
+              aria-selected={activeInputTab === "handwriting"}
+              className={
+                activeInputTab === "handwriting"
+                  ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
+                  : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+              }
+              onClick={() => setActiveInputTab("handwriting")}
+            >
+              手書き入力
+            </button>
+            <button
+              type="button"
+              id="tab-text"
+              role="tab"
+              aria-controls="panel-text"
+              aria-selected={activeInputTab === "text"}
+              className={
+                activeInputTab === "text"
+                  ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
+                  : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+              }
+              onClick={() => setActiveInputTab("text")}
+            >
+              テキスト入力
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <p className="text-xs text-slate-400">
@@ -457,33 +437,40 @@ export default function SessionPage() {
 
       {/* 入力エリア */}
       <section className="min-h-[520px] rounded-lg bg-white p-4">
-        {activeInputTab === "handwriting" ? (
-          <div id="panel-handwriting" role="tabpanel" aria-labelledby="tab-handwriting">
-            <HandwritingCanvas
-              value={handwritingDataUrl}
-              onChange={setHandwritingDataUrl}
-              disabled={isInputDisabled}
-              className="h-full"
-            />
-          </div>
-        ) : (
-          <div id="panel-text" role="tabpanel" aria-labelledby="tab-text">
-            <textarea
-              ref={(el) => {
-                // テキストタブに切り替わった際に自動フォーカス
-                if (el && !isInputDisabled) {
-                  el.focus();
-                }
-              }}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              disabled={isInputDisabled}
-              placeholder="思いつくことをできるだけ書き出してみましょう"
-              aria-label="テキストメモ入力"
-              className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-            />
-          </div>
-        )}
+        <div
+          id="panel-handwriting"
+          role="tabpanel"
+          aria-labelledby="tab-handwriting"
+          hidden={activeInputTab !== "handwriting"}
+        >
+          <HandwritingCanvas
+            value={handwritingDataUrl}
+            onChange={setHandwritingDataUrl}
+            disabled={isInputDisabled}
+            className="h-full"
+          />
+        </div>
+        <div
+          id="panel-text"
+          role="tabpanel"
+          aria-labelledby="tab-text"
+          hidden={activeInputTab !== "text"}
+        >
+          <textarea
+            ref={(el) => {
+              // テキストタブに切り替わった際に自動フォーカス
+              if (el && !isInputDisabled) {
+                el.focus();
+              }
+            }}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            disabled={isInputDisabled}
+            placeholder="思いつくことをできるだけ書き出してみましょう"
+            aria-label="テキストメモ入力"
+            className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+          />
+        </div>
       </section>
     </main>
   );
