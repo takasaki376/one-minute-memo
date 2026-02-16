@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import cc from "classcat";
 
 export interface HandwritingCanvasProps {
@@ -23,66 +23,122 @@ export function HandwritingCanvas({
 }: HandwritingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
+  const logicalSizeRef = useRef({ width, height });
+  const latestValueRef = useRef<string | null | undefined>(value);
 
-  // キャンバスの初期設定（サイズ & DPR 対応）
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const applyCanvasStyle = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#111827";
+    },
+    []
+  );
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr =
-      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    ctx.scale(dpr, dpr);
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#111827";
-    ctx.fillStyle = "#ffffff";
-
-    ctx.fillRect(0, 0, width, height);
-  }, [width, height]);
-
-  // value 変更時の復元描画
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+  const clearCanvas = useCallback((ctx: CanvasRenderingContext2D) => {
+    const logicalWidth = logicalSizeRef.current.width;
+    const logicalHeight = logicalSizeRef.current.height;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.restore();
-
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+    applyCanvasStyle(ctx);
+  }, [applyCanvasStyle]);
+
+  const drawDataUrl = useCallback((ctx: CanvasRenderingContext2D, dataUrl: string) => {
+    const logicalWidth = logicalSizeRef.current.width;
+    const logicalHeight = logicalSizeRef.current.height;
+    const img = new Image();
+    img.onload = () => {
+      // Avoid race conditions: only draw if this dataUrl is still the latest value
+      if (dataUrl !== latestValueRef.current) {
+        return;
+      }
+      clearCanvas(ctx);
+      ctx.drawImage(img, 0, 0, logicalWidth, logicalHeight);
+      applyCanvasStyle(ctx);
+    };
+    img.src = dataUrl;
+  }, [applyCanvasStyle, clearCanvas, latestValueRef]);
+
+  // props 経由での value 更新時に描画を反映
+  useEffect(() => {
+    latestValueRef.current = value;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
     if (!value) {
+      clearCanvas(ctx);
       return;
     }
 
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, width, height);
+    drawDataUrl(ctx, value);
+  }, [drawDataUrl, clearCanvas, value]);
+
+  // 親要素の実測サイズに追従してキャンバスバッファを再構築（DPR対応）
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    const resize = () => {
+      const rect = parent.getBoundingClientRect();
+      const displayWidth = Math.max(1, Math.floor(rect.width));
+      const displayHeight = Math.max(
+        1,
+        Math.floor((displayWidth * height) / width)
+      );
+      const dpr =
+        typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+
+      logicalSizeRef.current = { width: displayWidth, height: displayHeight };
+
+      canvas.style.width = `${displayWidth}px`;
+      canvas.style.height = `${displayHeight}px`;
+      canvas.width = Math.round(displayWidth * dpr);
+      canvas.height = Math.round(displayHeight * dpr);
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      clearCanvas(ctx);
+
+      if (latestValueRef.current) {
+        drawDataUrl(ctx, latestValueRef.current);
+      }
     };
-    img.src = value;
-  }, [value, width, height]);
+
+    resize();
+
+    const observer = new ResizeObserver(() => {
+      resize();
+    });
+    observer.observe(parent);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [clearCanvas, drawDataUrl, height, width]);
 
   const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    // 表示サイズと論理サイズの比率で座標をスケーリング
+    const logicalWidth = logicalSizeRef.current.width;
+    const logicalHeight = logicalSizeRef.current.height;
+    const scaleX = logicalWidth / rect.width;
+    const scaleY = logicalHeight / rect.height;
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
     return { x, y };
   };
 
@@ -164,7 +220,8 @@ export function HandwritingCanvas({
     ctx.restore();
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, logicalSizeRef.current.width, logicalSizeRef.current.height);
+    applyCanvasStyle(ctx);
 
     onChange?.(null);
   };

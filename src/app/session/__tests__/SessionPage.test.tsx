@@ -138,6 +138,14 @@ import * as memosRepo from "@/lib/db/memosRepo";
 import type { SettingsRecord } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 
+/** デフォルトが手書きタブなので、テキスト入力タブに切り替えるヘルパー */
+async function switchToTextTab() {
+  const textTab = screen.getByRole("tab", { name: "テキスト入力" });
+  await act(async () => {
+    fireEvent.click(textTab);
+  });
+}
+
 describe("/session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -162,6 +170,7 @@ describe("/session page", () => {
     // セッションはまだ作成されていない（最初のメモ保存時に作成される）
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
+    await switchToTextTab();
     const textarea = screen.getByRole("textbox");
     const nextButton = screen.getByRole("button", { name: /次へ/ });
     await act(async () => {
@@ -197,6 +206,7 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
+    await switchToTextTab();
     const textarea = screen.getByRole("textbox");
     const nextButton = screen.getByRole("button", { name: /次へ/ });
 
@@ -260,6 +270,7 @@ describe("/session page", () => {
     // セッションはまだ作成されていない（最初のメモ保存時に作成される）
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
+    await switchToTextTab();
     const textarea = screen.getByRole("textbox");
     const nextButton = screen.getByRole("button", { name: /次へ/ });
 
@@ -317,6 +328,7 @@ describe("/session page", () => {
     // セッションはまだ作成されていない
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
+    await switchToTextTab();
     const textarea = screen.getByRole("textbox");
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "auto-finished memo" } });
@@ -434,6 +446,7 @@ describe("/session page", () => {
       // セッションはまだ作成されていない（最初のメモ保存時に作成される）
       expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
+      await switchToTextTab();
       const textarea = screen.getByRole("textbox");
       const nextButton = screen.getByRole("button", { name: /次へ/ });
 

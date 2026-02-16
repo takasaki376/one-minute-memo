@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
-import { TextEditor } from "@/components/session/TextEditor";
 import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
-import { ThemeHeader } from "@/components/session/ThemeHeader";
 import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
 import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
@@ -51,6 +49,12 @@ export default function SessionPage() {
   const [handwritingDataUrl, setHandwritingDataUrl] = useState<string | null>(
     null
   );
+  // 入力モードのタブ切り替え: 手書き / テキスト
+  const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
+    "handwriting",
+  );
+  // テキスト入力エリアへの参照（タブ切り替え時のフォーカス制御に使用）
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
@@ -65,6 +69,13 @@ export default function SessionPage() {
     () => themes[currentIndex] ?? null,
     [themes, currentIndex]
   );
+
+  // テキストタブに切り替わった際に自動フォーカス
+  useEffect(() => {
+    if (activeInputTab === "text" && textareaRef.current && stage === "running" && secondsLeft > 0) {
+      textareaRef.current.focus();
+    }
+  }, [activeInputTab, stage, secondsLeft]);
 
   // セッション開始時の初期化
   useEffect(() => {
@@ -339,81 +350,132 @@ export default function SessionPage() {
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-      {/* ヘッダー（テーマ情報） */}
-      <ThemeHeader
-        currentIndex={currentNumber}
-        total={total}
-        title={currentTheme.title}
-        category={currentTheme.category}
-      />
-
-      {/* タイマー表示 */}
-      <div className="flex items-center justify-center">
-        <div className="rounded-lg bg-slate-100 px-6 py-3">
-          <p className="text-center text-sm text-slate-600">残り時間</p>
-          <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
-            {secondsLeft}
+    <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
+      {/* ヘッダー */}
+      <header className="flex items-center gap-3 rounded-lg bg-white p-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <p className="text-lg font-semibold text-slate-500">
+            {currentNumber} / {total}
           </p>
-          <p className="text-center text-xs text-slate-500">秒</p>
+          <h1 className="truncate text-xl font-bold text-slate-900">
+            {currentTheme.title}
+          </h1>
+          {currentTheme.category && (
+            <span className="rounded bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
+              {currentTheme.category}
+            </span>
+          )}
         </div>
-      </div>
+        <div className="flex items-center gap-2 rounded-md bg-slate-100 px-4 py-2">
+          <span className="text-xs text-slate-500">残り時間</span>
+          <span className="text-2xl font-bold text-slate-900 tabular-nums">
+            {secondsLeft}
+          </span>
+          <span className="text-xs text-slate-500">秒</span>
+        </div>
+      </header>
+
+      {/* タブ + フッター操作 */}
+      <section className="border-t border-slate-200 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
+            role="tablist"
+            aria-label="入力方式"
+          >
+            <button
+              type="button"
+              id="tab-handwriting"
+              role="tab"
+              aria-controls="panel-handwriting"
+              aria-selected={activeInputTab === "handwriting"}
+              className={
+                activeInputTab === "handwriting"
+                  ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
+                  : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+              }
+              onClick={() => setActiveInputTab("handwriting")}
+            >
+              手書き入力
+            </button>
+            <button
+              type="button"
+              id="tab-text"
+              role="tab"
+              aria-controls="panel-text"
+              aria-selected={activeInputTab === "text"}
+              className={
+                activeInputTab === "text"
+                  ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
+                  : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+              }
+              onClick={() => setActiveInputTab("text")}
+            >
+              テキスト入力
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-slate-400">
+              {isRunning ? "入力中…" : "一時停止中"}
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (isRunning) {
+                  pause();
+                } else {
+                  start();
+                }
+              }}
+              disabled={secondsLeft === 0}
+              className="bg-slate-100 text-slate-600 hover:bg-slate-200"
+            >
+              {isRunning ? "一時停止" : "再開"}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void handleThemeFinished()}
+              disabled={secondsLeft === 0}
+              className="bg-blue-500 text-white hover:bg-blue-600"
+            >
+              このテーマを終えて次へ
+            </Button>
+          </div>
+        </div>
+      </section>
 
       {/* 入力エリア */}
-      <section className="flex flex-col gap-6">
-        <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">
-            テキストメモ
-          </h2>
-          <TextEditor
-            value={text}
-            onChange={setText}
-            autoFocus
-            disabled={isInputDisabled}
-            placeholder="思いつくことをできるだけ書き出してみましょう"
-          />
-        </div>
-
-        <div>
-          <h2 className="mb-2 text-sm font-medium text-slate-700">
-            手書きメモ（任意）
-          </h2>
+      <section className="min-h-[520px] rounded-lg bg-white p-4">
+        <div
+          id="panel-handwriting"
+          role="tabpanel"
+          aria-labelledby="tab-handwriting"
+          hidden={activeInputTab !== "handwriting"}
+        >
           <HandwritingCanvas
             value={handwritingDataUrl}
             onChange={setHandwritingDataUrl}
             disabled={isInputDisabled}
+            className="h-full"
+          />
+        </div>
+        <div
+          id="panel-text"
+          role="tabpanel"
+          aria-labelledby="tab-text"
+          hidden={activeInputTab !== "text"}
+        >
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            disabled={isInputDisabled}
+            placeholder="思いつくことをできるだけ書き出してみましょう"
+            aria-label="テキストメモ入力"
+            className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           />
         </div>
       </section>
-
-      {/* フッター操作 */}
-      <footer className="mt-2 flex items-center justify-between gap-4 border-t border-slate-200 pt-4">
-        <div className="text-xs text-slate-500">
-          {isRunning ? "入力中…" : "一時停止中"}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (isRunning) {
-                pause();
-              } else {
-                start();
-              }
-            }}
-            disabled={secondsLeft === 0}
-          >
-            {isRunning ? "一時停止" : "再開"}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => void handleThemeFinished()}
-            disabled={secondsLeft === 0}
-          >
-            このテーマを終えて次へ
-          </Button>
-        </div>
-      </footer>
     </main>
   );
 }
