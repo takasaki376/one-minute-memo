@@ -24,6 +24,7 @@ export function HandwritingCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const logicalSizeRef = useRef({ width, height });
+  // 非同期 onload 内でも常に最新の value を参照できるように ref で保持する
   const latestValueRef = useRef<string | null | undefined>(value);
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
 
@@ -59,7 +60,9 @@ export function HandwritingCanvas({
       const logicalHeight = logicalSizeRef.current.height;
       const img = new Image();
       img.onload = () => {
-        // value 由来の再描画時のみ最新値チェックを行い、描画中リサイズの復元では無効化する
+        // value 由来の再描画時のみ最新値チェックを行い、描画中リサイズの復元では無効化する。
+        // latestValueRef は useRef のため .current の更新で drawDataUrl を再生成する必要はなく、
+        // onload 実行時に最新値を読み取ってレースコンディションを回避できる。
         if (
           options?.enforceLatestValue !== false &&
           dataUrl !== latestValueRef.current
