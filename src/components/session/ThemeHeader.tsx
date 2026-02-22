@@ -74,6 +74,7 @@ export function ThemeHeader({
           <h2
             className="truncate text-base font-semibold text-slate-900"
             title={title}
+            aria-hidden="true"
           >
             {title}
           </h2>
