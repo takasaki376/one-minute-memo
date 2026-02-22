@@ -374,7 +374,7 @@ export default function SessionPage() {
 
       {/* タブ + フッター操作 */}
       <section className="border-t border-slate-200 pt-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div
             className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
             role="tablist"
@@ -411,7 +411,7 @@ export default function SessionPage() {
               テキスト入力
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap">
             <p className="text-xs text-slate-400">
               {isRunning ? "入力中…" : "一時停止中"}
             </p>
