@@ -435,14 +435,13 @@ export default function SessionPage() {
           role="tabpanel"
           aria-labelledby="tab-handwriting"
           hidden={activeInputTab !== "handwriting"}
+          className="h-[480px]"
         >
           <HandwritingCanvas
             value={handwritingDataUrl}
             onChange={setHandwritingDataUrl}
             disabled={isInputDisabled}
-            width={960}
-            height={480}
-            className="w-full"
+            className="h-full"
           />
         </div>
         <div
