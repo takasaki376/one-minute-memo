@@ -29,6 +29,7 @@ export function HandwritingCanvas({
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
   const mountedRef = useRef(true);
   const pendingImagesRef = useRef<Set<HTMLImageElement>>(new Set());
+  const resizeRafIdRef = useRef<number | null>(null);
 
   const applyCanvasStyle = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -98,6 +99,10 @@ export function HandwritingCanvas({
 
     return () => {
       mountedRef.current = false;
+      if (resizeRafIdRef.current !== null) {
+        cancelAnimationFrame(resizeRafIdRef.current);
+        resizeRafIdRef.current = null;
+      }
       for (const img of pendingImagesRef.current) {
         img.onload = null;
         img.onerror = null;
@@ -172,12 +177,24 @@ export function HandwritingCanvas({
 
     resize();
 
+    const scheduleResize = () => {
+      if (resizeRafIdRef.current !== null) return;
+      resizeRafIdRef.current = requestAnimationFrame(() => {
+        resizeRafIdRef.current = null;
+        resize();
+      });
+    };
+
     const observer = new ResizeObserver(() => {
-      resize();
+      scheduleResize();
     });
     observer.observe(parent);
 
     return () => {
+      if (resizeRafIdRef.current !== null) {
+        cancelAnimationFrame(resizeRafIdRef.current);
+        resizeRafIdRef.current = null;
+      }
       observer.disconnect();
     };
   }, [clearCanvas, drawDataUrl, height, width]);
