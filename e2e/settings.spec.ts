@@ -45,9 +45,11 @@ test.describe("設定変更フロー", () => {
     await page.goto("/session");
 
     // 設定が反映されていればテーマインジケータが 1 / 5 になる
-    await expect(page.locator("text=/1\\s*\\/\\s*5/")).toBeVisible({
-      timeout: 5000,
-    });
+    const progressIndicator = page.locator(
+      "text=/1\\s*\\/\\s*5/ >> visible=true"
+    );
+    await expect(progressIndicator).toHaveCount(1, { timeout: 5000 });
+    await expect(progressIndicator).toBeVisible({ timeout: 5000 });
   });
 
   test("トップ画面から設定画面に遷移できる", async ({ page }) => {

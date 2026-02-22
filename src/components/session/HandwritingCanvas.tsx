@@ -24,7 +24,12 @@ export function HandwritingCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const logicalSizeRef = useRef({ width, height });
+  // 非同期 onload 内でも常に最新の value を参照できるように ref で保持する
   const latestValueRef = useRef<string | null | undefined>(value);
+  const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
+  const mountedRef = useRef(true);
+  const pendingImagesRef = useRef<Set<HTMLImageElement>>(new Set());
+  const resizeRafIdRef = useRef<number | null>(null);
 
   const applyCanvasStyle = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -48,21 +53,64 @@ export function HandwritingCanvas({
     applyCanvasStyle(ctx);
   }, [applyCanvasStyle]);
 
-  const drawDataUrl = useCallback((ctx: CanvasRenderingContext2D, dataUrl: string) => {
-    const logicalWidth = logicalSizeRef.current.width;
-    const logicalHeight = logicalSizeRef.current.height;
-    const img = new Image();
-    img.onload = () => {
-      // Avoid race conditions: only draw if this dataUrl is still the latest value
-      if (dataUrl !== latestValueRef.current) {
-        return;
+  const drawDataUrl = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      dataUrl: string,
+      options?: { enforceLatestValue?: boolean }
+    ) => {
+      const logicalWidth = logicalSizeRef.current.width;
+      const logicalHeight = logicalSizeRef.current.height;
+      const img = new Image();
+      pendingImagesRef.current.add(img);
+
+      const cleanupImage = () => {
+        img.onload = null;
+        img.onerror = null;
+        pendingImagesRef.current.delete(img);
+      };
+
+      img.onload = () => {
+        cleanupImage();
+        if (!mountedRef.current) return;
+        // value 由来の再描画時のみ最新値チェックを行い、描画中リサイズの復元では無効化する。
+        // latestValueRef は useRef のため .current の更新で drawDataUrl を再生成する必要はなく、
+        // onload 実行時に最新値を読み取ってレースコンディションを回避できる。
+        if (
+          options?.enforceLatestValue !== false &&
+          dataUrl !== latestValueRef.current
+        ) {
+          return;
+        }
+        clearCanvas(ctx);
+        ctx.drawImage(img, 0, 0, logicalWidth, logicalHeight);
+        applyCanvasStyle(ctx);
+      };
+      img.onerror = () => {
+        cleanupImage();
+      };
+      img.src = dataUrl;
+    },
+    [applyCanvasStyle, clearCanvas]
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      if (resizeRafIdRef.current !== null) {
+        cancelAnimationFrame(resizeRafIdRef.current);
+        resizeRafIdRef.current = null;
       }
-      clearCanvas(ctx);
-      ctx.drawImage(img, 0, 0, logicalWidth, logicalHeight);
-      applyCanvasStyle(ctx);
+      for (const img of pendingImagesRef.current) {
+        img.onload = null;
+        img.onerror = null;
+        img.src = "";
+      }
+      pendingImagesRef.current.clear();
     };
-    img.src = dataUrl;
-  }, [applyCanvasStyle, clearCanvas, latestValueRef]);
+  }, []);
 
   // props 経由での value 更新時に描画を反映
   useEffect(() => {
@@ -74,10 +122,12 @@ export function HandwritingCanvas({
     if (!ctx) return;
 
     if (!value) {
+      latestCanvasDataUrlRef.current = null;
       clearCanvas(ctx);
       return;
     }
 
+    latestCanvasDataUrlRef.current = value;
     drawDataUrl(ctx, value);
   }, [drawDataUrl, clearCanvas, value]);
 
@@ -97,6 +147,9 @@ export function HandwritingCanvas({
       );
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      const inProgressDataUrl = isDrawingRef.current
+        ? canvas.toDataURL("image/png")
+        : null;
 
       logicalSizeRef.current = { width: displayWidth, height: displayHeight };
 
@@ -111,19 +164,37 @@ export function HandwritingCanvas({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       clearCanvas(ctx);
 
-      if (latestValueRef.current) {
-        drawDataUrl(ctx, latestValueRef.current);
+      const restoreSource =
+        inProgressDataUrl ??
+        latestCanvasDataUrlRef.current ??
+        latestValueRef.current ??
+        null;
+
+      if (restoreSource) {
+        drawDataUrl(ctx, restoreSource, { enforceLatestValue: false });
       }
     };
 
     resize();
 
+    const scheduleResize = () => {
+      if (resizeRafIdRef.current !== null) return;
+      resizeRafIdRef.current = requestAnimationFrame(() => {
+        resizeRafIdRef.current = null;
+        resize();
+      });
+    };
+
     const observer = new ResizeObserver(() => {
-      resize();
+      scheduleResize();
     });
     observer.observe(parent);
 
     return () => {
+      if (resizeRafIdRef.current !== null) {
+        cancelAnimationFrame(resizeRafIdRef.current);
+        resizeRafIdRef.current = null;
+      }
       observer.disconnect();
     };
   }, [clearCanvas, drawDataUrl, height, width]);
@@ -184,6 +255,7 @@ export function HandwritingCanvas({
     // dataURL エクスポートと onChange 呼び出し
     try {
       const dataUrl = canvas.toDataURL("image/png");
+      latestCanvasDataUrlRef.current = dataUrl;
       onChange?.(dataUrl);
     } catch (e) {
       console.error("Failed to export canvas as dataURL", e);
@@ -223,6 +295,7 @@ export function HandwritingCanvas({
     ctx.fillRect(0, 0, logicalSizeRef.current.width, logicalSizeRef.current.height);
     applyCanvasStyle(ctx);
 
+    latestCanvasDataUrlRef.current = null;
     onChange?.(null);
   };
 

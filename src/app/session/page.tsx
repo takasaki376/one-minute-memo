@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
+import { TextEditor } from "@/components/session/TextEditor";
+import { ThemeHeader } from "@/components/session/ThemeHeader";
 import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
 import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
@@ -22,7 +24,10 @@ interface SessionTheme {
 
 // デフォルト値（設定取得失敗時のフォールバック）
 const DEFAULT_THEME_COUNT = DEFAULT_SETTINGS.theme_count;
-const DEFAULT_TIME_LIMIT_SECONDS = Number.parseInt(DEFAULT_SETTINGS.time_limit, 10);
+const DEFAULT_TIME_LIMIT_SECONDS = Number.parseInt(
+  DEFAULT_SETTINGS.time_limit,
+  10,
+);
 
 export default function SessionPage() {
   const router = useRouter();
@@ -37,7 +42,9 @@ export default function SessionPage() {
   // themeCountは現時点では未使用だが、将来的に「セッション結果画面／分析機能」で
   // 1セッションあたりのテーマ数を表示・保存する際に利用する予定のため state として保持しておく
   const [, setThemeCount] = useState(DEFAULT_THEME_COUNT);
-  const [secondsPerTheme, setSecondsPerTheme] = useState(DEFAULT_TIME_LIMIT_SECONDS);
+  const [secondsPerTheme, setSecondsPerTheme] = useState(
+    DEFAULT_TIME_LIMIT_SECONDS,
+  );
   // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isSavingMemo, setIsSavingMemo] = useState(false);
@@ -47,14 +54,12 @@ export default function SessionPage() {
   // --- 現在テーマの入力状態 ---
   const [text, setText] = useState("");
   const [handwritingDataUrl, setHandwritingDataUrl] = useState<string | null>(
-    null
+    null,
   );
   // 入力モードのタブ切り替え: 手書き / テキスト
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
     "handwriting",
   );
-  // テキスト入力エリアへの参照（タブ切り替え時のフォーカス制御に使用）
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
@@ -67,15 +72,8 @@ export default function SessionPage() {
 
   const currentTheme = useMemo(
     () => themes[currentIndex] ?? null,
-    [themes, currentIndex]
+    [themes, currentIndex],
   );
-
-  // テキストタブに切り替わった際に自動フォーカス
-  useEffect(() => {
-    if (activeInputTab === "text" && textareaRef.current && stage === "running" && secondsLeft > 0) {
-      textareaRef.current.focus();
-    }
-  }, [activeInputTab, stage, secondsLeft]);
 
   // セッション開始時の初期化
   useEffect(() => {
@@ -146,14 +144,16 @@ export default function SessionPage() {
   // themeIdは引数として受け取ることで、非同期処理中にcurrentThemeが変わる可能性に対応
   const saveCurrentMemo = async (
     index: number,
-    themeId: string
+    themeId: string,
   ): Promise<void> => {
     // セッションがまだ作成されていない場合は、最初のメモ保存時に作成する
     // これにより、メモ0件のセッションが作成されることを防ぐ
     let currentSessionId = sessionId;
     if (!currentSessionId) {
       if (themes.length === 0) {
-        console.error("[PJ1-99] テーマが設定されていないためセッションを作成できません");
+        console.error(
+          "[PJ1-99] テーマが設定されていないためセッションを作成できません",
+        );
         return;
       }
       const session = await createSession(themes.map((t) => t.id));
@@ -351,33 +351,17 @@ export default function SessionPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
-      {/* ヘッダー */}
-      <header className="flex items-center gap-3 rounded-lg bg-white p-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <p className="text-lg font-semibold text-slate-500">
-            {currentNumber} / {total}
-          </p>
-          <h1 className="truncate text-xl font-bold text-slate-900">
-            {currentTheme.title}
-          </h1>
-          {currentTheme.category && (
-            <span className="rounded bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
-              {currentTheme.category}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 rounded-md bg-slate-100 px-4 py-2">
-          <span className="text-xs text-slate-500">残り時間</span>
-          <span className="text-2xl font-bold text-slate-900 tabular-nums">
-            {secondsLeft}
-          </span>
-          <span className="text-xs text-slate-500">秒</span>
-        </div>
-      </header>
+      <ThemeHeader
+        currentIndex={currentNumber}
+        total={total}
+        title={currentTheme.title}
+        category={currentTheme.category}
+        secondsLeft={secondsLeft}
+      />
 
       {/* タブ + フッター操作 */}
       <section className="border-t border-slate-200 pt-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div
             className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
             role="tablist"
@@ -414,7 +398,7 @@ export default function SessionPage() {
               テキスト入力
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap">
             <p className="text-xs text-slate-400">
               {isRunning ? "入力中…" : "一時停止中"}
             </p>
@@ -456,7 +440,9 @@ export default function SessionPage() {
             value={handwritingDataUrl}
             onChange={setHandwritingDataUrl}
             disabled={isInputDisabled}
-            className="h-full"
+            width={960}
+            height={480}
+            className="w-full"
           />
         </div>
         <div
@@ -465,14 +451,15 @@ export default function SessionPage() {
           aria-labelledby="tab-text"
           hidden={activeInputTab !== "text"}
         >
-          <textarea
-            ref={textareaRef}
+          <TextEditor
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={setText}
             disabled={isInputDisabled}
-            placeholder="思いつくことをできるだけ書き出してみましょう"
-            aria-label="テキストメモ入力"
-            className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            autoFocus={
+              activeInputTab === "text" && stage === "running" && secondsLeft > 0
+            }
+            maxLength={1000}
+            className="h-[480px]"
           />
         </div>
       </section>

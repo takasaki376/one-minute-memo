@@ -132,6 +132,25 @@ vi.mock("@/components/session/HandwritingCanvas", () => {
   return { HandwritingCanvas };
 });
 
+vi.mock("@/components/session/ThemeHeader", () => {
+  const ThemeHeader = ({
+    currentIndex,
+    total,
+    title,
+  }: {
+    currentIndex: number;
+    total: number;
+    title: string;
+  }) => (
+    <header>
+      <p>{`${currentIndex} / ${total}`}</p>
+      <h2>{title}</h2>
+    </header>
+  );
+
+  return { ThemeHeader };
+});
+
 import SessionPage from "../page";
 import * as sessionsRepo from "@/lib/db/sessionsRepo";
 import * as memosRepo from "@/lib/db/memosRepo";

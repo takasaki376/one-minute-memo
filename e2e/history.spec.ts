@@ -30,7 +30,9 @@ test.describe("履歴確認フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
+          page
+            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
+            .first(),
         ).toBeVisible({ timeout: 5000 });
       }
     }
@@ -64,7 +66,9 @@ test.describe("履歴確認フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
+          page
+            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
+            .first(),
         ).toBeVisible({ timeout: 5000 });
       }
     }
@@ -94,7 +98,9 @@ test.describe("履歴確認フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
+          page
+            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
+            .first(),
         ).toBeVisible({ timeout: 5000 });
       }
     }
