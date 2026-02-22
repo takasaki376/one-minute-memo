@@ -1,7 +1,7 @@
 // src/app/session/__tests__/SessionPage.test.tsx
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
 const mockThemes = Array.from({ length: 10 }, (_, index) => ({
   id: `theme-${index + 1}`,
