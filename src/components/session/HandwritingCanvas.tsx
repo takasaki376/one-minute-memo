@@ -26,6 +26,8 @@ export function HandwritingCanvas({
   const mountedRef = useRef(true);
   const pendingImagesRef = useRef<Set<HTMLImageElement>>(new Set());
   const resizeRafIdRef = useRef<number | null>(null);
+  const pendingResizeRef = useRef(false);
+  const resizeFnRef = useRef<(() => void) | null>(null);
 
   const applyCanvasStyle = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -128,17 +130,16 @@ export function HandwritingCanvas({
     if (!canvas || !wrapper) return;
 
     const resize = () => {
-      // 描画中はリサイズをスキップ（canvas.width/height 設定でパスがリセットされるため）
-      if (isDrawingRef.current) return;
+      // 描画中はリサイズを保留し、描画終了時（finishDrawing）に実行する
+      if (isDrawingRef.current) {
+        pendingResizeRef.current = true;
+        return;
+      }
 
-      // clientWidth/clientHeight でコンテンツ領域のサイズを取得（border 除外）
       const displayWidth = Math.max(1, wrapper.clientWidth);
       const displayHeight = Math.max(1, wrapper.clientHeight);
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-      const inProgressDataUrl = isDrawingRef.current
-        ? canvas.toDataURL("image/png")
-        : null;
 
       const prevLogical = logicalSizeRef.current;
 
@@ -149,7 +150,7 @@ export function HandwritingCanvas({
         return;
       }
 
-      // 方針A: リサイズ前にオフスクリーン Canvas へ描画内容を退避
+      // リサイズ前にオフスクリーン Canvas へ描画内容を退避
       let savedCanvas: HTMLCanvasElement | null = null;
       if (
         canvas.width > 0 &&
@@ -193,7 +194,6 @@ export function HandwritingCanvas({
         applyCanvasStyle(ctx);
       } else {
         const restoreSource =
-          inProgressDataUrl ??
           latestCanvasDataUrlRef.current ??
           latestValueRef.current ??
           null;
@@ -204,6 +204,7 @@ export function HandwritingCanvas({
       }
     };
 
+    resizeFnRef.current = resize;
     resize();
 
     const scheduleResize = () => {
@@ -224,6 +225,8 @@ export function HandwritingCanvas({
         cancelAnimationFrame(resizeRafIdRef.current);
         resizeRafIdRef.current = null;
       }
+      pendingResizeRef.current = false;
+      resizeFnRef.current = null;
       observer.disconnect();
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
@@ -298,6 +301,11 @@ export function HandwritingCanvas({
       canvas.releasePointerCapture(event.pointerId);
     } catch {
       // noop
+    }
+
+    if (pendingResizeRef.current) {
+      pendingResizeRef.current = false;
+      resizeFnRef.current?.();
     }
   };
 
