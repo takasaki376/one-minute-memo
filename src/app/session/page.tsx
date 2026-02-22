@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
+import { TextEditor } from "@/components/session/TextEditor";
 import { ThemeHeader } from "@/components/session/ThemeHeader";
 import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
@@ -59,8 +60,6 @@ export default function SessionPage() {
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
     "handwriting",
   );
-  // テキスト入力エリアへの参照（タブ切り替え時のフォーカス制御に使用）
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
@@ -75,18 +74,6 @@ export default function SessionPage() {
     () => themes[currentIndex] ?? null,
     [themes, currentIndex],
   );
-
-  // テキストタブに切り替わった際に自動フォーカス
-  useEffect(() => {
-    if (
-      activeInputTab === "text" &&
-      textareaRef.current &&
-      stage === "running" &&
-      secondsLeft > 0
-    ) {
-      textareaRef.current.focus();
-    }
-  }, [activeInputTab, stage, secondsLeft]);
 
   // セッション開始時の初期化
   useEffect(() => {
@@ -464,14 +451,15 @@ export default function SessionPage() {
           aria-labelledby="tab-text"
           hidden={activeInputTab !== "text"}
         >
-          <textarea
-            ref={textareaRef}
+          <TextEditor
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={setText}
             disabled={isInputDisabled}
-            placeholder="思いつくことをできるだけ書き出してみましょう"
-            aria-label="テキストメモ入力"
-            className="h-[480px] w-full resize-none border-none bg-transparent text-[13px] leading-relaxed text-slate-900 placeholder:text-slate-300 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            autoFocus={
+              activeInputTab === "text" && stage === "running" && secondsLeft > 0
+            }
+            maxLength={1000}
+            className="h-[480px]"
           />
         </div>
       </section>
