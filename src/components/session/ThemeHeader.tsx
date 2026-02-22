@@ -86,7 +86,7 @@ export function ThemeHeader({
               {category}
             </span>
           )}
-          <span className="text-sm font-medium text-slate-500">
+          <span className="text-sm font-medium text-slate-600">
             {currentIndex} / {total}
           </span>
           {secondsLeft !== undefined && (
