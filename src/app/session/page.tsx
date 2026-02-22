@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
+import { ThemeHeader } from "@/components/session/ThemeHeader";
 import { useCountdown } from "@/lib/timer/useCountdown";
 import { createSession, completeSession } from "@/lib/db/sessionsRepo";
 import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
@@ -363,29 +364,13 @@ export default function SessionPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
-      {/* ヘッダー */}
-      <header className="flex items-center gap-3 rounded-lg bg-white p-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <p className="text-lg font-semibold text-slate-500">
-            {currentNumber} / {total}
-          </p>
-          <h1 className="truncate text-xl font-bold text-slate-900">
-            {currentTheme.title}
-          </h1>
-          {currentTheme.category && (
-            <span className="rounded bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
-              {currentTheme.category}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 rounded-md bg-slate-100 px-4 py-2">
-          <span className="text-xs text-slate-500">残り時間</span>
-          <span className="text-2xl font-bold text-slate-900 tabular-nums">
-            {secondsLeft}
-          </span>
-          <span className="text-xs text-slate-500">秒</span>
-        </div>
-      </header>
+      <ThemeHeader
+        currentIndex={currentNumber}
+        total={total}
+        title={currentTheme.title}
+        category={currentTheme.category}
+        secondsLeft={secondsLeft}
+      />
 
       {/* タブ + フッター操作 */}
       <section className="border-t border-slate-200 pt-3">
