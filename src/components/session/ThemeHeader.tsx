@@ -92,7 +92,7 @@ export function ThemeHeader({
           </span>
           {secondsLeft !== undefined && (
             <div className="flex items-baseline gap-1 rounded-md bg-slate-100 px-3 py-1">
-              <span className="text-lg font-bold tabular-nums text-slate-900">
+              <span className="text-lg font-bold text-slate-900 tabular-nums">
                 {secondsLeft}
               </span>
               <span className="text-xs text-slate-500">秒</span>
