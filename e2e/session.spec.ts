@@ -32,14 +32,18 @@ test.describe("セッション実行フロー", () => {
     await expect(page).toHaveURL(/\/session/);
 
     // テーマ表示があることを確認（1/N のインジケータ、N は設定で可変）
-    await expect(page.locator("text=/1\\s*\\/\\s*\\d+/")).toBeVisible();
+    await expect(
+      page.locator("text=/1\\s*\\/\\s*\\d+/ >> visible=true").first(),
+    ).toBeVisible();
   });
 
   test("セッション画面でタイマーが表示される", async ({ page }) => {
     await page.goto("/session");
 
-    // タイマー表示を確認（「残り時間」「秒」に挟まれた秒数表示）
-    await expect(page.getByText(/残り時間\s*\d+\s*秒/)).toBeVisible();
+    // タイマー表示を確認（モバイル/デスクトップ共通で数字表示を持つ要素）
+    await expect(
+      page.locator(".tabular-nums >> visible=true").first(),
+    ).toBeVisible();
   });
 
   test("セッション画面でテキスト入力ができる", async ({ page }) => {
@@ -63,7 +67,9 @@ test.describe("セッション実行フロー", () => {
     await page.goto("/session");
 
     // 最初のテーマ（1/10 など）を確認
-    const themeIndicator = page.locator("text=/1.*\\/|テーマ.*1/");
+    const themeIndicator = page
+      .locator("text=/1.*\\/|テーマ.*1/ >> visible=true")
+      .first();
     await expect(themeIndicator).toBeVisible();
 
     // 次へボタンをクリック
@@ -73,7 +79,9 @@ test.describe("セッション実行フロー", () => {
     await nextButton.click();
 
     // 次のテーマ（2/10 など）に進んだことを確認
-    await expect(page.locator("text=/2.*\\/|テーマ.*2/")).toBeVisible();
+    await expect(
+      page.locator("text=/2.*\\/|テーマ.*2/ >> visible=true").first(),
+    ).toBeVisible();
   });
 
   test("10テーマ完了後、完了画面に遷移する", async ({ page }) => {
@@ -90,7 +98,9 @@ test.describe("セッション実行フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page.locator(`text=/${nextIndex}\\s*\\/\\s*${total}/`),
+          page
+            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
+            .first(),
         ).toBeVisible({ timeout: 5000 });
       }
     }

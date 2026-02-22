@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
  * 設定でテーマ数が変更されていてもテストが通るようにする。
  */
 export async function getThemeTotal(page: Page): Promise<number> {
-  const indicator = page.locator("text=/1\\s*\\/\\s*\\d+/");
+  const indicator = page.locator("text=/1\\s*\\/\\s*\\d+/ >> visible=true");
   await indicator.first().waitFor({ state: "visible", timeout: 10000 });
   const text = await indicator.first().textContent();
   const match = text?.replace(/\s/g, "").match(/1\/(\d+)/);
