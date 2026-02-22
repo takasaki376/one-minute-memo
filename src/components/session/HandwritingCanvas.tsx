@@ -27,6 +27,8 @@ export function HandwritingCanvas({
   // 非同期 onload 内でも常に最新の value を参照できるように ref で保持する
   const latestValueRef = useRef<string | null | undefined>(value);
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
+  const mountedRef = useRef(true);
+  const pendingImagesRef = useRef<Set<HTMLImageElement>>(new Set());
 
   const applyCanvasStyle = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -59,7 +61,17 @@ export function HandwritingCanvas({
       const logicalWidth = logicalSizeRef.current.width;
       const logicalHeight = logicalSizeRef.current.height;
       const img = new Image();
+      pendingImagesRef.current.add(img);
+
+      const cleanupImage = () => {
+        img.onload = null;
+        img.onerror = null;
+        pendingImagesRef.current.delete(img);
+      };
+
       img.onload = () => {
+        cleanupImage();
+        if (!mountedRef.current) return;
         // value 由来の再描画時のみ最新値チェックを行い、描画中リサイズの復元では無効化する。
         // latestValueRef は useRef のため .current の更新で drawDataUrl を再生成する必要はなく、
         // onload 実行時に最新値を読み取ってレースコンディションを回避できる。
@@ -73,10 +85,27 @@ export function HandwritingCanvas({
         ctx.drawImage(img, 0, 0, logicalWidth, logicalHeight);
         applyCanvasStyle(ctx);
       };
+      img.onerror = () => {
+        cleanupImage();
+      };
       img.src = dataUrl;
     },
     [applyCanvasStyle, clearCanvas]
   );
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      for (const img of pendingImagesRef.current) {
+        img.onload = null;
+        img.onerror = null;
+        img.src = "";
+      }
+      pendingImagesRef.current.clear();
+    };
+  }, []);
 
   // props 経由での value 更新時に描画を反映
   useEffect(() => {
