@@ -429,13 +429,13 @@ export default function SessionPage() {
       </section>
 
       {/* 入力エリア */}
-      <section className="flex min-h-[520px] flex-col rounded-lg bg-white p-4">
+      <section className="min-h-[520px] rounded-lg bg-white p-4">
         <div
           id="panel-handwriting"
           role="tabpanel"
           aria-labelledby="tab-handwriting"
           hidden={activeInputTab !== "handwriting"}
-          className="min-h-0 flex-1"
+          className="h-[480px]"
         >
           <HandwritingCanvas
             value={handwritingDataUrl}
