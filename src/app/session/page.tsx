@@ -441,9 +441,7 @@ export default function SessionPage() {
             value={handwritingDataUrl}
             onChange={setHandwritingDataUrl}
             disabled={isInputDisabled}
-            width={960}
-            height={480}
-            className="w-full"
+            className="h-full"
           />
         </div>
         <div
