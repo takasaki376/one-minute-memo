@@ -78,10 +78,15 @@ export function HandwritingCanvas({
     const wrapper = wrapperRef.current;
     if (!canvas || !wrapper) return;
 
+    let rafId = 0;
+
     const resize = () => {
-      const rect = wrapper.getBoundingClientRect();
-      const displayWidth = Math.max(1, Math.floor(rect.width));
-      const displayHeight = Math.max(1, Math.floor(rect.height));
+      // 描画中はリサイズをスキップ（canvas.width/height 設定でパスがリセットされるため）
+      if (isDrawingRef.current) return;
+
+      // clientWidth/clientHeight でコンテンツ領域のサイズを取得（border 除外）
+      const displayWidth = Math.max(1, wrapper.clientWidth);
+      const displayHeight = Math.max(1, wrapper.clientHeight);
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
@@ -145,12 +150,14 @@ export function HandwritingCanvas({
     resize();
 
     const observer = new ResizeObserver(() => {
-      resize();
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(resize);
     });
     observer.observe(wrapper);
 
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(rafId);
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
 
@@ -167,6 +174,8 @@ export function HandwritingCanvas({
     };
   };
 
+  const lastPosRef = useRef({ x: 0, y: 0 });
+
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
     event
   ) => {
@@ -179,9 +188,10 @@ export function HandwritingCanvas({
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
 
-    const { x, y } = getCanvasPos(event);
+    const pos = getCanvasPos(event);
+    lastPosRef.current = pos;
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(pos.x, pos.y);
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
@@ -194,9 +204,12 @@ export function HandwritingCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const { x, y } = getCanvasPos(event);
-    ctx.lineTo(x, y);
+    const pos = getCanvasPos(event);
+    ctx.beginPath();
+    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+    ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
+    lastPosRef.current = pos;
   };
 
   const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
