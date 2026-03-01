@@ -3,16 +3,6 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
-const mockThemes = Array.from({ length: 10 }, (_, index) => ({
-  id: `theme-${index + 1}`,
-  title: `theme ${index + 1}`,
-  category: 'general',
-  isActive: true,
-  source: 'builtin' as const,
-  createdAt: '2025-01-01T00:00:00.000Z',
-  updatedAt: '2025-01-01T00:00:00.000Z',
-}));
-
 // vi.mock の hoisting を考慮して、factory 内で定義
 vi.mock("@/lib/utils/selectRandomThemes", () => {
   const mockPickRandomActiveThemes = vi.fn(async (count = 10) =>
@@ -321,6 +311,15 @@ describe("/session page", () => {
       expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
     });
 
+    const saveInvocationOrders = (memosRepo.saveMemo as unknown as Mock).mock
+      .invocationCallOrder;
+    const completeInvocationOrder = (
+      sessionsRepo.completeSession as unknown as Mock
+    ).mock.invocationCallOrder[0];
+    const lastSaveInvocationOrder =
+      saveInvocationOrders[saveInvocationOrders.length - 1];
+    expect(lastSaveInvocationOrder).toBeLessThan(completeInvocationOrder);
+
     const [sessionIdArg, memoCountArg] = (
       sessionsRepo.completeSession as unknown as Mock
     ).mock.calls[0];
@@ -333,6 +332,77 @@ describe("/session page", () => {
         "/session/complete?sessionId=session-1"
       );
     });
+  });
+
+  it("prevents double save when manual next and timer finish race", async () => {
+    const saveMemoMock = memosRepo.saveMemo as unknown as Mock;
+    let resolveSave: (() => void) | undefined;
+    saveMemoMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = () =>
+            resolve({
+              id: "memo-race",
+              sessionId: "session-1",
+              themeId: "theme-1",
+              order: 1,
+              textContent: "memo race",
+              handwritingType: "none",
+              createdAt: "2025-01-01T00:00:00.000Z",
+              updatedAt: "2025-01-01T00:00:00.000Z",
+            });
+        }),
+    );
+
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    });
+
+    await switchToTextTab();
+    const textarea = screen.getByRole("textbox");
+    const nextButton = screen.getByRole("button", { name: /次へ/ });
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: "memo race" } });
+      fireEvent.click(nextButton);
+      callLastOnFinish();
+    });
+
+    expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSave?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("2 / 10")).toBeInTheDocument();
+    });
+    expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(0);
+  });
+
+  it("blurs textarea focus when switching to handwriting tab", async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    });
+
+    await switchToTextTab();
+    const textarea = screen.getByRole("textbox");
+    expect(textarea).toHaveFocus();
+
+    const handwritingTab = screen.getByRole("tab", { name: "手書き入力" });
+    await act(async () => {
+      fireEvent.click(handwritingTab);
+    });
+
+    expect(textarea).not.toHaveFocus();
   });
 
   it("saves memo when timer finishes automatically", async () => {

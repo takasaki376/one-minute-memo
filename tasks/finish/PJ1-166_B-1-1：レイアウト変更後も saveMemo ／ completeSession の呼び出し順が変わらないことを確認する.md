@@ -98,3 +98,19 @@ UI構造変更による副作用で、
   レイアウト条件分岐の内側に入っていないか注意する
 - console.log / spy を一時的に仕込んで
   呼び出し順を確認するのは可（最終的には削除）
+
+---
+
+## 確認結果（2026-02-22）
+
+実施者: Codex
+
+- ✅ 最終テーマ完了テストで `saveMemo` 最終呼び出しが `completeSession` より先に実行されることを検証
+- ✅ `manual next + timer finish` 競合時に `saveMemo` が1回だけ呼ばれることを検証
+- ✅ `createSession` は初回保存時のみ実行される既存仕様を維持
+
+検証した主な観点:
+
+1. 中間テーマ: `saveMemo` 実行後に次テーマへ遷移
+2. 最終テーマ: `saveMemo` → `completeSession` → `/session/complete` 遷移
+3. 競合ケース: 二重保存・二重遷移が発生しない
