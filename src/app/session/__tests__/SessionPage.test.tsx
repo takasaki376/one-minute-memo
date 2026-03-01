@@ -268,6 +268,30 @@ describe("/session page", () => {
   });
 
   it("completes the session after 10 memos and navigates to complete page", async () => {
+    const saveMemoMock = memosRepo.saveMemo as unknown as Mock;
+    let saveMemoCallCount = 0;
+    let resolveLastSave: (() => void) | undefined;
+    saveMemoMock.mockImplementation((memo) => {
+      saveMemoCallCount += 1;
+      if (saveMemoCallCount === 10) {
+        return new Promise((resolve) => {
+          resolveLastSave = () =>
+            resolve({
+              ...memo,
+              id: "memo-last",
+              createdAt: "2025-01-01T00:00:00.000Z",
+              updatedAt: "2025-01-01T00:00:00.000Z",
+            });
+        });
+      }
+      return Promise.resolve({
+        ...memo,
+        id: `memo-${saveMemoCallCount}`,
+        createdAt: "2025-01-01T00:00:00.000Z",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      });
+    });
+
     await act(async () => {
       render(<SessionPage />);
     });
@@ -300,25 +324,20 @@ describe("/session page", () => {
     await waitFor(() => {
       expect(memosRepo.saveMemo).toHaveBeenCalledTimes(10);
     });
+    expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(0);
 
     // 最初のメモ保存時にセッションが作成されることを確認
     await waitFor(() => {
       expect(sessionsRepo.createSession).toHaveBeenCalledTimes(1);
     });
 
-    // セッション完了処理を待つ
+    await act(async () => {
+      resolveLastSave?.();
+    });
+    // セッション完了処理を待つ（最後のsaveMemo解決後に実行される）
     await waitFor(() => {
       expect(sessionsRepo.completeSession).toHaveBeenCalledTimes(1);
     });
-
-    const saveInvocationOrders = (memosRepo.saveMemo as unknown as Mock).mock
-      .invocationCallOrder;
-    const completeInvocationOrder = (
-      sessionsRepo.completeSession as unknown as Mock
-    ).mock.invocationCallOrder[0];
-    const lastSaveInvocationOrder =
-      saveInvocationOrders[saveInvocationOrders.length - 1];
-    expect(lastSaveInvocationOrder).toBeLessThan(completeInvocationOrder);
 
     const [sessionIdArg, memoCountArg] = (
       sessionsRepo.completeSession as unknown as Mock
