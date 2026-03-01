@@ -75,6 +75,15 @@ export default function SessionPage() {
     [themes, currentIndex],
   );
 
+  const handleSwitchToHandwritingTab = () => {
+    setActiveInputTab("handwriting");
+    if (typeof document === "undefined") return;
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLTextAreaElement) {
+      activeElement.blur();
+    }
+  };
+
   // セッション開始時の初期化
   useEffect(() => {
     const init = async () => {
@@ -378,7 +387,7 @@ export default function SessionPage() {
                   ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
                   : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
               }
-              onClick={() => setActiveInputTab("handwriting")}
+              onClick={handleSwitchToHandwritingTab}
             >
               手書き入力
             </button>

@@ -99,4 +99,17 @@ describe("TextEditor", () => {
 
     expect(container.firstChild).toHaveClass("custom-class");
   });
+
+  it("スクロール干渉を抑えるクラスが適用される", () => {
+    const handleChange = vi.fn();
+
+    render(<TextEditor value="" onChange={handleChange} />);
+
+    const textarea = screen.getByLabelText(
+      "テキストメモ入力",
+    ) as HTMLTextAreaElement;
+    expect(textarea).toHaveClass("overflow-y-auto");
+    expect(textarea).toHaveClass("overscroll-contain");
+    expect(textarea).toHaveClass("resize-none");
+  });
 });

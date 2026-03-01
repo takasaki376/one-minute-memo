@@ -53,7 +53,9 @@ export function TextEditor({
     "focus-visible:ring-2",
     "focus-visible:ring-blue-500",
     "focus-visible:ring-offset-1",
-    "resize-y",
+    "overflow-y-auto",
+    "overscroll-contain",
+    "resize-none",
     disabled && "bg-slate-100 text-slate-400 cursor-not-allowed",
   ]);
 
