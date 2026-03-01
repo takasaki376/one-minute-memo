@@ -381,7 +381,6 @@ export function HandwritingCanvas({
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerLeave}
           className={canvasClass}
-          style={{ touchAction: "none" }}
         />
       </div>
       <button
