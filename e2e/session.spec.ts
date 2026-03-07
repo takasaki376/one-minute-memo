@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clearIndexedDB } from "./helpers/indexeddb";
-import { getThemeTotal } from "./helpers/session";
+import { getThemeTotal, getVisibleSessionTextarea } from "./helpers/session";
 
 test.describe("セッション実行フロー", () => {
   test.beforeEach(async ({ page }) => {
@@ -49,12 +49,7 @@ test.describe("セッション実行フロー", () => {
   test("セッション画面でテキスト入力ができる", async ({ page }) => {
     await page.goto("/session");
 
-    // デフォルトは手書きタブなので、テキスト入力タブに切り替え
-    await page.getByRole("tab", { name: "テキスト入力" }).click();
-
-    // テキストエリアを探す
-    const textarea = page.locator("textarea");
-    await expect(textarea).toBeVisible();
+    const textarea = await getVisibleSessionTextarea(page);
 
     // テキストを入力
     await textarea.fill("テスト入力テキスト");

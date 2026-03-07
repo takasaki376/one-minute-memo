@@ -155,6 +155,18 @@ async function switchToTextTab() {
   });
 }
 
+function getPrimaryTextbox() {
+  return screen.getAllByRole("textbox")[0];
+}
+
+function getPrimaryNextButton() {
+  return screen.getAllByRole("button", { name: /次へ/ })[0];
+}
+
+function getPrimaryHandwritingButton() {
+  return screen.getAllByRole("button", { name: "手書き入力" })[0];
+}
+
 describe("/session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -180,8 +192,8 @@ describe("/session page", () => {
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = getPrimaryTextbox();
+    const nextButton = getPrimaryNextButton();
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "first memo" } });
       fireEvent.click(nextButton);
@@ -216,8 +228,8 @@ describe("/session page", () => {
     });
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = getPrimaryTextbox();
+    const nextButton = getPrimaryNextButton();
 
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "text only memo" } });
@@ -243,10 +255,8 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    const handwritingButton = screen.getByRole("button", {
-      name: "手書き入力",
-    });
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const handwritingButton = getPrimaryHandwritingButton();
+    const nextButton = getPrimaryNextButton();
 
     await act(async () => {
       fireEvent.click(handwritingButton);
@@ -304,8 +314,8 @@ describe("/session page", () => {
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = getPrimaryTextbox();
+    const nextButton = getPrimaryNextButton();
 
     for (let i = 1; i <= 10; i += 1) {
       await act(async () => {
@@ -382,8 +392,8 @@ describe("/session page", () => {
     });
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = getPrimaryTextbox();
+    const nextButton = getPrimaryNextButton();
 
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "memo race" } });
@@ -413,7 +423,7 @@ describe("/session page", () => {
     });
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
+    const textarea = getPrimaryTextbox();
     expect(textarea).toHaveFocus();
 
     const handwritingTab = screen.getByRole("tab", { name: "手書き入力" });
@@ -437,7 +447,7 @@ describe("/session page", () => {
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
+    const textarea = getPrimaryTextbox();
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "auto-finished memo" } });
     });
@@ -555,8 +565,8 @@ describe("/session page", () => {
       expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
       await switchToTextTab();
-      const textarea = screen.getByRole("textbox");
-      const nextButton = screen.getByRole("button", { name: /次へ/ });
+      const textarea = getPrimaryTextbox();
+      const nextButton = getPrimaryNextButton();
 
       // 3回進める
       for (let i = 1; i <= 3; i += 1) {

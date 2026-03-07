@@ -359,7 +359,7 @@ export default function SessionPage() {
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
 
   return (
-    <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
+    <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 bg-slate-50 p-4 md:p-8">
       <ThemeHeader
         currentIndex={currentNumber}
         total={total}
@@ -368,8 +368,8 @@ export default function SessionPage() {
         secondsLeft={secondsLeft}
       />
 
-      {/* タブ + フッター操作 */}
-      <section className="border-t border-slate-200 pt-3">
+      {/* モバイル: 既存のタブ切り替えUIを維持 */}
+      <section className="border-t border-slate-200 pt-3 md:hidden">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div
             className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
@@ -437,8 +437,8 @@ export default function SessionPage() {
         </div>
       </section>
 
-      {/* 入力エリア */}
-      <section className="min-h-[520px] rounded-lg bg-white p-4">
+      {/* モバイル: 入力エリア */}
+      <section className="min-h-[520px] rounded-lg bg-white p-4 md:hidden">
         <div
           id="panel-handwriting"
           role="tabpanel"
@@ -470,6 +470,61 @@ export default function SessionPage() {
             className="h-[480px]"
           />
         </div>
+      </section>
+
+      {/* タブレット/PC: Handwriting メイン + Text サブの2ペイン */}
+      <section className="hidden md:grid md:grid-cols-10 md:gap-4 md:min-h-[calc(100dvh-240px)]">
+        <div className="md:col-span-7 rounded-lg bg-white p-4">
+          <HandwritingCanvas
+            value={handwritingDataUrl}
+            onChange={setHandwritingDataUrl}
+            disabled={isInputDisabled}
+            className="h-full min-h-[520px]"
+          />
+        </div>
+
+        <aside className="md:col-span-3 flex min-h-0 flex-col gap-3 rounded-lg bg-white p-4">
+          <p className="text-xs text-slate-500">
+            手書き入力を主に使いながら、必要に応じてテキストで補助できます。
+          </p>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <p className="text-xs text-slate-400">
+              {isRunning ? "入力中…" : "一時停止中"}
+            </p>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (isRunning) {
+                  pause();
+                } else {
+                  start();
+                }
+              }}
+              disabled={secondsLeft === 0}
+              className="bg-slate-100 text-slate-600 hover:bg-slate-200"
+            >
+              {isRunning ? "一時停止" : "再開"}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void handleThemeFinished()}
+              disabled={secondsLeft === 0}
+              className="bg-blue-500 text-white hover:bg-blue-600"
+            >
+              このテーマを終えて次へ
+            </Button>
+          </div>
+
+          <TextEditor
+            value={text}
+            onChange={setText}
+            disabled={isInputDisabled}
+            autoFocus={stage === "running" && secondsLeft > 0}
+            maxLength={1000}
+            className="h-full min-h-[280px] flex-1"
+          />
+        </aside>
       </section>
     </main>
   );
