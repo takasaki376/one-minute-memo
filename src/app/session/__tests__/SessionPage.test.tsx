@@ -1,7 +1,7 @@
 // src/app/session/__tests__/SessionPage.test.tsx
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 
 // vi.mock の hoisting を考慮して、factory 内で定義
 vi.mock("@/lib/utils/selectRandomThemes", () => {
@@ -155,9 +155,27 @@ async function switchToTextTab() {
   });
 }
 
+function getSplitTextPanel() {
+  return screen.getByTestId("split-text-panel");
+}
+
+function getSplitHandwritingPanel() {
+  return screen.getByTestId("split-handwriting-panel");
+}
+
+function getSessionControls() {
+  return screen.getByTestId("session-controls");
+}
+
 describe("/session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "innerWidth", {
+      writable: true,
+      configurable: true,
+      value: 1024,
+    });
+    window.dispatchEvent(new Event("resize"));
     // デフォルト設定をモック
     const defaultSettings: SettingsRecord = {
       id: "default",
@@ -180,8 +198,10 @@ describe("/session page", () => {
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = within(getSplitTextPanel()).getByRole("textbox");
+    const nextButton = within(getSessionControls()).getByRole("button", {
+      name: /次へ/,
+    });
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "first memo" } });
       fireEvent.click(nextButton);
@@ -216,8 +236,10 @@ describe("/session page", () => {
     });
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = within(getSplitTextPanel()).getByRole("textbox");
+    const nextButton = within(getSessionControls()).getByRole("button", {
+      name: /次へ/,
+    });
 
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "text only memo" } });
@@ -243,10 +265,12 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    const handwritingButton = screen.getByRole("button", {
+    const handwritingButton = within(getSplitHandwritingPanel()).getByRole("button", {
       name: "手書き入力",
     });
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const nextButton = within(getSessionControls()).getByRole("button", {
+      name: /次へ/,
+    });
 
     await act(async () => {
       fireEvent.click(handwritingButton);
@@ -304,8 +328,10 @@ describe("/session page", () => {
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = within(getSplitTextPanel()).getByRole("textbox");
+    const nextButton = within(getSessionControls()).getByRole("button", {
+      name: /次へ/,
+    });
 
     for (let i = 1; i <= 10; i += 1) {
       await act(async () => {
@@ -382,8 +408,10 @@ describe("/session page", () => {
     });
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
-    const nextButton = screen.getByRole("button", { name: /次へ/ });
+    const textarea = within(getSplitTextPanel()).getByRole("textbox");
+    const nextButton = within(getSessionControls()).getByRole("button", {
+      name: /次へ/,
+    });
 
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "memo race" } });
@@ -413,7 +441,7 @@ describe("/session page", () => {
     });
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
+    const textarea = within(getSplitTextPanel()).getByRole("textbox");
     expect(textarea).toHaveFocus();
 
     const handwritingTab = screen.getByRole("tab", { name: "手書き入力" });
@@ -437,7 +465,7 @@ describe("/session page", () => {
     expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
     await switchToTextTab();
-    const textarea = screen.getByRole("textbox");
+    const textarea = within(getSplitTextPanel()).getByRole("textbox");
     await act(async () => {
       fireEvent.change(textarea, { target: { value: "auto-finished memo" } });
     });
@@ -461,6 +489,64 @@ describe("/session page", () => {
     await waitFor(() => {
       expect(screen.getByText("2 / 10")).toBeInTheDocument();
     });
+  });
+
+  it("switches between split and handwriting focus modes on tablet width", async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("split-layout")).toBeVisible();
+    expect(screen.queryByTestId("focus-layout")).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("focus-mode-button"));
+    });
+
+    expect(screen.getByTestId("focus-layout")).toBeVisible();
+    expect(screen.getByTestId("split-layout")).not.toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("split-mode-button"));
+    });
+
+    expect(screen.getByTestId("split-layout")).toBeVisible();
+    expect(screen.queryByTestId("focus-layout")).not.toBeInTheDocument();
+  });
+
+  it("keeps text value when opening and closing focus mode text modal", async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    });
+
+    await switchToTextTab();
+    const splitTextarea = within(getSplitTextPanel()).getByRole("textbox");
+    await act(async () => {
+      fireEvent.change(splitTextarea, { target: { value: "focus modal memo" } });
+      fireEvent.click(screen.getByTestId("focus-mode-button"));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("focus-open-text-button"));
+    });
+
+    const modal = screen.getByTestId("focus-text-modal");
+    const modalTextarea = within(modal).getByRole("textbox");
+    expect(modalTextarea).toHaveValue("focus modal memo");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("focus-close-text-button"));
+    });
+
+    expect(screen.queryByTestId("focus-text-modal")).not.toBeInTheDocument();
   });
 
   describe("settings integration", () => {
@@ -555,8 +641,10 @@ describe("/session page", () => {
       expect(sessionsRepo.createSession).toHaveBeenCalledTimes(0);
 
       await switchToTextTab();
-      const textarea = screen.getByRole("textbox");
-      const nextButton = screen.getByRole("button", { name: /次へ/ });
+      const textarea = within(getSplitTextPanel()).getByRole("textbox");
+      const nextButton = within(getSessionControls()).getByRole("button", {
+        name: /次へ/,
+      });
 
       // 3回進める
       for (let i = 1; i <= 3; i += 1) {

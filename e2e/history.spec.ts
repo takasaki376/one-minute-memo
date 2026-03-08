@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clearIndexedDB } from "./helpers/indexeddb";
-import { getThemeTotal } from "./helpers/session";
+import { getThemeTotal, getVisibleSessionTextarea } from "./helpers/session";
 
 test.describe("履歴確認フロー", () => {
   test.beforeEach(async ({ page }) => {
@@ -51,11 +51,7 @@ test.describe("履歴確認フロー", () => {
   test("履歴詳細画面でメモ一覧が表示される", async ({ page }) => {
     await page.goto("/session");
     const total = await getThemeTotal(page);
-
-    // デフォルトは手書きタブなので、テキスト入力タブに切り替え
-    await page.getByRole("tab", { name: "テキスト入力" }).click();
-
-    const textarea = page.locator("textarea");
+    const textarea = await getVisibleSessionTextarea(page);
     await textarea.fill("テスト用メモ内容");
 
     for (let i = 0; i < total; i++) {
