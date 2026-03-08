@@ -369,7 +369,10 @@ export default function SessionPage() {
       />
 
       {/* モバイル: 既存のタブ切り替えUIを維持 */}
-      <section className="border-t border-slate-200 pt-3 md:hidden">
+      <section
+        className="border-t border-slate-200 pt-3 md:hidden"
+        data-testid="mobile-session-controls"
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div
             className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
@@ -438,13 +441,17 @@ export default function SessionPage() {
       </section>
 
       {/* モバイル: 入力エリア */}
-      <section className="min-h-[520px] rounded-lg bg-white p-4 md:hidden">
+      <section
+        className="min-h-[520px] rounded-lg bg-white p-4 md:hidden"
+        data-testid="mobile-session-inputs"
+      >
         <div
           id="panel-handwriting"
           role="tabpanel"
           aria-labelledby="tab-handwriting"
           hidden={activeInputTab !== "handwriting"}
           className="h-[480px]"
+          data-testid="mobile-handwriting-panel"
         >
           <HandwritingCanvas
             value={handwritingDataUrl}
@@ -458,6 +465,7 @@ export default function SessionPage() {
           role="tabpanel"
           aria-labelledby="tab-text"
           hidden={activeInputTab !== "text"}
+          data-testid="mobile-text-panel"
         >
           <TextEditor
             value={text}
@@ -520,7 +528,7 @@ export default function SessionPage() {
             value={text}
             onChange={setText}
             disabled={isInputDisabled}
-            autoFocus={stage === "running" && secondsLeft > 0}
+            autoFocus={false}
             maxLength={1000}
             className="h-full min-h-[280px] flex-1"
           />

@@ -1,7 +1,7 @@
 // src/app/session/__tests__/SessionPage.test.tsx
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 
 // vi.mock の hoisting を考慮して、factory 内で定義
 vi.mock("@/lib/utils/selectRandomThemes", () => {
@@ -156,15 +156,18 @@ async function switchToTextTab() {
 }
 
 function getPrimaryTextbox() {
-  return screen.getAllByRole("textbox")[0];
+  const textPanel = screen.getByTestId("mobile-text-panel");
+  return within(textPanel).getByRole("textbox");
 }
 
 function getPrimaryNextButton() {
-  return screen.getAllByRole("button", { name: /次へ/ })[0];
+  const controls = screen.getByTestId("mobile-session-controls");
+  return within(controls).getByRole("button", { name: /次へ/ });
 }
 
 function getPrimaryHandwritingButton() {
-  return screen.getAllByRole("button", { name: "手書き入力" })[0];
+  const handwritingPanel = screen.getByTestId("mobile-handwriting-panel");
+  return within(handwritingPanel).getByRole("button", { name: "手書き入力" });
 }
 
 describe("/session page", () => {
