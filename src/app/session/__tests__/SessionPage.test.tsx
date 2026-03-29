@@ -615,6 +615,31 @@ describe("/session page", () => {
       expect(screen.queryByTestId("focus-text-modal")).not.toBeInTheDocument();
     });
 
+    it("closes focus text modal on Escape", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-mode-button"));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-open-text-button"));
+      });
+
+      expect(screen.getByTestId("focus-text-modal")).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+      });
+
+      expect(screen.queryByTestId("focus-text-modal")).not.toBeInTheDocument();
+    });
+
     it("falls back to split when viewport shrinks below md while in focus mode", async () => {
       await act(async () => {
         render(<SessionPage />);

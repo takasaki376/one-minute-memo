@@ -119,6 +119,26 @@ export default function SessionPage() {
     }
   }, [viewMode]);
 
+  useEffect(() => {
+    if (
+      !isFocusTextOpen ||
+      !isTabletUp ||
+      viewMode !== "handwritingFocus"
+    ) {
+      return;
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsFocusTextOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isFocusTextOpen, isTabletUp, viewMode]);
+
   // セッション開始時の初期化
   useEffect(() => {
     const init = async () => {
@@ -638,18 +658,12 @@ export default function SessionPage() {
         isFocusTextOpen &&
         createPortal(
           <div className="fixed inset-0 z-[60] box-border flex h-[100dvh] w-[100vw] items-center justify-center p-4">
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop is decorative (aria-hidden); Escape closes via document listener; dialog has 閉じる */}
             <div
               role="presentation"
-              tabIndex={-1}
               aria-hidden="true"
               className="absolute inset-0 cursor-pointer bg-slate-900/40"
               onClick={() => setIsFocusTextOpen(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setIsFocusTextOpen(false);
-                }
-              }}
             />
             <dialog
               open
