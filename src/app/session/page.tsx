@@ -502,7 +502,6 @@ export default function SessionPage() {
               </Button>
             </div>
           )}
-
         </div>
       </section>
 
@@ -541,7 +540,9 @@ export default function SessionPage() {
             onChange={setText}
             disabled={isInputDisabled}
             autoFocus={
-              activeInputTab === "text" && stage === "running" && secondsLeft > 0
+              activeInputTab === "text" &&
+              stage === "running" &&
+              secondsLeft > 0
             }
             maxLength={1000}
             className="h-[480px]"
@@ -554,12 +555,6 @@ export default function SessionPage() {
         viewMode === "handwritingFocus" &&
         createPortal(
           <div className="fixed inset-0 z-50 box-border h-[100dvh] w-[100vw] max-w-none">
-            <button
-              type="button"
-              className="absolute inset-0 bg-slate-900/40"
-              onClick={() => setViewMode("split")}
-              aria-label="手書き集中を閉じる"
-            />
             <dialog
               open
               aria-label="手書き集中モード"
@@ -635,7 +630,7 @@ export default function SessionPage() {
               </div>
             </dialog>
           </div>,
-          document.body,
+          document.body
         )}
 
       {portalReady &&
@@ -657,7 +652,9 @@ export default function SessionPage() {
               className="relative z-10 m-0 box-border w-full max-w-2xl rounded-xl border-0 bg-white p-4 shadow-xl outline-none open:block"
             >
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">テキスト入力</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  テキスト入力
+                </h3>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -678,7 +675,7 @@ export default function SessionPage() {
               />
             </dialog>
           </div>,
-          document.body,
+          document.body
         )}
     </main>
   );
