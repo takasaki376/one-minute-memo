@@ -167,15 +167,19 @@ function getSessionControls() {
   return screen.getByTestId("session-controls");
 }
 
+function setViewportWidth(cssPixels: number) {
+  Object.defineProperty(window, "innerWidth", {
+    writable: true,
+    configurable: true,
+    value: cssPixels,
+  });
+  window.dispatchEvent(new Event("resize"));
+}
+
 describe("/session page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.defineProperty(window, "innerWidth", {
-      writable: true,
-      configurable: true,
-      value: 1024,
-    });
-    window.dispatchEvent(new Event("resize"));
+    setViewportWidth(700);
     // デフォルト設定をモック
     const defaultSettings: SettingsRecord = {
       id: "default",
@@ -491,7 +495,7 @@ describe("/session page", () => {
     });
   });
 
-  it("switches between split and handwriting focus modes on tablet width", async () => {
+  it("does not expose handwriting focus entry below md breakpoint", async () => {
     await act(async () => {
       render(<SessionPage />);
     });
@@ -500,96 +504,143 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("split-layout")).toBeVisible();
-    expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("focus-mode-button"));
-    });
-
-    expect(screen.getByTestId("focus-handwriting-modal")).toBeVisible();
-    expect(screen.getByTestId("split-layout")).not.toBeVisible();
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("split-mode-button"));
-    });
-
-    expect(screen.getByTestId("split-layout")).toBeVisible();
-    expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("focus-mode-button")).not.toBeInTheDocument();
   });
 
-  it("keeps handwriting data after exiting handwriting focus mode", async () => {
-    await act(async () => {
-      render(<SessionPage />);
+  describe("handwriting focus mode (tablet viewport)", () => {
+    beforeEach(() => {
+      setViewportWidth(1024);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    it("switches between split and handwriting focus modes on tablet width", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("split-layout")).toBeVisible();
+      expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-mode-button"));
+      });
+
+      expect(screen.getByTestId("focus-handwriting-modal")).toBeVisible();
+      expect(screen.queryByTestId("split-layout")).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("split-mode-button"));
+      });
+
+      expect(screen.getByTestId("split-layout")).toBeVisible();
+      expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
     });
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("focus-mode-button"));
+    it("keeps handwriting data after exiting handwriting focus mode", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-mode-button"));
+      });
+
+      const focusModal = screen.getByTestId("focus-handwriting-modal");
+      const handwritingInFocus = within(focusModal).getByRole("button", {
+        name: "手書き入力",
+      });
+      await act(async () => {
+        fireEvent.click(handwritingInFocus);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("split-mode-button"));
+      });
+
+      const nextButton = within(getSessionControls()).getByRole("button", {
+        name: /次へ/,
+      });
+      await act(async () => {
+        fireEvent.click(nextButton);
+      });
+
+      await waitFor(() => {
+        expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+      });
+
+      const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
+      expect(savedArg.handwritingType).toBe("dataUrl");
+      expect(savedArg.handwritingDataUrl).toBe(
+        "data:image/png;base64,handwriting",
+      );
     });
 
-    const focusModal = screen.getByTestId("focus-handwriting-modal");
-    const handwritingInFocus = within(focusModal).getByRole("button", {
-      name: "手書き入力",
-    });
-    await act(async () => {
-      fireEvent.click(handwritingInFocus);
-    });
+    it("keeps text value when opening and closing focus mode text modal", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("split-mode-button"));
-    });
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
 
-    const nextButton = within(getSessionControls()).getByRole("button", {
-      name: /次へ/,
-    });
-    await act(async () => {
-      fireEvent.click(nextButton);
-    });
+      await switchToTextTab();
+      const splitTextarea = within(getSplitTextPanel()).getByRole("textbox");
+      await act(async () => {
+        fireEvent.change(splitTextarea, {
+          target: { value: "focus modal memo" },
+        });
+        fireEvent.click(screen.getByTestId("focus-mode-button"));
+      });
 
-    await waitFor(() => {
-      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
-    });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-open-text-button"));
+      });
 
-    const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
-    expect(savedArg.handwritingType).toBe("dataUrl");
-    expect(savedArg.handwritingDataUrl).toBe(
-      "data:image/png;base64,handwriting",
-    );
-  });
+      const modal = screen.getByTestId("focus-text-modal");
+      const modalTextarea = within(modal).getByRole("textbox");
+      expect(modalTextarea).toHaveValue("focus modal memo");
 
-  it("keeps text value when opening and closing focus mode text modal", async () => {
-    await act(async () => {
-      render(<SessionPage />);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-close-text-button"));
+      });
+
+      expect(screen.queryByTestId("focus-text-modal")).not.toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    it("falls back to split when viewport shrinks below md while in focus mode", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-mode-button"));
+      });
+
+      expect(screen.getByTestId("focus-handwriting-modal")).toBeVisible();
+
+      await act(async () => {
+        setViewportWidth(700);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("split-layout")).toBeVisible();
+      expect(screen.queryByTestId("focus-mode-button")).not.toBeInTheDocument();
     });
-
-    await switchToTextTab();
-    const splitTextarea = within(getSplitTextPanel()).getByRole("textbox");
-    await act(async () => {
-      fireEvent.change(splitTextarea, { target: { value: "focus modal memo" } });
-      fireEvent.click(screen.getByTestId("focus-mode-button"));
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("focus-open-text-button"));
-    });
-
-    const modal = screen.getByTestId("focus-text-modal");
-    const modalTextarea = within(modal).getByRole("textbox");
-    expect(modalTextarea).toHaveValue("focus modal memo");
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("focus-close-text-button"));
-    });
-
-    expect(screen.queryByTestId("focus-text-modal")).not.toBeInTheDocument();
   });
 
   describe("settings integration", () => {

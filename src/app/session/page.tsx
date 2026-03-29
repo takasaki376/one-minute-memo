@@ -392,10 +392,9 @@ export default function SessionPage() {
   const currentNumber = currentIndex + 1;
   const total = themes.length;
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
-  // 集中モード中は split 欄が hidden になりラッパー幅高が 0 になりがちなので、
-  // 同じ state を共有する Canvas を二重マウントしない（戻ったときの描画消失を防ぐ）
-  const mountSplitHandwritingCanvas =
-    !isTabletUp || viewMode === "split";
+  // タブレット + 集中モード時は split 欄ごとアンマウント（hidden のまま TextEditor 等が
+  // 残ると ResizeObserver が無駄に走り、ポータル側と二重インスタンスになるのを避ける）
+  const mountSplitInputSection = !isTabletUp || viewMode === "split";
 
   const hideChromeForHandwritingFocus =
     isTabletUp && viewMode === "handwritingFocus";
@@ -413,142 +412,142 @@ export default function SessionPage() {
       )}
 
       {/* 入力モード/表示モードの操作 */}
-      <section
-        className="border-t border-slate-200 pt-3"
-        data-testid="session-controls"
-        hidden={hideChromeForHandwritingFocus}
-      >
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+      {!hideChromeForHandwritingFocus && (
+        <section
+          className="border-t border-slate-200 pt-3"
+          data-testid="session-controls"
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              {viewMode === "split" && (
+                <div
+                  className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
+                  role="tablist"
+                  aria-label="入力方式"
+                >
+                  <button
+                    type="button"
+                    id="tab-handwriting"
+                    role="tab"
+                    aria-controls="panel-handwriting"
+                    aria-selected={activeInputTab === "handwriting"}
+                    className={
+                      activeInputTab === "handwriting"
+                        ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
+                        : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+                    }
+                    onClick={handleSwitchToHandwritingTab}
+                  >
+                    手書き入力
+                  </button>
+                  <button
+                    type="button"
+                    id="tab-text"
+                    role="tab"
+                    aria-controls="panel-text"
+                    aria-selected={activeInputTab === "text"}
+                    className={
+                      activeInputTab === "text"
+                        ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
+                        : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+                    }
+                    onClick={() => setActiveInputTab("text")}
+                  >
+                    テキスト入力
+                  </button>
+                </div>
+              )}
+
+              {isTabletUp && viewMode === "split" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="hidden md:inline-flex"
+                  onClick={() => setViewMode("handwritingFocus")}
+                  aria-label="手書き集中モードに切り替え"
+                  data-testid="focus-mode-button"
+                >
+                  手書き集中
+                </Button>
+              )}
+            </div>
+
             {viewMode === "split" && (
-              <div
-                className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
-                role="tablist"
-                aria-label="入力方式"
-              >
-                <button
-                  type="button"
-                  id="tab-handwriting"
-                  role="tab"
-                  aria-controls="panel-handwriting"
-                  aria-selected={activeInputTab === "handwriting"}
-                  className={
-                    activeInputTab === "handwriting"
-                      ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
-                      : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
-                  }
-                  onClick={handleSwitchToHandwritingTab}
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap">
+                <p className="text-xs text-slate-400">
+                  {isRunning ? "入力中…" : "一時停止中"}
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    if (isRunning) {
+                      pause();
+                    } else {
+                      start();
+                    }
+                  }}
+                  disabled={secondsLeft === 0}
+                  className="bg-slate-100 text-slate-600 hover:bg-slate-200"
                 >
-                  手書き入力
-                </button>
-                <button
-                  type="button"
-                  id="tab-text"
-                  role="tab"
-                  aria-controls="panel-text"
-                  aria-selected={activeInputTab === "text"}
-                  className={
-                    activeInputTab === "text"
-                      ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
-                      : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
-                  }
-                  onClick={() => setActiveInputTab("text")}
+                  {isRunning ? "一時停止" : "再開"}
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => void handleThemeFinished()}
+                  disabled={secondsLeft === 0}
+                  className="bg-blue-500 text-white hover:bg-blue-600"
                 >
-                  テキスト入力
-                </button>
+                  このテーマを終えて次へ
+                </Button>
               </div>
             )}
-
-            {isTabletUp && viewMode === "split" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="hidden md:inline-flex"
-                onClick={() => setViewMode("handwritingFocus")}
-                aria-label="手書き集中モードに切り替え"
-                data-testid="focus-mode-button"
-              >
-                手書き集中
-              </Button>
-            )}
           </div>
-
-          {viewMode === "split" && (
-            <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap">
-              <p className="text-xs text-slate-400">
-                {isRunning ? "入力中…" : "一時停止中"}
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  if (isRunning) {
-                    pause();
-                  } else {
-                    start();
-                  }
-                }}
-                disabled={secondsLeft === 0}
-                className="bg-slate-100 text-slate-600 hover:bg-slate-200"
-              >
-                {isRunning ? "一時停止" : "再開"}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => void handleThemeFinished()}
-                disabled={secondsLeft === 0}
-                className="bg-blue-500 text-white hover:bg-blue-600"
-              >
-                このテーマを終えて次へ
-              </Button>
-            </div>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 入力エリア */}
-      <section
-        className="min-h-[520px] rounded-lg bg-white p-4"
-        data-testid="split-layout"
-        hidden={isTabletUp && viewMode === "handwritingFocus"}
-      >
-        <div
-          id="panel-handwriting"
-          role="tabpanel"
-          aria-labelledby="tab-handwriting"
-          hidden={activeInputTab !== "handwriting"}
-          className="h-[480px]"
-          data-testid="split-handwriting-panel"
+      {mountSplitInputSection && (
+        <section
+          className="min-h-[520px] rounded-lg bg-white p-4"
+          data-testid="split-layout"
         >
-          {mountSplitHandwritingCanvas ? (
+          <div
+            id="panel-handwriting"
+            role="tabpanel"
+            aria-labelledby="tab-handwriting"
+            hidden={activeInputTab !== "handwriting"}
+            className="h-[480px]"
+            data-testid="split-handwriting-panel"
+          >
             <HandwritingCanvas
               value={handwritingDataUrl}
               onChange={setHandwritingDataUrl}
               disabled={isInputDisabled}
               className="h-full"
             />
-          ) : null}
-        </div>
-        <div
-          id="panel-text"
-          role="tabpanel"
-          aria-labelledby="tab-text"
-          hidden={activeInputTab !== "text"}
-          data-testid="split-text-panel"
-        >
-          <TextEditor
-            value={text}
-            onChange={setText}
-            disabled={isInputDisabled}
-            autoFocus={
-              activeInputTab === "text" &&
-              stage === "running" &&
-              secondsLeft > 0
-            }
-            maxLength={1000}
-            className="h-[480px]"
-          />
-        </div>
-      </section>
+          </div>
+          <div
+            id="panel-text"
+            role="tabpanel"
+            aria-labelledby="tab-text"
+            hidden={activeInputTab !== "text"}
+            data-testid="split-text-panel"
+          >
+            <TextEditor
+              value={text}
+              onChange={setText}
+              disabled={isInputDisabled}
+              autoFocus={
+                activeInputTab === "text" &&
+                stage === "running" &&
+                secondsLeft > 0
+              }
+              maxLength={1000}
+              className="h-[480px]"
+            />
+          </div>
+        </section>
+      )}
 
       {portalReady &&
         isTabletUp &&
@@ -639,11 +638,18 @@ export default function SessionPage() {
         isFocusTextOpen &&
         createPortal(
           <div className="fixed inset-0 z-[60] box-border flex h-[100dvh] w-[100vw] items-center justify-center p-4">
-            <button
-              type="button"
-              className="absolute inset-0 bg-slate-900/40"
+            <div
+              role="presentation"
+              tabIndex={-1}
+              aria-hidden="true"
+              className="absolute inset-0 cursor-pointer bg-slate-900/40"
               onClick={() => setIsFocusTextOpen(false)}
-              aria-label="テキスト入力を閉じる"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setIsFocusTextOpen(false);
+                }
+              }}
             />
             <dialog
               open
