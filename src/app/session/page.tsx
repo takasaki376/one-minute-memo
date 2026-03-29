@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
@@ -63,6 +64,7 @@ export default function SessionPage() {
   const [viewMode, setViewMode] = useState<"split" | "handwritingFocus">("split");
   const [isFocusTextOpen, setIsFocusTextOpen] = useState(false);
   const [isTabletUp, setIsTabletUp] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
 
   // タイマー（secondsPerThemeは初期化時に設定される）
   const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
@@ -86,6 +88,10 @@ export default function SessionPage() {
       activeElement.blur();
     }
   };
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -387,20 +393,26 @@ export default function SessionPage() {
   const total = themes.length;
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
 
+  const hideChromeForHandwritingFocus =
+    isTabletUp && viewMode === "handwritingFocus";
+
   return (
     <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
-      <ThemeHeader
-        currentIndex={currentNumber}
-        total={total}
-        title={currentTheme.title}
-        category={currentTheme.category}
-        secondsLeft={secondsLeft}
-      />
+      {!hideChromeForHandwritingFocus && (
+        <ThemeHeader
+          currentIndex={currentNumber}
+          total={total}
+          title={currentTheme.title}
+          category={currentTheme.category}
+          secondsLeft={secondsLeft}
+        />
+      )}
 
       {/* 入力モード/表示モードの操作 */}
       <section
         className="border-t border-slate-200 pt-3"
         data-testid="session-controls"
+        hidden={hideChromeForHandwritingFocus}
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
@@ -443,11 +455,11 @@ export default function SessionPage() {
               </div>
             )}
 
-            {isTabletUp && (
+            {isTabletUp && viewMode === "split" && (
               <div className="hidden items-center gap-1 rounded-lg bg-slate-100 p-0.5 md:inline-flex">
                 <Button
                   size="sm"
-                  variant={viewMode === "split" ? "primary" : "ghost"}
+                  variant="primary"
                   onClick={() => setViewMode("split")}
                   aria-label="分割モードに切り替え"
                   data-testid="split-mode-button"
@@ -456,7 +468,7 @@ export default function SessionPage() {
                 </Button>
                 <Button
                   size="sm"
-                  variant={viewMode === "handwritingFocus" ? "primary" : "ghost"}
+                  variant="ghost"
                   onClick={() => setViewMode("handwritingFocus")}
                   aria-label="手書き集中モードに切り替え"
                   data-testid="focus-mode-button"
@@ -497,41 +509,6 @@ export default function SessionPage() {
             </div>
           )}
 
-          {viewMode === "handwritingFocus" && isTabletUp && (
-            <div className="hidden items-center gap-2 md:flex">
-              <Button
-                variant="secondary"
-                onClick={() => setIsFocusTextOpen(true)}
-                className="bg-slate-100 text-slate-600 hover:bg-slate-200"
-                aria-label="テキスト入力を開く"
-                data-testid="focus-open-text-button"
-              >
-                テキスト入力を開く
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  if (isRunning) {
-                    pause();
-                  } else {
-                    start();
-                  }
-                }}
-                disabled={secondsLeft === 0}
-                className="bg-slate-100 text-slate-600 hover:bg-slate-200"
-              >
-                {isRunning ? "一時停止" : "再開"}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => void handleThemeFinished()}
-                disabled={secondsLeft === 0}
-                className="bg-blue-500 text-white hover:bg-blue-600"
-              >
-                このテーマを終えて次へ
-              </Button>
-            </div>
-          )}
         </div>
       </section>
 
@@ -576,57 +553,137 @@ export default function SessionPage() {
         </div>
       </section>
 
-      {isTabletUp && viewMode === "handwritingFocus" && (
-        <section
-          className="hidden min-h-[calc(100dvh-240px)] rounded-lg bg-white p-3 md:flex md:flex-col"
-          data-testid="focus-layout"
-        >
-          <HandwritingCanvas
-            value={handwritingDataUrl}
-            onChange={setHandwritingDataUrl}
-            disabled={isInputDisabled}
-            className="h-full min-h-[560px]"
-          />
-        </section>
-      )}
-
-      {isTabletUp && viewMode === "handwritingFocus" && isFocusTextOpen && (
-        <div className="fixed inset-0 z-50 hidden items-center justify-center p-4 md:flex">
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-900/40"
-            onClick={() => setIsFocusTextOpen(false)}
-            aria-label="テキスト入力を閉じる"
-          />
-          <dialog
-            open
-            className="relative z-10 m-0 w-full max-w-2xl rounded-xl border-none bg-white p-4 shadow-xl"
-            aria-label="集中モードのテキスト入力"
-            data-testid="focus-text-modal"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">テキスト入力</h3>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsFocusTextOpen(false)}
-                aria-label="テキスト入力を閉じる"
-                data-testid="focus-close-text-button"
-              >
-                閉じる
-              </Button>
-            </div>
-            <TextEditor
-              value={text}
-              onChange={setText}
-              disabled={isInputDisabled}
-              autoFocus
-              maxLength={1000}
-              className="h-[360px]"
+      {portalReady &&
+        isTabletUp &&
+        viewMode === "handwritingFocus" &&
+        createPortal(
+          <div className="fixed inset-0 z-50 box-border h-[100dvh] w-[100vw] max-w-none">
+            <button
+              type="button"
+              className="absolute inset-0 bg-slate-900/40"
+              onClick={() => setViewMode("split")}
+              aria-label="手書き集中を閉じる"
             />
-          </dialog>
-        </div>
-      )}
+            <dialog
+              open
+              aria-label="手書き集中モード"
+              data-testid="focus-handwriting-modal"
+              className="absolute inset-0 z-10 m-0 box-border flex min-h-0 h-full w-full max-h-none max-w-none flex-col border-0 bg-slate-50 p-0 shadow-none outline-none open:flex"
+            >
+              <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setViewMode("split")}
+                  aria-label="分割モードに戻る"
+                  data-testid="split-mode-button"
+                >
+                  分割に戻る
+                </Button>
+                <span
+                  className="min-w-0 max-w-[min(40vw,14rem)] truncate text-sm font-medium text-slate-800"
+                  title={currentTheme.title}
+                >
+                  {currentTheme.title}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {currentNumber} / {total}
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-slate-900">
+                  {secondsLeft}
+                  <span className="text-xs font-normal text-slate-500">秒</span>
+                </span>
+                <span className="flex-1" />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setIsFocusTextOpen(true)}
+                  className="bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  aria-label="テキスト入力を開く"
+                  data-testid="focus-open-text-button"
+                >
+                  テキスト入力を開く
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    if (isRunning) {
+                      pause();
+                    } else {
+                      start();
+                    }
+                  }}
+                  disabled={secondsLeft === 0}
+                  className="bg-slate-100 text-slate-600 hover:bg-slate-200"
+                >
+                  {isRunning ? "一時停止" : "再開"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => void handleThemeFinished()}
+                  disabled={secondsLeft === 0}
+                  className="bg-blue-500 text-white hover:bg-blue-600"
+                >
+                  このテーマを終えて次へ
+                </Button>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col p-2">
+                <HandwritingCanvas
+                  value={handwritingDataUrl}
+                  onChange={setHandwritingDataUrl}
+                  disabled={isInputDisabled}
+                  className="min-h-0 flex-1"
+                />
+              </div>
+            </dialog>
+          </div>,
+          document.body,
+        )}
+
+      {portalReady &&
+        isTabletUp &&
+        viewMode === "handwritingFocus" &&
+        isFocusTextOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[60] box-border flex h-[100dvh] w-[100vw] items-center justify-center p-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-slate-900/40"
+              onClick={() => setIsFocusTextOpen(false)}
+              aria-label="テキスト入力を閉じる"
+            />
+            <dialog
+              open
+              aria-label="集中モードのテキスト入力"
+              data-testid="focus-text-modal"
+              className="relative z-10 m-0 box-border w-full max-w-2xl rounded-xl border-0 bg-white p-4 shadow-xl outline-none open:block"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900">テキスト入力</h3>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsFocusTextOpen(false)}
+                  aria-label="テキスト入力を閉じる"
+                  data-testid="focus-close-text-button"
+                >
+                  閉じる
+                </Button>
+              </div>
+              <TextEditor
+                value={text}
+                onChange={setText}
+                disabled={isInputDisabled}
+                autoFocus
+                maxLength={1000}
+                className="h-[360px]"
+              />
+            </dialog>
+          </div>,
+          document.body,
+        )}
     </main>
   );
 }

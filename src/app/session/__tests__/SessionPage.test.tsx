@@ -501,13 +501,13 @@ describe("/session page", () => {
     });
 
     expect(screen.getByTestId("split-layout")).toBeVisible();
-    expect(screen.queryByTestId("focus-layout")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByTestId("focus-mode-button"));
     });
 
-    expect(screen.getByTestId("focus-layout")).toBeVisible();
+    expect(screen.getByTestId("focus-handwriting-modal")).toBeVisible();
     expect(screen.getByTestId("split-layout")).not.toBeVisible();
 
     await act(async () => {
@@ -515,7 +515,7 @@ describe("/session page", () => {
     });
 
     expect(screen.getByTestId("split-layout")).toBeVisible();
-    expect(screen.queryByTestId("focus-layout")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
   });
 
   it("keeps text value when opening and closing focus mode text modal", async () => {
