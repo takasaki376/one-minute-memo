@@ -456,26 +456,16 @@ export default function SessionPage() {
             )}
 
             {isTabletUp && viewMode === "split" && (
-              <div className="hidden items-center gap-1 rounded-lg bg-slate-100 p-0.5 md:inline-flex">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => setViewMode("split")}
-                  aria-label="分割モードに切り替え"
-                  data-testid="split-mode-button"
-                >
-                  分割
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setViewMode("handwritingFocus")}
-                  aria-label="手書き集中モードに切り替え"
-                  data-testid="focus-mode-button"
-                >
-                  手書き集中
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="hidden md:inline-flex"
+                onClick={() => setViewMode("handwritingFocus")}
+                aria-label="手書き集中モードに切り替え"
+                data-testid="focus-mode-button"
+              >
+                手書き集中
+              </Button>
             )}
           </div>
 
@@ -575,10 +565,10 @@ export default function SessionPage() {
                   size="sm"
                   variant="ghost"
                   onClick={() => setViewMode("split")}
-                  aria-label="分割モードに戻る"
+                  aria-label="手書き集中を終了して戻る"
                   data-testid="split-mode-button"
                 >
-                  分割に戻る
+                  戻る
                 </Button>
                 <span
                   className="min-w-0 max-w-[min(40vw,14rem)] truncate text-sm font-medium text-slate-800"
