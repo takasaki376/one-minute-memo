@@ -392,6 +392,10 @@ export default function SessionPage() {
   const currentNumber = currentIndex + 1;
   const total = themes.length;
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
+  // 集中モード中は split 欄が hidden になりラッパー幅高が 0 になりがちなので、
+  // 同じ state を共有する Canvas を二重マウントしない（戻ったときの描画消失を防ぐ）
+  const mountSplitHandwritingCanvas =
+    !isTabletUp || viewMode === "split";
 
   const hideChromeForHandwritingFocus =
     isTabletUp && viewMode === "handwritingFocus";
@@ -516,12 +520,14 @@ export default function SessionPage() {
           className="h-[480px]"
           data-testid="split-handwriting-panel"
         >
-          <HandwritingCanvas
-            value={handwritingDataUrl}
-            onChange={setHandwritingDataUrl}
-            disabled={isInputDisabled}
-            className="h-full"
-          />
+          {mountSplitHandwritingCanvas ? (
+            <HandwritingCanvas
+              value={handwritingDataUrl}
+              onChange={setHandwritingDataUrl}
+              disabled={isInputDisabled}
+              className="h-full"
+            />
+          ) : null}
         </div>
         <div
           id="panel-text"

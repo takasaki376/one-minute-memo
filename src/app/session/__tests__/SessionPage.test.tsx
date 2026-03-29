@@ -518,6 +518,49 @@ describe("/session page", () => {
     expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
   });
 
+  it("keeps handwriting data after exiting handwriting focus mode", async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("focus-mode-button"));
+    });
+
+    const focusModal = screen.getByTestId("focus-handwriting-modal");
+    const handwritingInFocus = within(focusModal).getByRole("button", {
+      name: "手書き入力",
+    });
+    await act(async () => {
+      fireEvent.click(handwritingInFocus);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("split-mode-button"));
+    });
+
+    const nextButton = within(getSessionControls()).getByRole("button", {
+      name: /次へ/,
+    });
+    await act(async () => {
+      fireEvent.click(nextButton);
+    });
+
+    await waitFor(() => {
+      expect(memosRepo.saveMemo).toHaveBeenCalledTimes(1);
+    });
+
+    const savedArg = (memosRepo.saveMemo as unknown as Mock).mock.calls[0][0];
+    expect(savedArg.handwritingType).toBe("dataUrl");
+    expect(savedArg.handwritingDataUrl).toBe(
+      "data:image/png;base64,handwriting",
+    );
+  });
+
   it("keeps text value when opening and closing focus mode text modal", async () => {
     await act(async () => {
       render(<SessionPage />);
