@@ -396,6 +396,8 @@ export function HandwritingCanvas({
     "border",
     "border-slate-300",
     "bg-white",
+    "select-none",
+    "[-webkit-touch-callout:none]",
     disabled && "opacity-70",
   ]);
 
@@ -403,11 +405,14 @@ export function HandwritingCanvas({
     "block",
     "rounded-md",
     "touch-none",
+    "select-none",
+    "[-webkit-touch-callout:none]",
     disabled && "pointer-events-none",
   ]);
 
   const toolbarClass = cc([
     "absolute left-2 top-2 z-10",
+    "select-none",
     "hidden flex-wrap items-center gap-1.5 md:flex",
     "rounded-lg border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-sm",
   ]);
@@ -485,6 +490,9 @@ export function HandwritingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerLeave}
+          onContextMenu={(e) => {
+            e.preventDefault();
+          }}
           className={canvasClass}
         />
       </div>
