@@ -1,8 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import cc from "classcat";
+
+const PEN_WIDTHS = { s: 2, m: 4, l: 8 } as const;
+export type PenSize = keyof typeof PEN_WIDTHS;
 
 export interface HandwritingCanvasProps {
   value?: string | null;
@@ -17,6 +20,9 @@ export function HandwritingCanvas({
   disabled = false,
   className,
 }: HandwritingCanvasProps) {
+  const [penSize, setPenSize] = useState<PenSize>("m");
+  const [tool, setTool] = useState<"pen" | "eraser">("pen");
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
@@ -29,32 +35,33 @@ export function HandwritingCanvas({
   const pendingResizeRef = useRef(false);
   const resizeFnRef = useRef<(() => void) | null>(null);
 
-  const applyCanvasStyle = useCallback(
-    (ctx: CanvasRenderingContext2D) => {
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#111827";
-    },
-    []
-  );
+  const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = PEN_WIDTHS[penSize];
+    ctx.strokeStyle = "#111827";
+  }, [penSize]);
 
-  const clearCanvas = useCallback((ctx: CanvasRenderingContext2D) => {
-    const { width, height } = logicalSizeRef.current;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.restore();
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
-    applyCanvasStyle(ctx);
-  }, [applyCanvasStyle]);
+  const clearCanvas = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const { width, height } = logicalSizeRef.current;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      applyCanvasStyle(ctx);
+    },
+    [applyCanvasStyle],
+  );
 
   const drawDataUrl = useCallback(
     (
       ctx: CanvasRenderingContext2D,
       dataUrl: string,
-      options?: { enforceLatestValue?: boolean }
+      options?: { enforceLatestValue?: boolean },
     ) => {
       const img = new Image();
       pendingImagesRef.current.add(img);
@@ -84,7 +91,7 @@ export function HandwritingCanvas({
       };
       img.src = dataUrl;
     },
-    [applyCanvasStyle, clearCanvas]
+    [applyCanvasStyle, clearCanvas],
   );
 
   useEffect(() => {
@@ -130,7 +137,6 @@ export function HandwritingCanvas({
     if (!canvas || !wrapper) return;
 
     const resize = () => {
-      // 描画中はリサイズを保留し、描画終了時（finishDrawing）に実行する
       if (isDrawingRef.current) {
         pendingResizeRef.current = true;
         return;
@@ -150,7 +156,6 @@ export function HandwritingCanvas({
         return;
       }
 
-      // リサイズ前にオフスクリーン Canvas へ描画内容を退避
       let savedCanvas: HTMLCanvasElement | null = null;
       if (
         canvas.width > 0 &&
@@ -188,15 +193,19 @@ export function HandwritingCanvas({
       if (savedCanvas && prevW > 0 && prevH > 0) {
         ctx.drawImage(
           savedCanvas,
-          0, 0, savedCanvas.width, savedCanvas.height,
-          0, 0, prevW, prevH
+          0,
+          0,
+          savedCanvas.width,
+          savedCanvas.height,
+          0,
+          0,
+          prevW,
+          prevH,
         );
         applyCanvasStyle(ctx);
       } else {
         const restoreSource =
-          latestCanvasDataUrlRef.current ??
-          latestValueRef.current ??
-          null;
+          latestCanvasDataUrlRef.current ?? latestValueRef.current ?? null;
 
         if (restoreSource) {
           drawDataUrl(ctx, restoreSource, { enforceLatestValue: false });
@@ -235,7 +244,8 @@ export function HandwritingCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const { width: logicalWidth, height: logicalHeight } = logicalSizeRef.current;
+    const { width: logicalWidth, height: logicalHeight } =
+      logicalSizeRef.current;
     const scaleX = logicalWidth / rect.width;
     const scaleY = logicalHeight / rect.height;
     return {
@@ -246,8 +256,25 @@ export function HandwritingCanvas({
 
   const lastPosRef = useRef({ x: 0, y: 0 });
 
+  const applyStrokeTool = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const w = PEN_WIDTHS[penSize];
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.lineWidth = w;
+      if (tool === "eraser") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = "#111827";
+      }
+    },
+    [penSize, tool],
+  );
+
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
-    event
+    event,
   ) => {
     if (disabled) return;
     const canvas = canvasRef.current;
@@ -258,6 +285,8 @@ export function HandwritingCanvas({
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
 
+    applyStrokeTool(ctx);
+
     const pos = getCanvasPos(event);
     lastPosRef.current = pos;
     ctx.beginPath();
@@ -265,7 +294,7 @@ export function HandwritingCanvas({
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
-    event
+    event,
   ) => {
     if (!isDrawingRef.current) return;
     if (disabled) return;
@@ -273,6 +302,8 @@ export function HandwritingCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    applyStrokeTool(ctx);
 
     const pos = getCanvasPos(event);
     ctx.beginPath();
@@ -303,6 +334,11 @@ export function HandwritingCanvas({
       // noop
     }
 
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      applyCanvasStyle(ctx);
+    }
+
     if (pendingResizeRef.current) {
       pendingResizeRef.current = false;
       resizeFnRef.current?.();
@@ -310,13 +346,13 @@ export function HandwritingCanvas({
   };
 
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
-    event
+    event,
   ) => {
     finishDrawing(event);
   };
 
   const handlePointerLeave: React.PointerEventHandler<HTMLCanvasElement> = (
-    event
+    event,
   ) => {
     finishDrawing(event);
   };
@@ -333,7 +369,12 @@ export function HandwritingCanvas({
     ctx.restore();
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, logicalSizeRef.current.width, logicalSizeRef.current.height);
+    ctx.fillRect(
+      0,
+      0,
+      logicalSizeRef.current.width,
+      logicalSizeRef.current.height,
+    );
     applyCanvasStyle(ctx);
 
     latestCanvasDataUrlRef.current = null;
@@ -361,6 +402,21 @@ export function HandwritingCanvas({
     disabled && "pointer-events-none",
   ]);
 
+  const toolbarClass = cc([
+    "absolute left-2 top-2 z-10",
+    "hidden flex-wrap items-center gap-1.5 md:flex",
+    "rounded-lg border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-sm",
+  ]);
+
+  const toolBtnClass = (active: boolean) =>
+    cc([
+      "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
+      active
+        ? "border-blue-500 bg-blue-50 text-blue-800"
+        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+      disabled && "pointer-events-none opacity-50",
+    ]);
+
   const clearButtonClass = cc([
     "self-end",
     "inline-flex items-center justify-center",
@@ -368,12 +424,57 @@ export function HandwritingCanvas({
     "px-2 py-1 text-xs text-slate-600",
     "hover:bg-slate-50",
     "transition-colors",
-    disabled && "opacity-50 cursor-not-allowed pointer-events-none",
+    disabled && "pointer-events-none cursor-not-allowed opacity-50",
   ]);
 
   return (
     <div className={containerClass}>
       <div ref={wrapperRef} className={canvasWrapperClass}>
+        <div className={toolbarClass} role="toolbar" aria-label="手書きツール">
+          <div className="flex items-center gap-0.5 border-r border-slate-200 pr-2">
+            <button
+              type="button"
+              className={toolBtnClass(tool === "pen")}
+              onClick={() => setTool("pen")}
+              disabled={disabled}
+              aria-label="ペン"
+              aria-pressed={tool === "pen"}
+            >
+              ペン
+            </button>
+            <button
+              type="button"
+              className={toolBtnClass(tool === "eraser")}
+              onClick={() => setTool("eraser")}
+              disabled={disabled}
+              aria-label="消しゴム"
+              aria-pressed={tool === "eraser"}
+            >
+              消しゴム
+            </button>
+          </div>
+          <div className="flex items-center gap-0.5">
+            {(["s", "m", "l"] as const).map((size) => (
+              <button
+                key={size}
+                type="button"
+                className={toolBtnClass(penSize === size)}
+                onClick={() => setPenSize(size)}
+                disabled={disabled}
+                aria-label={
+                  size === "s"
+                    ? "線の太さ 細い"
+                    : size === "m"
+                      ? "線の太さ 普通"
+                      : "線の太さ 太い"
+                }
+                aria-pressed={penSize === size}
+              >
+                {size.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
