@@ -7,6 +7,30 @@ import cc from "classcat";
 const PEN_WIDTHS = { s: 2, m: 4, l: 8 } as const;
 export type PenSize = keyof typeof PEN_WIDTHS;
 
+const PEN_STROKE_COLOR = "#111827";
+const ERASER_STROKE_COLOR = "rgba(0,0,0,1)";
+
+/**
+ * 線の見た目（結合・端・太さ・合成・色）を一箇所で設定する。
+ * アイドル時のペン状態は tool="pen"、描画中は現在の tool を渡す。
+ */
+function applyStrokeForTool(
+  ctx: CanvasRenderingContext2D,
+  tool: "pen" | "eraser",
+  penSize: PenSize,
+) {
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.lineWidth = PEN_WIDTHS[penSize];
+  if (tool === "eraser") {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = ERASER_STROKE_COLOR;
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = PEN_STROKE_COLOR;
+  }
+}
+
 export interface HandwritingCanvasProps {
   value?: string | null;
   onChange?: (dataUrl: string | null) => void;
@@ -35,12 +59,9 @@ export function HandwritingCanvas({
   const pendingResizeRef = useRef(false);
   const resizeFnRef = useRef<(() => void) | null>(null);
 
+  /** 画像読み込み後・クリア後・ストローク終了後など「ペンで書き足せる状態」に戻す */
   const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.globalCompositeOperation = "source-over";
-    ctx.lineWidth = PEN_WIDTHS[penSize];
-    ctx.strokeStyle = "#111827";
+    applyStrokeForTool(ctx, "pen", penSize);
   }, [penSize]);
 
   const clearCanvas = useCallback(
@@ -256,23 +277,6 @@ export function HandwritingCanvas({
 
   const lastPosRef = useRef({ x: 0, y: 0 });
 
-  const applyStrokeTool = useCallback(
-    (ctx: CanvasRenderingContext2D) => {
-      const w = PEN_WIDTHS[penSize];
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.lineWidth = w;
-      if (tool === "eraser") {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-      } else {
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = "#111827";
-      }
-    },
-    [penSize, tool],
-  );
-
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
@@ -285,7 +289,7 @@ export function HandwritingCanvas({
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
 
-    applyStrokeTool(ctx);
+    applyStrokeForTool(ctx, tool, penSize);
 
     const pos = getCanvasPos(event);
     lastPosRef.current = pos;
@@ -303,7 +307,7 @@ export function HandwritingCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    applyStrokeTool(ctx);
+    applyStrokeForTool(ctx, tool, penSize);
 
     const pos = getCanvasPos(event);
     ctx.beginPath();
