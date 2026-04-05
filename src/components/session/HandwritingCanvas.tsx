@@ -58,6 +58,8 @@ export function HandwritingCanvas({
   const resizeRafIdRef = useRef<number | null>(null);
   const pendingResizeRef = useRef(false);
   const resizeFnRef = useRef<(() => void) | null>(null);
+  /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
+  const pendingLocalExportRef = useRef(false);
 
   /** 画像読み込み後・クリア後・ストローク終了後など「ペンで書き足せる状態」に戻す */
   const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -142,11 +144,21 @@ export function HandwritingCanvas({
     if (!ctx) return;
 
     if (!value) {
+      pendingLocalExportRef.current = false;
       latestCanvasDataUrlRef.current = null;
       clearCanvas(ctx);
       return;
     }
 
+    if (
+      pendingLocalExportRef.current &&
+      value === latestCanvasDataUrlRef.current
+    ) {
+      pendingLocalExportRef.current = false;
+      return;
+    }
+
+    pendingLocalExportRef.current = false;
     latestCanvasDataUrlRef.current = value;
     drawDataUrl(ctx, value);
   }, [drawDataUrl, clearCanvas, value]);
@@ -325,17 +337,18 @@ export function HandwritingCanvas({
     if (!canvas) return;
 
     try {
+      canvas.releasePointerCapture(event.pointerId);
+    } catch {
+      // noop
+    }
+
+    try {
       const dataUrl = canvas.toDataURL("image/png");
+      pendingLocalExportRef.current = true;
       latestCanvasDataUrlRef.current = dataUrl;
       onChange?.(dataUrl);
     } catch (e) {
       console.error("Failed to export canvas as dataURL", e);
-    }
-
-    try {
-      canvas.releasePointerCapture(event.pointerId);
-    } catch {
-      // noop
     }
 
     const ctx = canvas.getContext("2d");
@@ -381,6 +394,7 @@ export function HandwritingCanvas({
     );
     applyCanvasStyle(ctx);
 
+    pendingLocalExportRef.current = false;
     latestCanvasDataUrlRef.current = null;
     onChange?.(null);
   };
@@ -489,6 +503,7 @@ export function HandwritingCanvas({
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           onPointerLeave={handlePointerLeave}
           onContextMenu={(e) => {
             e.preventDefault();
