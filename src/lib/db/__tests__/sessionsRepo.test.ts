@@ -72,7 +72,7 @@ vi.mock("../openDB", () => {
       if (extra !== undefined) {
         requireSessionRow(extra);
       }
-    }
+  /** テスト専用: getAll の結果に、fromDB が undefined になる行（undefined）や検証済みの行を混ぜる */
     getAllExtras.push(...extras);
   }
 
