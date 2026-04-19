@@ -33,21 +33,29 @@ describe("HandwritingCanvas", () => {
   beforeEach(() => {
     mockCtx = createMock2dContext();
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-      (type: string) => (type === "2d" ? (mockCtx as unknown as CanvasRenderingContext2D) : null),
+      function (this: HTMLCanvasElement, type: string) {
+        if (type !== "2d") return null;
+        mockCtx.canvas = this;
+        return mockCtx as unknown as CanvasRenderingContext2D;
+      },
     );
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
       "data:image/png;base64,xx",
     );
 
-    global.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   function getCanvas(container: HTMLElement): HTMLCanvasElement {

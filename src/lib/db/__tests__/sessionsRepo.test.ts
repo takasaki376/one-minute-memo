@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-/** openDB モックのテスト用エクスポート（本番の openDB 型には含まれない） */
-type SessionsOpenDBTestModule = typeof import("../openDB") & {
-  __reset: () => void;
-  __seedGetAllExtras: (
-    ...extras: (({ id: string } & Record<string, unknown>) | undefined)[]
-  ) => void;
-};
+import { importOpenDBSessionsTestModule } from "./openDBTestModule";
 
 // openDB をモック
 vi.mock("../openDB", () => {
@@ -21,7 +15,7 @@ vi.mock("../openDB", () => {
       (value as { id: string }).id.length === 0
     ) {
       throw new Error(
-        "sessionsRepo openDB mock: add/put expect { id: non-empty string, ... }",
+        "sessionsRepo openDB mock: add/put expects { id: non-empty string, ... }",
       );
     }
   }
@@ -45,7 +39,7 @@ vi.mock("../openDB", () => {
       return store.get(key);
     },
     async getAll() {
-      return [...Array.from(store.values()), ...getAllExtras];
+      return [...store.values(), ...getAllExtras];
     },
   });
 
@@ -72,7 +66,7 @@ vi.mock("../openDB", () => {
     getAllExtras.length = 0;
   }
 
-  /** テスト専用: getAll の結果に、fromDB が undefined になる行（undefined）だけを混ぜる */
+  /** テスト専用: getAll の結果の末尾に、undefined（欠損行）や検証済みの行を混ぜる */
   function __seedGetAllExtras(...extras: (Value | undefined)[]) {
     for (const extra of extras) {
       if (extra !== undefined) {
@@ -99,7 +93,7 @@ import { getAllSessions, createSession } from "../sessionsRepo";
 
 describe("sessionsRepo", () => {
   beforeEach(async () => {
-    const mod = (await import("../openDB")) as SessionsOpenDBTestModule;
+    const mod = await importOpenDBSessionsTestModule();
     mod.__reset();
   });
 
@@ -160,7 +154,7 @@ describe("sessionsRepo", () => {
     it("filters out rows where fromDB returns undefined", async () => {
       const validSession = await createSession(["theme-1"]);
 
-      const mod = (await import("../openDB")) as SessionsOpenDBTestModule;
+      const mod = await importOpenDBSessionsTestModule();
       // fromDB は record が falsy のとき undefined を返す（DB が欠損行を返す想定）
       mod.__seedGetAllExtras(undefined);
 

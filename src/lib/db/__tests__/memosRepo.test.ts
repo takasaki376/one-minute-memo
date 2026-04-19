@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+import { importOpenDBTestModule } from "./openDBTestModule";
+
 // memosRepo から見ると './openDB' をインポートしているので、
 // テストからは '../openDB' をモックする
 vi.mock("../openDB", () => {
@@ -84,10 +86,7 @@ import {
 
 describe("memosRepo", () => {
   beforeEach(async () => {
-    // 毎テスト前にストアをリセット（vi.mock の __reset は実モジュールに無いため型のみ付与）
-    const mod = (await import("../openDB")) as typeof import("../openDB") & {
-      __reset: () => void;
-    };
+    const mod = await importOpenDBTestModule();
     mod.__reset();
   });
 
