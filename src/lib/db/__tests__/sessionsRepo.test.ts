@@ -45,7 +45,7 @@ vi.mock("../openDB", () => {
 
   const db = {
     transaction(storeName: string, mode?: "readonly" | "readwrite") {
-      void storeName;
+      return [...store.values(), ...getAllExtras];
       void mode;
       return {
         store: createStore(),
