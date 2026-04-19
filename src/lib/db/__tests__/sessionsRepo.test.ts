@@ -21,7 +21,7 @@ vi.mock("../openDB", () => {
   }
 
   // シンプルなインメモリストア（db.add と transaction.store で共有）
-  const store = new Map<string, Value>();
+        "sessionsRepo openDB mock: add/put expects { id: non-empty string, ... }",
 
   /** getAll の末尾に混ぜる値（IndexedDB が undefined を返しうる経路のテスト用） */
   const getAllExtras: (Value | undefined)[] = [];
