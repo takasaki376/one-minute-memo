@@ -374,15 +374,21 @@ export function HandwritingCanvas({
     }
   };
 
+  /**
+   * ストローク終了に pointerleave は使わない。
+   * iPad Safari では leave / up の順序や余計な leave が連続ストロークの pointerdown を阻害することがある。
+   * pointer capture 中は up / cancel / lostpointercapture で十分。
+   */
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
     finishDrawing(event);
   };
 
-  const handlePointerLeave: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
+  /** キャプチャが pointerup なしに失われたときの後始末（iPad Safari 等） */
+  const handleLostPointerCapture: React.PointerEventHandler<
+    HTMLCanvasElement
+  > = (event) => {
     finishDrawing(event);
   };
 
@@ -510,7 +516,7 @@ export function HandwritingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          onPointerLeave={handlePointerLeave}
+          onLostPointerCapture={handleLostPointerCapture}
           onContextMenu={(e) => {
             e.preventDefault();
           }}
