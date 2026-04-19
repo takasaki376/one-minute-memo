@@ -21,7 +21,7 @@ vi.mock("../openDB", () => {
   }
 
   // シンプルなインメモリストア（db.add と transaction.store で共有）
-        "sessionsRepo openDB mock: add/put expects { id: non-empty string, ... }",
+  const store = new Map<string, Value>();
 
   /** getAll の末尾に混ぜる値（IndexedDB が undefined を返しうる経路のテスト用） */
   const getAllExtras: (Value | undefined)[] = [];
@@ -44,9 +44,8 @@ vi.mock("../openDB", () => {
   });
 
   const db = {
-    transaction(storeName: string, mode?: "readonly" | "readwrite") {
-      return [...store.values(), ...getAllExtras];
-      void mode;
+    transaction(_storeName: string, _mode?: "readonly" | "readwrite") {
+      void _mode;
       return {
         store: createStore(),
         done: Promise.resolve(),
@@ -72,7 +71,7 @@ vi.mock("../openDB", () => {
       if (extra !== undefined) {
         requireSessionRow(extra);
       }
-  /** テスト専用: getAll の結果に、fromDB が undefined になる行（undefined）や検証済みの行を混ぜる */
+    }
     getAllExtras.push(...extras);
   }
 
