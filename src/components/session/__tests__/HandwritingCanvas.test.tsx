@@ -43,15 +43,19 @@ describe("HandwritingCanvas", () => {
       "data:image/png;base64,xx",
     );
 
-    global.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   function getCanvas(container: HTMLElement): HTMLCanvasElement {

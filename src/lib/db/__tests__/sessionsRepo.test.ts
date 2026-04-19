@@ -15,7 +15,7 @@ vi.mock("../openDB", () => {
       (value as { id: string }).id.length === 0
     ) {
       throw new Error(
-        "sessionsRepo openDB mock: add/put expect { id: non-empty string, ... }",
+        "sessionsRepo openDB mock: add/put expects { id: non-empty string, ... }",
       );
     }
   }
@@ -39,7 +39,7 @@ vi.mock("../openDB", () => {
       return store.get(key);
     },
     async getAll() {
-      return [...Array.from(store.values()), ...getAllExtras];
+      return [...store.values(), ...getAllExtras];
     },
   });
 
@@ -66,7 +66,7 @@ vi.mock("../openDB", () => {
     getAllExtras.length = 0;
   }
 
-  /** テスト専用: getAll の結果に、fromDB が undefined になる行（undefined）だけを混ぜる */
+  /** テスト専用: getAll の結果の末尾に、undefined（欠損行）や検証済みの行を混ぜる */
   function __seedGetAllExtras(...extras: (Value | undefined)[]) {
     for (const extra of extras) {
       if (extra !== undefined) {
