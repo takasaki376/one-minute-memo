@@ -14,12 +14,36 @@ export async function getThemeTotal(page: Page): Promise<number> {
 }
 
 export async function getVisibleSessionTextarea(page: Page) {
+  // セッションUIの操作領域が出るまで待つ（初期ロード中の取りこぼしを防ぐ）
+  await expect(page.locator('[data-testid="session-controls"]')).toBeVisible({
+    timeout: 15000,
+  });
+
   const textTab = page.getByRole("tab", { name: "テキスト入力" });
-  if ((await textTab.count()) > 0) {
+  if ((await textTab.count()) > 0 && (await textTab.first().isVisible())) {
     await textTab.click();
+  } else {
+    const openTextButton = page.getByRole("button", {
+      name: "テキスト入力を開く",
+    });
+    if (
+      (await openTextButton.count()) > 0 &&
+      (await openTextButton.first().isVisible())
+    ) {
+      await openTextButton.click();
+    }
   }
 
-  const textarea = page.locator("textarea:visible").first();
-  await expect(textarea).toBeVisible();
-  return textarea;
+  const splitTextarea = page
+    .locator('[data-testid="split-text-panel"]:not([hidden]) textarea')
+    .first();
+  if (await splitTextarea.isVisible()) {
+    return splitTextarea;
+  }
+
+  const focusTextarea = page
+    .locator('[data-testid="focus-text-modal"] textarea')
+    .first();
+  await expect(focusTextarea).toBeVisible({ timeout: 10000 });
+  return focusTextarea;
 }
