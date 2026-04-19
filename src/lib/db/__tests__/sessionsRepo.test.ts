@@ -7,6 +7,9 @@ vi.mock("../openDB", () => {
   // シンプルなインメモリストア（db.add と transaction.store で共有）
   const store = new Map<string, Value>();
 
+  /** getAll の末尾に混ぜる値（IndexedDB が undefined を返しうる経路のテスト用） */
+  const getAllExtras: (Value | undefined)[] = [];
+
   const createStore = () => ({
     async add(value: Value) {
       store.set(value.id as string, value);
@@ -18,7 +21,7 @@ vi.mock("../openDB", () => {
       return store.get(key);
     },
     async getAll() {
-      return Array.from(store.values());
+      return [...Array.from(store.values()), ...getAllExtras];
     },
   });
 
@@ -41,6 +44,12 @@ vi.mock("../openDB", () => {
 
   function __reset() {
     store.clear();
+    getAllExtras.length = 0;
+  }
+
+  /** テスト専用: store.getAll() に相当する配列へ、fromDB が undefined になる行などを混ぜる */
+  function __seedGetAllExtras(...extras: (Value | undefined)[]) {
+    getAllExtras.push(...extras);
   }
 
   // getDB は常に同じ db を返す
@@ -51,6 +60,7 @@ vi.mock("../openDB", () => {
   return {
     getDB,
     __reset,
+    __seedGetAllExtras,
   };
 });
 
@@ -61,6 +71,9 @@ describe("sessionsRepo", () => {
   beforeEach(async () => {
     const mod = (await import("../openDB")) as typeof import("../openDB") & {
       __reset: () => void;
+      __seedGetAllExtras: (
+        ...extras: (Record<string, unknown> | undefined)[]
+      ) => void;
     };
     mod.__reset();
   });
@@ -119,25 +132,21 @@ describe("sessionsRepo", () => {
       });
     });
 
-    it("filters out undefined values from fromDB transformation", async () => {
-      // 直接ストアに不正なデータを追加して、fromDB が undefined を返すケースをシミュレート
-      // （現状は正常データのみで、フィルタが有効な経路を通すことを確認）
-
-      // 正常なセッション
+    it("filters out rows where fromDB returns undefined", async () => {
       const validSession = await createSession(["theme-1"]);
 
-      // 不正なデータ（undefined になる可能性があるデータ）を直接追加
-      // 実際には fromDB が undefined を返すようなケースをシミュレート
-      // ここでは、getAll で取得したデータが fromDB で undefined になるケースを想定
-      // 実際の実装では、fromDB が undefined を返すことはないが、
-      // フィルタリングロジックが正しく動作することを確認
+      const mod = (await import("../openDB")) as typeof import("../openDB") & {
+        __seedGetAllExtras: (
+          ...extras: (Record<string, unknown> | undefined)[]
+        ) => void;
+      };
+      // fromDB は record が falsy のとき undefined を返す（DB が欠損行を返す想定）
+      mod.__seedGetAllExtras(undefined);
 
       const result = await getAllSessions();
 
-      // 正常なセッションのみが返されることを確認
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(validSession.id);
-      expect(result.every((s) => s !== undefined)).toBe(true);
     });
 
     it("handles sessions with endedAt correctly", async () => {
