@@ -7,6 +7,18 @@ import cc from "classcat";
 const PEN_WIDTHS = { s: 2, m: 4, l: 8 } as const;
 export type PenSize = keyof typeof PEN_WIDTHS;
 
+const PEN_SIZE_LABELS: Record<PenSize, string> = {
+  s: "細",
+  m: "中",
+  l: "太",
+};
+
+const PEN_SIZE_ARIA_LABELS: Record<PenSize, string> = {
+  s: "線の太さ 細",
+  m: "線の太さ 中",
+  l: "線の太さ 太",
+};
+
 const PEN_STROKE_COLOR = "#111827";
 const ERASER_STROKE_COLOR = "rgba(0,0,0,1)";
 
@@ -484,16 +496,10 @@ export function HandwritingCanvas({
                 className={toolBtnClass(penSize === size)}
                 onClick={() => setPenSize(size)}
                 disabled={disabled}
-                aria-label={
-                  size === "s"
-                    ? "線の太さ 細い"
-                    : size === "m"
-                      ? "線の太さ 普通"
-                      : "線の太さ 太い"
-                }
+                aria-label={PEN_SIZE_ARIA_LABELS[size]}
                 aria-pressed={penSize === size}
               >
-                {size.toUpperCase()}
+                {PEN_SIZE_LABELS[size]}
               </button>
             ))}
           </div>

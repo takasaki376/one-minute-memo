@@ -71,12 +71,14 @@ test.describe("履歴確認フロー", () => {
     await expect(page).toHaveURL(/\/session\/complete/);
 
     // 完了画面から直接、当該セッションの詳細へ遷移
-    await page
-      .getByRole("link", { name: "このセッションの詳細を見る" })
-      .click();
-
-    // 履歴詳細画面
-    await expect(page).toHaveURL(/\/history\/.+/);
+    const detailLink = page.getByRole("link", {
+      name: "このセッションの詳細を見る",
+    });
+    await expect(detailLink).toHaveAttribute("href", /\/history\/.+/);
+    await Promise.all([
+      page.waitForURL(/\/history\/.+/, { timeout: 15000 }),
+      detailLink.click(),
+    ]);
 
     // メモ一覧が表示される（見出しで一意に特定）
     await expect(page.getByRole("heading", { name: "メモ一覧" })).toBeVisible();
@@ -104,10 +106,12 @@ test.describe("履歴確認フロー", () => {
 
     // 履歴一覧へ
     await page.goto("/history");
-    await page.getByRole("link", { name: /詳細を見る/ }).first().click();
-
-    // 履歴詳細画面
-    await expect(page).toHaveURL(/\/history\/.+/);
+    const firstDetailLink = page.getByRole("link", { name: /詳細を見る/ }).first();
+    await expect(firstDetailLink).toHaveAttribute("href", /\/history\/.+/);
+    await Promise.all([
+      page.waitForURL(/\/history\/.+/, { timeout: 15000 }),
+      firstDetailLink.click(),
+    ]);
 
     // 戻るボタンをクリック
     const backButton = page.getByRole("link", {

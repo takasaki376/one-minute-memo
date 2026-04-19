@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+import { importOpenDBTestModule } from "./openDBTestModule";
+
 // memosRepo から見ると './openDB' をインポートしているので、
 // テストからは '../openDB' をモックする
 vi.mock("../openDB", () => {
@@ -84,9 +86,8 @@ import {
 
 describe("memosRepo", () => {
   beforeEach(async () => {
-    // 毎テスト前にストアをリセット
-    const { __reset } = await import("../openDB");
-    __reset();
+    const mod = await importOpenDBTestModule();
+    mod.__reset();
   });
 
   describe("saveMemo", () => {

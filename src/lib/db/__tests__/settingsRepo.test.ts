@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SettingsRecord } from "@/types/settings";
+
+import { importOpenDBTestModule } from "./openDBTestModule";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 
 // openDB をモック
@@ -60,8 +62,8 @@ import { getSettings, updateSettings, resetSettings } from "../settingsRepo";
 
 describe("settingsRepo", () => {
   beforeEach(async () => {
-    const { __reset } = await import("../openDB");
-    __reset();
+    const mod = await importOpenDBTestModule();
+    mod.__reset();
   });
 
   describe("getSettings", () => {

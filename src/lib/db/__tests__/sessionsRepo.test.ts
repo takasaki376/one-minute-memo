@@ -1,38 +1,58 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import type { SessionRecordDB } from "../openDB";
-import type { SessionRecord } from "@/types/session";
+import { importOpenDBSessionsTestModule } from "./openDBTestModule";
 
 // openDB をモック
 vi.mock("../openDB", () => {
-  type Value = any;
+  /** ストア行（id 必須）。欠損行は __seedGetAllExtras(undefined) のみで注入 */
+  type Value = { id: string } & Record<string, unknown>;
+
+  function requireSessionRow(value: unknown): asserts value is Value {
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      typeof (value as { id?: unknown }).id !== "string" ||
+      (value as { id: string }).id.length === 0
+    ) {
+      throw new Error(
+        "sessionsRepo openDB mock: add/put expects { id: non-empty string, ... }",
+      );
+    }
+  }
 
   // シンプルなインメモリストア（db.add と transaction.store で共有）
   const store = new Map<string, Value>();
 
+  /** getAll の末尾に混ぜる値（IndexedDB が undefined を返しうる経路のテスト用） */
+  const getAllExtras: (Value | undefined)[] = [];
+
   const createStore = () => ({
-    async add(value: Value) {
+    async add(value: unknown) {
+      requireSessionRow(value);
       store.set(value.id, value);
     },
-    async put(value: Value) {
+    async put(value: unknown) {
+      requireSessionRow(value);
       store.set(value.id, value);
     },
     async get(key: string) {
       return store.get(key);
     },
     async getAll() {
-      return Array.from(store.values());
+      return [...store.values(), ...getAllExtras];
     },
   });
 
   const db = {
     transaction(_storeName: string, _mode?: "readonly" | "readwrite") {
+      void _mode;
       return {
         store: createStore(),
         done: Promise.resolve(),
       };
     },
-    async add(_storeName: string, value: Value) {
+    async add(_storeName: string, value: unknown) {
+      requireSessionRow(value);
       store.set(value.id, value);
     },
     async get(_storeName: string, key: string) {
@@ -42,6 +62,17 @@ vi.mock("../openDB", () => {
 
   function __reset() {
     store.clear();
+    getAllExtras.length = 0;
+  }
+
+  /** テスト専用: getAll の結果の末尾に、undefined（欠損行）や検証済みの行を混ぜる */
+  function __seedGetAllExtras(...extras: (Value | undefined)[]) {
+    for (const extra of extras) {
+      if (extra !== undefined) {
+        requireSessionRow(extra);
+      }
+    }
+    getAllExtras.push(...extras);
   }
 
   // getDB は常に同じ db を返す
@@ -52,6 +83,7 @@ vi.mock("../openDB", () => {
   return {
     getDB,
     __reset,
+    __seedGetAllExtras,
   };
 });
 
@@ -60,8 +92,8 @@ import { getAllSessions, createSession } from "../sessionsRepo";
 
 describe("sessionsRepo", () => {
   beforeEach(async () => {
-    const { __reset } = await import("../openDB");
-    __reset();
+    const mod = await importOpenDBSessionsTestModule();
+    mod.__reset();
   });
 
   describe("getAllSessions", () => {
@@ -118,28 +150,17 @@ describe("sessionsRepo", () => {
       });
     });
 
-    it("filters out undefined values from fromDB transformation", async () => {
-      // 直接ストアに不正なデータを追加して、fromDB が undefined を返すケースをシミュレート
-      const { getDB } = await import("../openDB");
-      const db = await getDB();
-      const tx = db.transaction("sessions", "readwrite");
-      const store = tx.store;
-
-      // 正常なセッション
+    it("filters out rows where fromDB returns undefined", async () => {
       const validSession = await createSession(["theme-1"]);
 
-      // 不正なデータ（undefined になる可能性があるデータ）を直接追加
-      // 実際には fromDB が undefined を返すようなケースをシミュレート
-      // ここでは、getAll で取得したデータが fromDB で undefined になるケースを想定
-      // 実際の実装では、fromDB が undefined を返すことはないが、
-      // フィルタリングロジックが正しく動作することを確認
+      const mod = await importOpenDBSessionsTestModule();
+      // fromDB は record が falsy のとき undefined を返す（DB が欠損行を返す想定）
+      mod.__seedGetAllExtras(undefined);
 
       const result = await getAllSessions();
 
-      // 正常なセッションのみが返されることを確認
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(validSession.id);
-      expect(result.every((s) => s !== undefined)).toBe(true);
     });
 
     it("handles sessions with endedAt correctly", async () => {
