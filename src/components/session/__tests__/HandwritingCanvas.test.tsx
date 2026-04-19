@@ -17,7 +17,18 @@ function createMock2dContext() {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     stroke: vi.fn(),
+    fill: vi.fn(),
+    closePath: vi.fn(),
     drawImage: vi.fn(),
+    getImageData: vi.fn((_sx: number, _sy: number, sw: number, sh: number) => {
+      return {
+        width: sw,
+        height: sh,
+        data: new Uint8ClampedArray(sw * sh * 4),
+        colorSpace: "srgb",
+      } as ImageData;
+    }),
+    putImageData: vi.fn(),
     lineJoin: "",
     lineCap: "",
     lineWidth: 0,
@@ -67,6 +78,8 @@ describe("HandwritingCanvas", () => {
   }
 
   function setupCanvasForPointer(canvas: HTMLCanvasElement) {
+    canvas.width = 400;
+    canvas.height = 300;
     canvas.getBoundingClientRect = vi.fn(() => ({
       left: 0,
       top: 0,

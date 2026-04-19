@@ -3,6 +3,8 @@
 import type React from "react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import cc from "classcat";
+import getStroke from "perfect-freehand";
+import type { StrokeOptions } from "perfect-freehand";
 
 const PEN_WIDTHS = { s: 2, m: 4, l: 8 } as const;
 export type PenSize = keyof typeof PEN_WIDTHS;
@@ -21,6 +23,36 @@ const PEN_SIZE_ARIA_LABELS: Record<PenSize, string> = {
 
 const PEN_STROKE_COLOR = "#111827";
 const ERASER_STROKE_COLOR = "rgba(0,0,0,1)";
+
+function freehandOptions(penSize: PenSize, last: boolean): StrokeOptions {
+  const w = PEN_WIDTHS[penSize];
+  return {
+    size: Math.max(6, w * 2 + 4),
+    thinning: 0.65,
+    smoothing: 0.65,
+    streamline: 0.65,
+    simulatePressure: true,
+    last,
+  };
+}
+
+function fillFreehandOutline(
+  ctx: CanvasRenderingContext2D,
+  outline: [number, number][],
+  tool: "pen" | "eraser",
+) {
+  if (outline.length < 2) return;
+  ctx.globalCompositeOperation =
+    tool === "eraser" ? "destination-out" : "source-over";
+  ctx.fillStyle = tool === "eraser" ? ERASER_STROKE_COLOR : PEN_STROKE_COLOR;
+  ctx.beginPath();
+  ctx.moveTo(outline[0][0], outline[0][1]);
+  for (let i = 1; i < outline.length; i++) {
+    ctx.lineTo(outline[i][0], outline[i][1]);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
 
 /**
  * 線の見た目（結合・端・太さ・合成・色）を一箇所で設定する。
@@ -70,6 +102,10 @@ export function HandwritingCanvas({
   const resizeRafIdRef = useRef<number | null>(null);
   const pendingResizeRef = useRef(false);
   const resizeFnRef = useRef<(() => void) | null>(null);
+  /** perfect-freehand 用: 現在ストロークの [x, y, pressure?]（論理座標） */
+  const strokePointsRef = useRef<number[][]>([]);
+  /** ストローク開始直前のキャンバス（device px）— ストローク中は毎フレームこれに戻してから描画 */
+  const beforeStrokeImageDataRef = useRef<ImageData | null>(null);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
 
@@ -327,7 +363,76 @@ export function HandwritingCanvas({
     return getCanvasPosFromClient(canvas, event.clientX, event.clientY);
   };
 
-  const lastPosRef = useRef({ x: 0, y: 0 });
+  const pointerPressure = (e: { pressure?: number }) => {
+    const p = e.pressure;
+    if (typeof p === "number" && p > 0 && p <= 1) return p;
+    return 0.5;
+  };
+
+  const appendStrokeSamples = (
+    canvas: HTMLCanvasElement,
+    event: React.PointerEvent<HTMLCanvasElement>,
+  ) => {
+    const native = event.nativeEvent;
+    const coalesced =
+      typeof native.getCoalescedEvents === "function"
+        ? native.getCoalescedEvents()
+        : [];
+    const samples: { clientX: number; clientY: number; pressure: number }[] =
+      coalesced.length > 0
+        ? [
+            ...coalesced.map((e) => ({
+              clientX: e.clientX,
+              clientY: e.clientY,
+              pressure: pointerPressure(e),
+            })),
+            {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              pressure: pointerPressure(event.nativeEvent),
+            },
+          ]
+        : [
+            {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              pressure: pointerPressure(event.nativeEvent),
+            },
+          ];
+
+    for (const sample of samples) {
+      const pos = getCanvasPosFromClient(
+        canvas,
+        sample.clientX,
+        sample.clientY,
+      );
+      strokePointsRef.current.push([pos.x, pos.y, sample.pressure]);
+    }
+  };
+
+  const redrawCurrentStroke = (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    last: boolean,
+  ) => {
+    const snapshot = beforeStrokeImageDataRef.current;
+    if (!snapshot) return;
+
+    ctx.putImageData(snapshot, 0, 0);
+
+    let points = strokePointsRef.current;
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      const a = points[0];
+      points = [a, a];
+    }
+
+    const outline = getStroke(points, freehandOptions(penSize, last)) as [
+      number,
+      number,
+    ][];
+    fillFreehandOutline(ctx, outline, tool);
+  };
 
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
@@ -341,12 +446,24 @@ export function HandwritingCanvas({
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
 
+    beforeStrokeImageDataRef.current = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+
+    strokePointsRef.current = [];
+    const pos = getCanvasPos(event);
+    strokePointsRef.current.push([
+      pos.x,
+      pos.y,
+      pointerPressure(event.nativeEvent),
+    ]);
+
     applyStrokeForTool(ctx, tool, penSize);
 
-    const pos = getCanvasPos(event);
-    lastPosRef.current = pos;
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
+    redrawCurrentStroke(ctx, canvas, false);
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
@@ -359,40 +476,8 @@ export function HandwritingCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    applyStrokeForTool(ctx, tool, penSize);
-
-    const native = event.nativeEvent;
-    const coalesced =
-      typeof native.getCoalescedEvents === "function"
-        ? native.getCoalescedEvents()
-        : [];
-    /**
-     * coalesced は「マージ前の中間点」であり、配信された pointermove の
-     * 最終 clientX/Y と一致しないことが多い。最後の点を欠くと一定間隔で角ばる。
-     */
-    const samples: { clientX: number; clientY: number }[] =
-      coalesced.length > 0
-        ? [
-            ...coalesced.map((e) => ({
-              clientX: e.clientX,
-              clientY: e.clientY,
-            })),
-            { clientX: event.clientX, clientY: event.clientY },
-          ]
-        : [{ clientX: event.clientX, clientY: event.clientY }];
-
-    for (const sample of samples) {
-      const pos = getCanvasPosFromClient(
-        canvas,
-        sample.clientX,
-        sample.clientY,
-      );
-      ctx.beginPath();
-      ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-      lastPosRef.current = pos;
-    }
+    appendStrokeSamples(canvas, event);
+    redrawCurrentStroke(ctx, canvas, false);
   };
 
   const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -408,6 +493,13 @@ export function HandwritingCanvas({
       // noop
     }
 
+    const ctx = canvas.getContext("2d");
+    if (ctx && beforeStrokeImageDataRef.current) {
+      redrawCurrentStroke(ctx, canvas, true);
+    }
+    beforeStrokeImageDataRef.current = null;
+    strokePointsRef.current = [];
+
     try {
       const dataUrl = canvas.toDataURL("image/png");
       pendingLocalExportRef.current = true;
@@ -417,7 +509,6 @@ export function HandwritingCanvas({
       console.error("Failed to export canvas as dataURL", e);
     }
 
-    const ctx = canvas.getContext("2d");
     if (ctx) {
       applyCanvasStyle(ctx);
     }
