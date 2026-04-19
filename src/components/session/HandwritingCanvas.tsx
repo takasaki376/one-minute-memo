@@ -366,9 +366,19 @@ export function HandwritingCanvas({
       typeof native.getCoalescedEvents === "function"
         ? native.getCoalescedEvents()
         : [];
-    const samples: ReadonlyArray<{ clientX: number; clientY: number }> =
+    /**
+     * coalesced は「マージ前の中間点」であり、配信された pointermove の
+     * 最終 clientX/Y と一致しないことが多い。最後の点を欠くと一定間隔で角ばる。
+     */
+    const samples: { clientX: number; clientY: number }[] =
       coalesced.length > 0
-        ? coalesced
+        ? [
+            ...coalesced.map((e) => ({
+              clientX: e.clientX,
+              clientY: e.clientY,
+            })),
+            { clientX: event.clientX, clientY: event.clientY },
+          ]
         : [{ clientX: event.clientX, clientY: event.clientY }];
 
     for (const sample of samples) {
