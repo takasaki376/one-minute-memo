@@ -1,8 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+/** openDB モックのテスト用エクスポート（本番の openDB 型には含まれない） */
+type SessionsOpenDBTestModule = typeof import("../openDB") & {
+  __reset: () => void;
+  __seedGetAllExtras: (
+    ...extras: (({ id: string } & Record<string, unknown>) | undefined)[]
+  ) => void;
+};
+
 // openDB をモック
 vi.mock("../openDB", () => {
-  type Value = Record<string, unknown>;
+  /** ストア行（id 必須）。欠損行は __seedGetAllExtras(undefined) のみで注入 */
+  type Value = { id: string } & Record<string, unknown>;
+
+  function requireSessionRow(value: unknown): asserts value is Value {
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      typeof (value as { id?: unknown }).id !== "string" ||
+      (value as { id: string }).id.length === 0
+    ) {
+      throw new Error(
+        "sessionsRepo openDB mock: add/put expect { id: non-empty string, ... }",
+      );
+    }
+  }
 
   // シンプルなインメモリストア（db.add と transaction.store で共有）
   const store = new Map<string, Value>();
@@ -11,11 +33,13 @@ vi.mock("../openDB", () => {
   const getAllExtras: (Value | undefined)[] = [];
 
   const createStore = () => ({
-    async add(value: Value) {
-      store.set(value.id as string, value);
+    async add(value: unknown) {
+      requireSessionRow(value);
+      store.set(value.id, value);
     },
-    async put(value: Value) {
-      store.set(value.id as string, value);
+    async put(value: unknown) {
+      requireSessionRow(value);
+      store.set(value.id, value);
     },
     async get(key: string) {
       return store.get(key);
@@ -34,8 +58,9 @@ vi.mock("../openDB", () => {
         done: Promise.resolve(),
       };
     },
-    async add(_storeName: string, value: Value) {
-      store.set(value.id as string, value);
+    async add(_storeName: string, value: unknown) {
+      requireSessionRow(value);
+      store.set(value.id, value);
     },
     async get(_storeName: string, key: string) {
       return store.get(key);
@@ -47,8 +72,13 @@ vi.mock("../openDB", () => {
     getAllExtras.length = 0;
   }
 
-  /** テスト専用: store.getAll() に相当する配列へ、fromDB が undefined になる行などを混ぜる */
+  /** テスト専用: getAll の結果に、fromDB が undefined になる行（undefined）だけを混ぜる */
   function __seedGetAllExtras(...extras: (Value | undefined)[]) {
+    for (const extra of extras) {
+      if (extra !== undefined) {
+        requireSessionRow(extra);
+      }
+    }
     getAllExtras.push(...extras);
   }
 
@@ -69,12 +99,7 @@ import { getAllSessions, createSession } from "../sessionsRepo";
 
 describe("sessionsRepo", () => {
   beforeEach(async () => {
-    const mod = (await import("../openDB")) as typeof import("../openDB") & {
-      __reset: () => void;
-      __seedGetAllExtras: (
-        ...extras: (Record<string, unknown> | undefined)[]
-      ) => void;
-    };
+    const mod = (await import("../openDB")) as SessionsOpenDBTestModule;
     mod.__reset();
   });
 
@@ -135,11 +160,7 @@ describe("sessionsRepo", () => {
     it("filters out rows where fromDB returns undefined", async () => {
       const validSession = await createSession(["theme-1"]);
 
-      const mod = (await import("../openDB")) as typeof import("../openDB") & {
-        __seedGetAllExtras: (
-          ...extras: (Record<string, unknown> | undefined)[]
-        ) => void;
-      };
+      const mod = (await import("../openDB")) as SessionsOpenDBTestModule;
       // fromDB は record が falsy のとき undefined を返す（DB が欠損行を返す想定）
       mod.__seedGetAllExtras(undefined);
 
