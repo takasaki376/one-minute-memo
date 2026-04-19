@@ -60,8 +60,10 @@ import { getSettings, updateSettings, resetSettings } from "../settingsRepo";
 
 describe("settingsRepo", () => {
   beforeEach(async () => {
-    const { __reset } = await import("../openDB");
-    __reset();
+    const mod = (await import("../openDB")) as typeof import("../openDB") & {
+      __reset: () => void;
+    };
+    mod.__reset();
   });
 
   describe("getSettings", () => {

@@ -50,6 +50,14 @@ describe("HandwritingCanvas", () => {
     vi.restoreAllMocks();
   });
 
+  function getCanvas(container: HTMLElement): HTMLCanvasElement {
+    const el = container.querySelector("canvas");
+    if (!el) {
+      throw new Error("Expected canvas element");
+    }
+    return el;
+  }
+
   function setupCanvasForPointer(canvas: HTMLCanvasElement) {
     canvas.getBoundingClientRect = vi.fn(() => ({
       left: 0,
@@ -97,7 +105,7 @@ describe("HandwritingCanvas", () => {
 
   it("pointerdown で lineWidth が選択中の太さに設定される", async () => {
     const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
-    const canvas = container.querySelector("canvas")!;
+    const canvas = getCanvas(container);
     setupCanvasForPointer(canvas);
 
     fireEvent.click(screen.getByLabelText("線の太さ 太"));
@@ -142,7 +150,7 @@ describe("HandwritingCanvas", () => {
 
   it("消しゴム選択時の pointerdown で globalCompositeOperation が destination-out になる", async () => {
     const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
-    const canvas = container.querySelector("canvas")!;
+    const canvas = getCanvas(container);
     setupCanvasForPointer(canvas);
 
     fireEvent.click(screen.getByLabelText("消しゴム"));
@@ -162,7 +170,7 @@ describe("HandwritingCanvas", () => {
 
   it("ストローク終了後は idle 用に globalCompositeOperation が source-over に戻る", async () => {
     const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
-    const canvas = container.querySelector("canvas")!;
+    const canvas = getCanvas(container);
     setupCanvasForPointer(canvas);
 
     fireEvent.click(screen.getByLabelText("消しゴム"));

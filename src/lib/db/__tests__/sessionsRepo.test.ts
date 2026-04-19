@@ -1,21 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import type { SessionRecordDB } from "../openDB";
-import type { SessionRecord } from "@/types/session";
-
 // openDB をモック
 vi.mock("../openDB", () => {
-  type Value = any;
+  type Value = Record<string, unknown>;
 
   // シンプルなインメモリストア（db.add と transaction.store で共有）
   const store = new Map<string, Value>();
 
   const createStore = () => ({
     async add(value: Value) {
-      store.set(value.id, value);
+      store.set(value.id as string, value);
     },
     async put(value: Value) {
-      store.set(value.id, value);
+      store.set(value.id as string, value);
     },
     async get(key: string) {
       return store.get(key);
@@ -26,14 +23,16 @@ vi.mock("../openDB", () => {
   });
 
   const db = {
-    transaction(_storeName: string, _mode?: "readonly" | "readwrite") {
+    transaction(storeName: string, mode?: "readonly" | "readwrite") {
+      void storeName;
+      void mode;
       return {
         store: createStore(),
         done: Promise.resolve(),
       };
     },
     async add(_storeName: string, value: Value) {
-      store.set(value.id, value);
+      store.set(value.id as string, value);
     },
     async get(_storeName: string, key: string) {
       return store.get(key);
@@ -60,8 +59,10 @@ import { getAllSessions, createSession } from "../sessionsRepo";
 
 describe("sessionsRepo", () => {
   beforeEach(async () => {
-    const { __reset } = await import("../openDB");
-    __reset();
+    const mod = (await import("../openDB")) as typeof import("../openDB") & {
+      __reset: () => void;
+    };
+    mod.__reset();
   });
 
   describe("getAllSessions", () => {
@@ -120,10 +121,7 @@ describe("sessionsRepo", () => {
 
     it("filters out undefined values from fromDB transformation", async () => {
       // 直接ストアに不正なデータを追加して、fromDB が undefined を返すケースをシミュレート
-      const { getDB } = await import("../openDB");
-      const db = await getDB();
-      const tx = db.transaction("sessions", "readwrite");
-      const store = tx.store;
+      // （現状は正常データのみで、フィルタが有効な経路を通すことを確認）
 
       // 正常なセッション
       const validSession = await createSession(["theme-1"]);

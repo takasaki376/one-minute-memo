@@ -84,9 +84,11 @@ import {
 
 describe("memosRepo", () => {
   beforeEach(async () => {
-    // 毎テスト前にストアをリセット
-    const { __reset } = await import("../openDB");
-    __reset();
+    // 毎テスト前にストアをリセット（vi.mock の __reset は実モジュールに無いため型のみ付与）
+    const mod = (await import("../openDB")) as typeof import("../openDB") & {
+      __reset: () => void;
+    };
+    mod.__reset();
   });
 
   describe("saveMemo", () => {
