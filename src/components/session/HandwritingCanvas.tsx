@@ -285,18 +285,46 @@ export function HandwritingCanvas({
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
 
-  const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  /** iOS Safari がスクロール等でポインターを奪うのを抑止（passive: false が必要） */
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas || disabled) return;
+
+    const onPointerDownCapture = (e: PointerEvent) => {
+      if (e.pointerType === "touch" || e.pointerType === "pen") {
+        e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDownCapture, {
+      passive: false,
+      capture: true,
+    });
+    return () => {
+      canvas.removeEventListener("pointerdown", onPointerDownCapture, true);
+    };
+  }, [disabled]);
+
+  const getCanvasPosFromClient = (
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number,
+  ) => {
     const rect = canvas.getBoundingClientRect();
     const { width: logicalWidth, height: logicalHeight } =
       logicalSizeRef.current;
     const scaleX = logicalWidth / rect.width;
     const scaleY = logicalHeight / rect.height;
     return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
+  };
+
+  const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    return getCanvasPosFromClient(canvas, event.clientX, event.clientY);
   };
 
   const lastPosRef = useRef({ x: 0, y: 0 });
@@ -333,12 +361,28 @@ export function HandwritingCanvas({
 
     applyStrokeForTool(ctx, tool, penSize);
 
-    const pos = getCanvasPos(event);
-    ctx.beginPath();
-    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    lastPosRef.current = pos;
+    const native = event.nativeEvent;
+    const coalesced =
+      typeof native.getCoalescedEvents === "function"
+        ? native.getCoalescedEvents()
+        : [];
+    const samples: ReadonlyArray<{ clientX: number; clientY: number }> =
+      coalesced.length > 0
+        ? coalesced
+        : [{ clientX: event.clientX, clientY: event.clientY }];
+
+    for (const sample of samples) {
+      const pos = getCanvasPosFromClient(
+        canvas,
+        sample.clientX,
+        sample.clientY,
+      );
+      ctx.beginPath();
+      ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      lastPosRef.current = pos;
+    }
   };
 
   const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -377,18 +421,11 @@ export function HandwritingCanvas({
   /**
    * ストローク終了に pointerleave は使わない。
    * iPad Safari では leave / up の順序や余計な leave が連続ストロークの pointerdown を阻害することがある。
-   * pointer capture 中は up / cancel / lostpointercapture で十分。
+   * lostpointercapture もストローク途中に誤発火し線が途切れることがあるため使わない（up / cancel のみ）。
    */
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
-    finishDrawing(event);
-  };
-
-  /** キャプチャが pointerup なしに失われたときの後始末（iPad Safari 等） */
-  const handleLostPointerCapture: React.PointerEventHandler<
-    HTMLCanvasElement
-  > = (event) => {
     finishDrawing(event);
   };
 
@@ -516,7 +553,6 @@ export function HandwritingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          onLostPointerCapture={handleLostPointerCapture}
           onContextMenu={(e) => {
             e.preventDefault();
           }}
