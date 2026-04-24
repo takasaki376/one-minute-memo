@@ -20,15 +20,6 @@ function createMock2dContext() {
     fill: vi.fn(),
     closePath: vi.fn(),
     drawImage: vi.fn(),
-    getImageData: vi.fn((_sx: number, _sy: number, sw: number, sh: number) => {
-      return {
-        width: sw,
-        height: sh,
-        data: new Uint8ClampedArray(sw * sh * 4),
-        colorSpace: "srgb",
-      } as ImageData;
-    }),
-    putImageData: vi.fn(),
     lineJoin: "",
     lineCap: "",
     lineWidth: 0,
