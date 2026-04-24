@@ -654,6 +654,7 @@ export function HandwritingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onLostPointerCapture={handlePointerUp}
           onContextMenu={(e) => {
             e.preventDefault();
           }}
