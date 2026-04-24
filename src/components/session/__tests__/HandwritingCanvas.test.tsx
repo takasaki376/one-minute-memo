@@ -62,6 +62,12 @@ describe("HandwritingCanvas", () => {
         disconnect() {}
       },
     );
+
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -203,6 +209,8 @@ describe("HandwritingCanvas", () => {
         pointerId: 10,
         buttons: 1,
       });
+      mockCtx.drawImage.mockClear();
+      mockCtx.fill.mockClear();
       fireEvent.pointerMove(canvas, {
         clientX: 20,
         clientY: 20,
