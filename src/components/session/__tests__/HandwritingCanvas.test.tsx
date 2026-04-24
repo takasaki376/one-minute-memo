@@ -142,6 +142,7 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.lineWidth).toBe(8);
     expect(mockCtx.globalCompositeOperation).toBe("source-over");
+    expect(mockCtx.fill).toHaveBeenCalled();
   });
 
   it("初期はペン（pen）が選択され、消しゴムに切り替えられる", () => {
@@ -187,6 +188,31 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.globalCompositeOperation).toBe("destination-out");
     expect(mockCtx.lineWidth).toBe(4);
+    expect(mockCtx.fill).toHaveBeenCalled();
+  });
+
+  it("pointermove でスナップショット復元（drawImage）→ fill で再描画される", async () => {
+    const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+    const canvas = getCanvas(container);
+    setupCanvasForPointer(canvas);
+
+    await act(async () => {
+      fireEvent.pointerDown(canvas, {
+        clientX: 10,
+        clientY: 10,
+        pointerId: 10,
+        buttons: 1,
+      });
+      fireEvent.pointerMove(canvas, {
+        clientX: 20,
+        clientY: 20,
+        pointerId: 10,
+        buttons: 1,
+      });
+    });
+
+    expect(mockCtx.drawImage).toHaveBeenCalled();
+    expect(mockCtx.fill).toHaveBeenCalled();
   });
 
   it("ストローク終了後は idle 用に globalCompositeOperation が source-over に戻る", async () => {

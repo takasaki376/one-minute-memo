@@ -94,7 +94,9 @@ export function HandwritingCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
   const logicalSizeRef = useRef({ width: 0, height: 0 });
+  const dprRef = useRef(1);
   const latestValueRef = useRef<string | null | undefined>(value);
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
   const mountedRef = useRef(true);
@@ -104,8 +106,11 @@ export function HandwritingCanvas({
   const resizeFnRef = useRef<(() => void) | null>(null);
   /** perfect-freehand 用: 現在ストロークの [x, y, pressure?]（論理座標） */
   const strokePointsRef = useRef<number[][]>([]);
-  /** ストローク開始直前のキャンバス（device px）— ストローク中は毎フレームこれに戻してから描画 */
-  const beforeStrokeImageDataRef = useRef<ImageData | null>(null);
+  /** ストローク開始直前のキャンバス（device px）— move では drawImage で復元する */
+  const beforeStrokeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** ストローク描画を rAF で 1 フレームにまとめる */
+  const strokeRafIdRef = useRef<number | null>(null);
+  const strokeLastFlagRef = useRef(false);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
 
@@ -227,6 +232,7 @@ export function HandwritingCanvas({
       const displayHeight = Math.max(1, wrapper.clientHeight);
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      dprRef.current = dpr;
 
       const prevLogical = logicalSizeRef.current;
 
@@ -415,10 +421,17 @@ export function HandwritingCanvas({
     canvas: HTMLCanvasElement,
     last: boolean,
   ) => {
-    const snapshot = beforeStrokeImageDataRef.current;
-    if (!snapshot) return;
+    const snapshotCanvas = beforeStrokeCanvasRef.current;
+    if (!snapshotCanvas) return;
 
-    ctx.putImageData(snapshot, 0, 0);
+    // drawImage は現在の transform の影響を受けるので、一度 identity に戻して device px で復元する
+    const dpr = dprRef.current;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(snapshotCanvas, 0, 0);
+    ctx.restore();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     let points = strokePointsRef.current;
     if (points.length === 0) return;
@@ -445,13 +458,15 @@ export function HandwritingCanvas({
 
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
+    activePointerIdRef.current = event.pointerId;
 
-    beforeStrokeImageDataRef.current = ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
+    const snapshot = document.createElement("canvas");
+    snapshot.width = canvas.width;
+    snapshot.height = canvas.height;
+    const snapshotCtx = snapshot.getContext("2d");
+    if (!snapshotCtx) return;
+    snapshotCtx.drawImage(canvas, 0, 0);
+    beforeStrokeCanvasRef.current = snapshot;
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
@@ -471,18 +486,33 @@ export function HandwritingCanvas({
   ) => {
     if (!isDrawingRef.current) return;
     if (disabled) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     appendStrokeSamples(canvas, event);
-    redrawCurrentStroke(ctx, canvas, false);
+    strokeLastFlagRef.current = false;
+    if (strokeRafIdRef.current !== null) return;
+    strokeRafIdRef.current = requestAnimationFrame(() => {
+      strokeRafIdRef.current = null;
+      const c = canvasRef.current;
+      if (!c) return;
+      const cctx = c.getContext("2d");
+      if (!cctx) return;
+      redrawCurrentStroke(cctx, c, strokeLastFlagRef.current);
+    });
   };
 
-  const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const finishDrawing = (
+    event: React.PointerEvent<HTMLCanvasElement>,
+    options?: { export?: boolean },
+  ) => {
     if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
     isDrawingRef.current = false;
+    activePointerIdRef.current = null;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -494,19 +524,25 @@ export function HandwritingCanvas({
     }
 
     const ctx = canvas.getContext("2d");
-    if (ctx && beforeStrokeImageDataRef.current) {
+    if (strokeRafIdRef.current !== null) {
+      cancelAnimationFrame(strokeRafIdRef.current);
+      strokeRafIdRef.current = null;
+    }
+    if (ctx && beforeStrokeCanvasRef.current) {
       redrawCurrentStroke(ctx, canvas, true);
     }
-    beforeStrokeImageDataRef.current = null;
+    beforeStrokeCanvasRef.current = null;
     strokePointsRef.current = [];
 
-    try {
-      const dataUrl = canvas.toDataURL("image/png");
-      pendingLocalExportRef.current = true;
-      latestCanvasDataUrlRef.current = dataUrl;
-      onChange?.(dataUrl);
-    } catch (e) {
-      console.error("Failed to export canvas as dataURL", e);
+    if (options?.export !== false) {
+      try {
+        const dataUrl = canvas.toDataURL("image/png");
+        pendingLocalExportRef.current = true;
+        latestCanvasDataUrlRef.current = dataUrl;
+        onChange?.(dataUrl);
+      } catch (e) {
+        console.error("Failed to export canvas as dataURL", e);
+      }
     }
 
     if (ctx) {
@@ -522,12 +558,19 @@ export function HandwritingCanvas({
   /**
    * ストローク終了に pointerleave は使わない。
    * iPad Safari では leave / up の順序や余計な leave が連続ストロークの pointerdown を阻害することがある。
-   * lostpointercapture もストローク途中に誤発火し線が途切れることがあるため使わない（up / cancel のみ）。
+   * lostpointercapture は「描画の確定」には使わず、取りこぼし対策として状態リセットのみ行う。
    */
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
-    finishDrawing(event);
+    finishDrawing(event, { export: true });
+  };
+
+  const handleLostPointerCapture: React.PointerEventHandler<
+    HTMLCanvasElement
+  > = (event) => {
+    // 出力はせずに状態だけ戻す（ストローク中の取りこぼし対策）
+    finishDrawing(event, { export: false });
   };
 
   const handleClear = () => {
@@ -654,7 +697,7 @@ export function HandwritingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          onLostPointerCapture={handlePointerUp}
+          onLostPointerCapture={handleLostPointerCapture}
           onContextMenu={(e) => {
             e.preventDefault();
           }}
