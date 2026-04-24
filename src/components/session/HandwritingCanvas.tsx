@@ -563,6 +563,10 @@ export function HandwritingCanvas({
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      appendStrokeSamples(canvas, event);
+    }
     finishDrawing(event, { export: true });
   };
 
