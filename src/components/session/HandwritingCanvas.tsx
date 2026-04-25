@@ -90,6 +90,8 @@ export function HandwritingCanvas({
 }: HandwritingCanvasProps) {
   const [penSize, setPenSize] = useState<PenSize>("m");
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const penSizeRef = useRef<PenSize>("m");
+  const toolRef = useRef<"pen" | "eraser">("pen");
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -114,10 +116,18 @@ export function HandwritingCanvas({
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
 
+  useEffect(() => {
+    penSizeRef.current = penSize;
+  }, [penSize]);
+
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
+
   /** 画像読み込み後・クリア後・ストローク終了後など「ペンで書き足せる状態」に戻す */
   const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
-    applyStrokeForTool(ctx, "pen", penSize);
-  }, [penSize]);
+    applyStrokeForTool(ctx, "pen", penSizeRef.current);
+  }, []);
 
   const clearCanvas = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -440,11 +450,11 @@ export function HandwritingCanvas({
       points = [a, a];
     }
 
-    const outline = getStroke(points, freehandOptions(penSize, last)) as [
+    const outline = getStroke(points, freehandOptions(penSizeRef.current, last)) as [
       number,
       number,
     ][];
-    fillFreehandOutline(ctx, outline, tool);
+    fillFreehandOutline(ctx, outline, toolRef.current);
   };
 
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
@@ -476,7 +486,7 @@ export function HandwritingCanvas({
       pointerPressure(event.nativeEvent),
     ]);
 
-    applyStrokeForTool(ctx, tool, penSize);
+    applyStrokeForTool(ctx, toolRef.current, penSizeRef.current);
 
     redrawCurrentStroke(ctx, canvas, false);
   };
