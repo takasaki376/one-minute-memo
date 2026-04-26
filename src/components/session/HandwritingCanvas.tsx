@@ -498,8 +498,17 @@ export function HandwritingCanvas({
   const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
-    if (!isDrawingRef.current) return;
     if (disabled) return;
+
+    // iPad / Apple Pencil: pointerdown が届かなかった場合の回復処理。
+    // ペン・タッチが押下中（buttons !== 0）なのに描画中でない場合は pointerdown を再現する。
+    if (!isDrawingRef.current) {
+      if (event.buttons !== 0) {
+        handlePointerDown(event);
+      }
+      return;
+    }
+
     if (activePointerIdRef.current !== event.pointerId) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -584,6 +593,61 @@ export function HandwritingCanvas({
     finishDrawing(event, { export: true });
   };
 
+  /**
+   * pointercancel: ブラウザやシステムがポインターを強制終了した場合。
+   * setPointerCapture 直後に iPad Safari が pointercancel を発火するケースへの対策。
+   * 描画途中のストロークをスナップショットで巻き戻し、エクスポートは行わない。
+   */
+  const handlePointerCancel: React.PointerEventHandler<HTMLCanvasElement> = (
+    event,
+  ) => {
+    if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
+
+    isDrawingRef.current = false;
+    activePointerIdRef.current = null;
+
+    try {
+      canvasRef.current?.releasePointerCapture(event.pointerId);
+    } catch {
+      // noop
+    }
+
+    if (strokeRafIdRef.current !== null) {
+      cancelAnimationFrame(strokeRafIdRef.current);
+      strokeRafIdRef.current = null;
+    }
+
+    // キャンセルされたストロークをスナップショットで巻き戻す
+    const canvas = canvasRef.current;
+    const snapshotCanvas = beforeStrokeCanvasRef.current;
+    if (canvas && snapshotCanvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        const dpr = dprRef.current;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(snapshotCanvas, 0, 0);
+        ctx.restore();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    beforeStrokeCanvasRef.current = null;
+    strokePointsRef.current = [];
+
+    const ctx = canvas?.getContext("2d");
+    if (ctx) {
+      applyCanvasStyle(ctx);
+    }
+
+    if (pendingResizeRef.current) {
+      pendingResizeRef.current = false;
+      resizeFnRef.current?.();
+    }
+  };
+
   const handleLostPointerCapture: React.PointerEventHandler<
     HTMLCanvasElement
   > = (event) => {
@@ -628,6 +692,7 @@ export function HandwritingCanvas({
     "border-slate-300",
     "bg-white",
     "select-none",
+    "touch-none",
     "[-webkit-touch-callout:none]",
     disabled && "opacity-70",
   ]);
@@ -754,7 +819,7 @@ export function HandwritingCanvas({
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           onLostPointerCapture={handleLostPointerCapture}
           onContextMenu={(e) => {
             e.preventDefault();
