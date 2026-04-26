@@ -613,6 +613,16 @@ export function HandwritingCanvas({
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
+    // iOS Safari は前ストロークの pointerup を遅延発火させることがある。
+    // Apple Pencil は常に同じ pointerId を使うため、古い pointerup が
+    // 現在の stroke2 を中断させる。タイムスタンプで除外する。
+    if (
+      event.nativeEvent.pointerType !== "mouse" &&
+      isDrawingRef.current &&
+      event.nativeEvent.timeStamp < strokeStartTimeRef.current
+    ) {
+      return;
+    }
     const canvas = canvasRef.current;
     if (canvas) {
       appendStrokeSamples(canvas, event);
