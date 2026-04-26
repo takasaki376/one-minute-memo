@@ -17,6 +17,8 @@ function createMock2dContext() {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     stroke: vi.fn(),
+    fill: vi.fn(),
+    closePath: vi.fn(),
     drawImage: vi.fn(),
     lineJoin: "",
     lineCap: "",
@@ -51,6 +53,12 @@ describe("HandwritingCanvas", () => {
         disconnect() {}
       },
     );
+
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -67,6 +75,8 @@ describe("HandwritingCanvas", () => {
   }
 
   function setupCanvasForPointer(canvas: HTMLCanvasElement) {
+    canvas.width = 400;
+    canvas.height = 300;
     canvas.getBoundingClientRect = vi.fn(() => ({
       left: 0,
       top: 0,
@@ -129,6 +139,7 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.lineWidth).toBe(8);
     expect(mockCtx.globalCompositeOperation).toBe("source-over");
+    expect(mockCtx.fill).toHaveBeenCalled();
   });
 
   it("初期はペン（pen）が選択され、消しゴムに切り替えられる", () => {
@@ -174,6 +185,39 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.globalCompositeOperation).toBe("destination-out");
     expect(mockCtx.lineWidth).toBe(4);
+    expect(mockCtx.fill).toHaveBeenCalled();
+  });
+
+  it("pointermove でスナップショット復元（drawImage）→ fill で再描画される", async () => {
+    const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+    const canvas = getCanvas(container);
+    setupCanvasForPointer(canvas);
+
+    await act(async () => {
+      const down = new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 10,
+        clientY: 10,
+        buttons: 1,
+      });
+      Object.defineProperty(down, "pointerId", { value: 10 });
+      Object.defineProperty(down, "pointerType", { value: "mouse" });
+      canvas.dispatchEvent(down as unknown as PointerEvent);
+      mockCtx.drawImage.mockClear();
+      mockCtx.fill.mockClear();
+      const move = new MouseEvent("pointermove", {
+        bubbles: true,
+        clientX: 20,
+        clientY: 20,
+        buttons: 1,
+      });
+      Object.defineProperty(move, "pointerId", { value: 10 });
+      Object.defineProperty(move, "pointerType", { value: "mouse" });
+      canvas.dispatchEvent(move as unknown as PointerEvent);
+    });
+
+    expect(mockCtx.drawImage).toHaveBeenCalled();
+    expect(mockCtx.fill).toHaveBeenCalled();
   });
 
   it("ストローク終了後は idle 用に globalCompositeOperation が source-over に戻る", async () => {
@@ -199,5 +243,192 @@ describe("HandwritingCanvas", () => {
     });
 
     expect(mockCtx.globalCompositeOperation).toBe("source-over");
+  });
+
+  describe("pointercancel の処理", () => {
+    it("pointercancel では onChange が呼ばれない（エクスポートしない）", async () => {
+      const onChange = vi.fn();
+      const { container } = render(<HandwritingCanvas onChange={onChange} />);
+      const canvas = getCanvas(container);
+      setupCanvasForPointer(canvas);
+
+      await act(async () => {
+        fireEvent.pointerDown(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+          buttons: 1,
+        });
+      });
+      onChange.mockClear();
+
+      await act(async () => {
+        fireEvent.pointerCancel(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+        });
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("pointercancel でスナップショットを drawImage で復元する（ストロークの巻き戻し）", async () => {
+      const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+      const canvas = getCanvas(container);
+      setupCanvasForPointer(canvas);
+
+      await act(async () => {
+        fireEvent.pointerDown(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+          buttons: 1,
+        });
+      });
+      // pointerdown で行われた drawImage の呼び出しをリセット
+      mockCtx.drawImage.mockClear();
+
+      await act(async () => {
+        fireEvent.pointerCancel(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+        });
+      });
+
+      // キャンセル時にスナップショットを drawImage で貼り直す
+      expect(mockCtx.drawImage).toHaveBeenCalled();
+    });
+
+    it("pointercancel 後は globalCompositeOperation が source-over（idle 状態）に戻る", async () => {
+      const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+      const canvas = getCanvas(container);
+      setupCanvasForPointer(canvas);
+
+      fireEvent.click(screen.getByLabelText("消しゴム"));
+
+      await act(async () => {
+        fireEvent.pointerDown(canvas, {
+          clientX: 5,
+          clientY: 5,
+          pointerId: 1,
+          buttons: 1,
+        });
+        // 消しゴムで描画中は destination-out のはず
+        expect(mockCtx.globalCompositeOperation).toBe("destination-out");
+      });
+
+      await act(async () => {
+        fireEvent.pointerCancel(canvas, {
+          clientX: 5,
+          clientY: 5,
+          pointerId: 1,
+        });
+      });
+
+      // キャンセル後は idle 用 source-over に戻る
+      expect(mockCtx.globalCompositeOperation).toBe("source-over");
+    });
+
+    it("描画中でない（isDrawing=false）ときの pointercancel は drawImage も onChange も発生しない", async () => {
+      // handlePointerCancel の先頭ガード: !isDrawingRef.current → return
+      const onChange = vi.fn();
+      const { container } = render(<HandwritingCanvas onChange={onChange} />);
+      const canvas = getCanvas(container);
+      setupCanvasForPointer(canvas);
+
+      // pointerdown なしで pointercancel だけ発火
+      await act(async () => {
+        fireEvent.pointerCancel(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+        });
+      });
+
+      expect(mockCtx.drawImage).not.toHaveBeenCalled();
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("pointercancel 後の pointermove（buttons: 1）では描画は再開されない", async () => {
+      const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+      const canvas = getCanvas(container);
+      setupCanvasForPointer(canvas);
+
+      await act(async () => {
+        fireEvent.pointerDown(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+          buttons: 1,
+        });
+      });
+
+      await act(async () => {
+        fireEvent.pointerCancel(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+        });
+      });
+
+      mockCtx.fill.mockClear();
+      mockCtx.drawImage.mockClear();
+
+      // 2の適用後は recovery を行わないため、move だけでは描画が再開しない
+      await act(async () => {
+        fireEvent.pointerMove(canvas, {
+          clientX: 20,
+          clientY: 20,
+          pointerId: 1,
+          buttons: 1,
+        });
+      });
+
+      expect(mockCtx.fill).not.toHaveBeenCalled();
+      expect(mockCtx.drawImage).not.toHaveBeenCalled();
+    });
+
+    it("pointercancel 後も pointerup では onChange が呼ばれない（cancel がストロークを確定させない）", async () => {
+      // pointercancel でストローク状態がリセットされるため、
+      // その後の pointerup は isDrawingRef=false のまま finishDrawing が早期リターンする。
+      const onChange = vi.fn();
+      const { container } = render(<HandwritingCanvas onChange={onChange} />);
+      const canvas = getCanvas(container);
+      setupCanvasForPointer(canvas);
+
+      await act(async () => {
+        fireEvent.pointerDown(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+          buttons: 1,
+        });
+      });
+
+      await act(async () => {
+        fireEvent.pointerCancel(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+        });
+      });
+
+      // cancel で onChange は呼ばれない
+      expect(onChange).not.toHaveBeenCalled();
+
+      // cancel 後の pointerup も onChange を呼ばない（isDrawing=false）
+      await act(async () => {
+        fireEvent.pointerUp(canvas, {
+          clientX: 10,
+          clientY: 10,
+          pointerId: 1,
+          buttons: 0,
+        });
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+    });
   });
 });
