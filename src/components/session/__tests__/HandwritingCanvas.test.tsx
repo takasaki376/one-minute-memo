@@ -194,20 +194,26 @@ describe("HandwritingCanvas", () => {
     setupCanvasForPointer(canvas);
 
     await act(async () => {
-      fireEvent.pointerDown(canvas, {
+      const down = new MouseEvent("pointerdown", {
+        bubbles: true,
         clientX: 10,
         clientY: 10,
-        pointerId: 10,
         buttons: 1,
       });
+      Object.defineProperty(down, "pointerId", { value: 10 });
+      Object.defineProperty(down, "pointerType", { value: "mouse" });
+      canvas.dispatchEvent(down as unknown as PointerEvent);
       mockCtx.drawImage.mockClear();
       mockCtx.fill.mockClear();
-      fireEvent.pointerMove(canvas, {
+      const move = new MouseEvent("pointermove", {
+        bubbles: true,
         clientX: 20,
         clientY: 20,
-        pointerId: 10,
         buttons: 1,
       });
+      Object.defineProperty(move, "pointerId", { value: 10 });
+      Object.defineProperty(move, "pointerType", { value: "mouse" });
+      canvas.dispatchEvent(move as unknown as PointerEvent);
     });
 
     expect(mockCtx.drawImage).toHaveBeenCalled();

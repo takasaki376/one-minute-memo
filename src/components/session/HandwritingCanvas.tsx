@@ -116,9 +116,6 @@ export function HandwritingCanvas({
   const strokeLastFlagRef = useRef(false);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
-  /** 現在ストロークの開始タイムスタンプ（event.timeStamp）— 遅延 pointercancel の検出に使用 */
-  const strokeStartTimeRef = useRef<number>(0);
-
   useEffect(() => {
     penSizeRef.current = penSize;
   }, [penSize]);
@@ -341,29 +338,6 @@ export function HandwritingCanvas({
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
 
-  /** iOS Safari がスクロール等でポインターを奪うのを抑止（passive: false が必要） */
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || disabled) return;
-
-    const onPointerDownCapture = (e: PointerEvent) => {
-      // pen には preventDefault() を呼ばない。
-      // touch-action: none で十分であり、pen で preventDefault() を呼ぶと
-      // Safari で後続の pointermove 配信に影響するケースがある。
-      if (e.pointerType === "touch") {
-        e.preventDefault();
-      }
-    };
-
-    canvas.addEventListener("pointerdown", onPointerDownCapture, {
-      passive: false,
-      capture: true,
-    });
-    return () => {
-      canvas.removeEventListener("pointerdown", onPointerDownCapture, true);
-    };
-  }, [disabled]);
-
   const getCanvasPosFromClient = (
     canvas: HTMLCanvasElement,
     clientX: number,
@@ -484,20 +458,13 @@ export function HandwritingCanvas({
     snapshotCtx.drawImage(canvas, 0, 0);
     beforeStrokeCanvasRef.current = snapshot;
 
-    // iPad Safari + Apple Pencil の既知バグ:
-    // pen / touch に対して setPointerCapture を呼ぶと即座に pointercancel が発火し、
-    // recovery → setPointerCapture → pointercancel の無限ループになる。
-    // マウスのみ setPointerCapture を使い、pen / touch はブラウザのデフォルト配送に委ねる。
-    if (event.pointerType === "mouse") {
-      try {
-        canvas.setPointerCapture(event.pointerId);
-      } catch {
-        // noop
-      }
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // noop
     }
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
-    strokeStartTimeRef.current = event.timeStamp;
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
@@ -513,8 +480,8 @@ export function HandwritingCanvas({
     if (!isDrawingRef.current) return;
 
     if (activePointerIdRef.current !== event.pointerId) return;
-    // マルチタッチ / ジェスチャーによる余計な move をガード（デモサイト準拠）
-    if (event.buttons > 1) return;
+    // デモ寄せ: 1ボタン押下中の move のみ描画対象にする
+    if (event.buttons !== 1) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -593,16 +560,6 @@ export function HandwritingCanvas({
    * pen/touch で処理すると次ストロークを誤って中断させるため。
    */
   const handlePointerUp = (event: PointerEvent) => {
-    // iOS Safari は前ストロークの pointerup を遅延発火させることがある。
-    // Apple Pencil は常に同じ pointerId を使うため、古い pointerup が
-    // 現在の stroke2 を中断させる。タイムスタンプで除外する。
-    if (
-      event.pointerType !== "mouse" &&
-      isDrawingRef.current &&
-      event.timeStamp < strokeStartTimeRef.current
-    ) {
-      return;
-    }
     const canvas = canvasRef.current;
     if (canvas) {
       appendStrokeSamples(canvas, event);
@@ -612,18 +569,12 @@ export function HandwritingCanvas({
 
   /**
    * pointercancel: ブラウザやシステムがポインターを強制終了した場合。
-   * setPointerCapture 直後に iPad Safari が pointercancel を発火するケースへの対策。
+   * setPointerCapture 直後に pointercancel が発火するケースもあるため、
    * 描画途中のストロークをスナップショットで巻き戻し、エクスポートは行わない。
    */
   const handlePointerCancel = (event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
-    // iOS Safari は前ストロークの pointercancel を遅延発火させることがある。
-    // Apple Pencil は常に同じ pointerId を使うため、前ストロークの cancel が
-    // 現在のストロークに一致してしまう。タイムスタンプで古い cancel を除外する。
-    if (event.timeStamp < strokeStartTimeRef.current) {
-      return;
-    }
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
 
@@ -669,11 +620,8 @@ export function HandwritingCanvas({
   };
 
   const handleLostPointerCapture = (event: PointerEvent) => {
-    // pen/touch では setPointerCapture を呼ばないため、本来 lostpointercapture は発火しない。
-    // しかし iOS Safari は暗黙的にキャプチャし、前ストロークの lostpointercapture を
-    // 遅延発火させることがある。Apple Pencil は常に同じ pointerId を使うため、
-    // 遅延発火が次ストロークを中断させる。pen/touch では lostpointercapture を無視する。
-    if (event.pointerType !== "mouse") return;
+    // lostpointercapture は pointer capture の解除時に発火するため、
+    // pointer type を限定せず描画確定として扱う。
     finishDrawing(event, { export: true });
   };
 
