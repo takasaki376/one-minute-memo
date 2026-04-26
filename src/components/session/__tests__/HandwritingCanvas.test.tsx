@@ -17,6 +17,8 @@ function createMock2dContext() {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     stroke: vi.fn(),
+    fill: vi.fn(),
+    closePath: vi.fn(),
     drawImage: vi.fn(),
     lineJoin: "",
     lineCap: "",
@@ -51,6 +53,12 @@ describe("HandwritingCanvas", () => {
         disconnect() {}
       },
     );
+
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -67,6 +75,8 @@ describe("HandwritingCanvas", () => {
   }
 
   function setupCanvasForPointer(canvas: HTMLCanvasElement) {
+    canvas.width = 400;
+    canvas.height = 300;
     canvas.getBoundingClientRect = vi.fn(() => ({
       left: 0,
       top: 0,
@@ -129,6 +139,7 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.lineWidth).toBe(8);
     expect(mockCtx.globalCompositeOperation).toBe("source-over");
+    expect(mockCtx.fill).toHaveBeenCalled();
   });
 
   it("初期はペン（pen）が選択され、消しゴムに切り替えられる", () => {
@@ -174,6 +185,33 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.globalCompositeOperation).toBe("destination-out");
     expect(mockCtx.lineWidth).toBe(4);
+    expect(mockCtx.fill).toHaveBeenCalled();
+  });
+
+  it("pointermove でスナップショット復元（drawImage）→ fill で再描画される", async () => {
+    const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+    const canvas = getCanvas(container);
+    setupCanvasForPointer(canvas);
+
+    await act(async () => {
+      fireEvent.pointerDown(canvas, {
+        clientX: 10,
+        clientY: 10,
+        pointerId: 10,
+        buttons: 1,
+      });
+      mockCtx.drawImage.mockClear();
+      mockCtx.fill.mockClear();
+      fireEvent.pointerMove(canvas, {
+        clientX: 20,
+        clientY: 20,
+        pointerId: 10,
+        buttons: 1,
+      });
+    });
+
+    expect(mockCtx.drawImage).toHaveBeenCalled();
+    expect(mockCtx.fill).toHaveBeenCalled();
   });
 
   it("ストローク終了後は idle 用に globalCompositeOperation が source-over に戻る", async () => {

@@ -3,6 +3,8 @@
 import type React from "react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import cc from "classcat";
+import getStroke from "perfect-freehand";
+import type { StrokeOptions } from "perfect-freehand";
 
 const PEN_WIDTHS = { s: 2, m: 4, l: 8 } as const;
 export type PenSize = keyof typeof PEN_WIDTHS;
@@ -21,6 +23,37 @@ const PEN_SIZE_ARIA_LABELS: Record<PenSize, string> = {
 
 const PEN_STROKE_COLOR = "#111827";
 const ERASER_STROKE_COLOR = "rgba(0,0,0,1)";
+
+function freehandOptions(penSize: PenSize, last: boolean): StrokeOptions {
+  const w = PEN_WIDTHS[penSize];
+  return {
+    size: Math.max(6, w * 2 + 4),
+    thinning: 0.65,
+    smoothing: 0.65,
+    streamline: 0.65,
+    // Prefer real stylus pressure when available.
+    simulatePressure: false,
+    last,
+  };
+}
+
+function fillFreehandOutline(
+  ctx: CanvasRenderingContext2D,
+  outline: [number, number][],
+  tool: "pen" | "eraser",
+) {
+  if (outline.length < 2) return;
+  ctx.globalCompositeOperation =
+    tool === "eraser" ? "destination-out" : "source-over";
+  ctx.fillStyle = tool === "eraser" ? ERASER_STROKE_COLOR : PEN_STROKE_COLOR;
+  ctx.beginPath();
+  ctx.moveTo(outline[0][0], outline[0][1]);
+  for (let i = 1; i < outline.length; i++) {
+    ctx.lineTo(outline[i][0], outline[i][1]);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
 
 /**
  * 線の見た目（結合・端・太さ・合成・色）を一箇所で設定する。
@@ -58,11 +91,15 @@ export function HandwritingCanvas({
 }: HandwritingCanvasProps) {
   const [penSize, setPenSize] = useState<PenSize>("m");
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const penSizeRef = useRef<PenSize>("m");
+  const toolRef = useRef<"pen" | "eraser">("pen");
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
   const logicalSizeRef = useRef({ width: 0, height: 0 });
+  const dprRef = useRef(1);
   const latestValueRef = useRef<string | null | undefined>(value);
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
   const mountedRef = useRef(true);
@@ -70,13 +107,28 @@ export function HandwritingCanvas({
   const resizeRafIdRef = useRef<number | null>(null);
   const pendingResizeRef = useRef(false);
   const resizeFnRef = useRef<(() => void) | null>(null);
+  /** perfect-freehand 用: 現在ストロークの [x, y, pressure?]（論理座標） */
+  const strokePointsRef = useRef<number[][]>([]);
+  /** ストローク開始直前のキャンバス（device px）— move では drawImage で復元する */
+  const beforeStrokeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** ストローク描画を rAF で 1 フレームにまとめる */
+  const strokeRafIdRef = useRef<number | null>(null);
+  const strokeLastFlagRef = useRef(false);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
 
+  useEffect(() => {
+    penSizeRef.current = penSize;
+  }, [penSize]);
+
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
+
   /** 画像読み込み後・クリア後・ストローク終了後など「ペンで書き足せる状態」に戻す */
   const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
-    applyStrokeForTool(ctx, "pen", penSize);
-  }, [penSize]);
+    applyStrokeForTool(ctx, "pen", penSizeRef.current);
+  }, []);
 
   const clearCanvas = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -131,6 +183,7 @@ export function HandwritingCanvas({
 
   useEffect(() => {
     mountedRef.current = true;
+    const pendingImages = pendingImagesRef.current;
 
     return () => {
       mountedRef.current = false;
@@ -138,12 +191,12 @@ export function HandwritingCanvas({
         cancelAnimationFrame(resizeRafIdRef.current);
         resizeRafIdRef.current = null;
       }
-      for (const img of pendingImagesRef.current) {
+      for (const img of pendingImages) {
         img.onload = null;
         img.onerror = null;
         img.src = "";
       }
-      pendingImagesRef.current.clear();
+      pendingImages.clear();
     };
   }, []);
 
@@ -191,6 +244,7 @@ export function HandwritingCanvas({
       const displayHeight = Math.max(1, wrapper.clientHeight);
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      dprRef.current = dpr;
 
       const prevLogical = logicalSizeRef.current;
 
@@ -285,21 +339,126 @@ export function HandwritingCanvas({
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
 
-  const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  /** iOS Safari がスクロール等でポインターを奪うのを抑止（passive: false が必要） */
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas || disabled) return;
+
+    const onPointerDownCapture = (e: PointerEvent) => {
+      if (e.pointerType === "touch" || e.pointerType === "pen") {
+        e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDownCapture, {
+      passive: false,
+      capture: true,
+    });
+    return () => {
+      canvas.removeEventListener("pointerdown", onPointerDownCapture, true);
+    };
+  }, [disabled]);
+
+  const getCanvasPosFromClient = (
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number,
+  ) => {
     const rect = canvas.getBoundingClientRect();
     const { width: logicalWidth, height: logicalHeight } =
       logicalSizeRef.current;
     const scaleX = logicalWidth / rect.width;
     const scaleY = logicalHeight / rect.height;
     return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
   };
 
-  const lastPosRef = useRef({ x: 0, y: 0 });
+  const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    return getCanvasPosFromClient(canvas, event.clientX, event.clientY);
+  };
+
+  const pointerPressure = (e: { pressure?: number }) => {
+    const p = e.pressure;
+    if (typeof p === "number" && p >= 0 && p <= 1) return p;
+    return 0.5;
+  };
+
+  const appendStrokeSamples = (
+    canvas: HTMLCanvasElement,
+    event: React.PointerEvent<HTMLCanvasElement>,
+  ) => {
+    const native = event.nativeEvent;
+    const coalesced =
+      typeof native.getCoalescedEvents === "function"
+        ? native.getCoalescedEvents()
+        : [];
+    const samples: { clientX: number; clientY: number; pressure: number }[] =
+      coalesced.length > 0
+        ? [
+            ...coalesced.map((e) => ({
+              clientX: e.clientX,
+              clientY: e.clientY,
+              pressure: pointerPressure(e),
+            })),
+            {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              pressure: pointerPressure(event.nativeEvent),
+            },
+          ]
+        : [
+            {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              pressure: pointerPressure(event.nativeEvent),
+            },
+          ];
+
+    for (const sample of samples) {
+      const pos = getCanvasPosFromClient(
+        canvas,
+        sample.clientX,
+        sample.clientY,
+      );
+      strokePointsRef.current.push([pos.x, pos.y, sample.pressure]);
+    }
+  };
+
+  const redrawCurrentStroke = (
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    last: boolean,
+  ) => {
+    const snapshotCanvas = beforeStrokeCanvasRef.current;
+    if (!snapshotCanvas) return;
+
+    // Snapshot を復元（現在の transform 無視して device px で描画）
+    const dpr = dprRef.current;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.drawImage(snapshotCanvas, 0, 0);
+    ctx.restore();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // ストロークを描画（論理座標系で）
+    let points = strokePointsRef.current;
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      const a = points[0];
+      points = [a, a];
+    }
+
+    const outline = getStroke(
+      points,
+      freehandOptions(penSizeRef.current, last),
+    ) as [number, number][];
+    fillFreehandOutline(ctx, outline, toolRef.current);
+  };
 
   const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
@@ -310,15 +469,30 @@ export function HandwritingCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Prepare snapshot first to avoid entering a partial drawing state.
+    const snapshot = document.createElement("canvas");
+    snapshot.width = canvas.width;
+    snapshot.height = canvas.height;
+    const snapshotCtx = snapshot.getContext("2d");
+    if (!snapshotCtx) return;
+    snapshotCtx.drawImage(canvas, 0, 0);
+    beforeStrokeCanvasRef.current = snapshot;
+
     canvas.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
+    activePointerIdRef.current = event.pointerId;
 
-    applyStrokeForTool(ctx, tool, penSize);
-
+    strokePointsRef.current = [];
     const pos = getCanvasPos(event);
-    lastPosRef.current = pos;
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
+    strokePointsRef.current.push([
+      pos.x,
+      pos.y,
+      pointerPressure(event.nativeEvent),
+    ]);
+
+    applyStrokeForTool(ctx, toolRef.current, penSizeRef.current);
+
+    redrawCurrentStroke(ctx, canvas, false);
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
@@ -326,24 +500,33 @@ export function HandwritingCanvas({
   ) => {
     if (!isDrawingRef.current) return;
     if (disabled) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    applyStrokeForTool(ctx, tool, penSize);
-
-    const pos = getCanvasPos(event);
-    ctx.beginPath();
-    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    lastPosRef.current = pos;
+    appendStrokeSamples(canvas, event);
+    strokeLastFlagRef.current = false;
+    if (strokeRafIdRef.current !== null) return;
+    strokeRafIdRef.current = requestAnimationFrame(() => {
+      strokeRafIdRef.current = null;
+      const c = canvasRef.current;
+      if (!c) return;
+      const cctx = c.getContext("2d");
+      if (!cctx) return;
+      redrawCurrentStroke(cctx, c, strokeLastFlagRef.current);
+    });
   };
 
-  const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const finishDrawing = (
+    event: React.PointerEvent<HTMLCanvasElement>,
+    options?: { export?: boolean },
+  ) => {
     if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
     isDrawingRef.current = false;
+    activePointerIdRef.current = null;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -354,16 +537,28 @@ export function HandwritingCanvas({
       // noop
     }
 
-    try {
-      const dataUrl = canvas.toDataURL("image/png");
-      pendingLocalExportRef.current = true;
-      latestCanvasDataUrlRef.current = dataUrl;
-      onChange?.(dataUrl);
-    } catch (e) {
-      console.error("Failed to export canvas as dataURL", e);
+    const ctx = canvas.getContext("2d");
+    if (strokeRafIdRef.current !== null) {
+      cancelAnimationFrame(strokeRafIdRef.current);
+      strokeRafIdRef.current = null;
+    }
+    if (ctx && beforeStrokeCanvasRef.current) {
+      redrawCurrentStroke(ctx, canvas, true);
+    }
+    beforeStrokeCanvasRef.current = null;
+    strokePointsRef.current = [];
+
+    if (options?.export !== false) {
+      try {
+        const dataUrl = canvas.toDataURL("image/png");
+        pendingLocalExportRef.current = true;
+        latestCanvasDataUrlRef.current = dataUrl;
+        onChange?.(dataUrl);
+      } catch (e) {
+        console.error("Failed to export canvas as dataURL", e);
+      }
     }
 
-    const ctx = canvas.getContext("2d");
     if (ctx) {
       applyCanvasStyle(ctx);
     }
@@ -374,16 +569,26 @@ export function HandwritingCanvas({
     }
   };
 
+  /**
+   * ストローク終了に pointerleave は使わない。
+   * iPad Safari では leave / up の順序や余計な leave が連続ストロークの pointerdown を阻害することがある。
+   * lostpointercapture は「描画の確定」には使わず、取りこぼし対策として状態リセットのみ行う。
+   */
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
   ) => {
-    finishDrawing(event);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      appendStrokeSamples(canvas, event);
+    }
+    finishDrawing(event, { export: true });
   };
 
-  const handlePointerLeave: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
-    finishDrawing(event);
+  const handleLostPointerCapture: React.PointerEventHandler<
+    HTMLCanvasElement
+  > = (event) => {
+    // On Safari/iPad, capture can be lost before pointerup; finalize safely.
+    finishDrawing(event, { export: true });
   };
 
   const handleClear = () => {
@@ -467,41 +672,81 @@ export function HandwritingCanvas({
       <div ref={wrapperRef} className={canvasWrapperClass}>
         <div className={toolbarClass} role="toolbar" aria-label="手書きツール">
           <div className="flex items-center gap-0.5 border-r border-slate-200 pr-2">
-            <button
-              type="button"
-              className={toolBtnClass(tool === "pen")}
-              onClick={() => setTool("pen")}
-              disabled={disabled}
-              aria-label="ペン"
-              aria-pressed={tool === "pen"}
-            >
-              ペン
-            </button>
-            <button
-              type="button"
-              className={toolBtnClass(tool === "eraser")}
-              onClick={() => setTool("eraser")}
-              disabled={disabled}
-              aria-label="消しゴム"
-              aria-pressed={tool === "eraser"}
-            >
-              消しゴム
-            </button>
+            {tool === "pen" ? (
+              <button
+                type="button"
+                className={toolBtnClass(true)}
+                onClick={() => setTool("pen")}
+                disabled={disabled}
+                aria-label="ペン"
+                aria-pressed="true"
+              >
+                ペン
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={toolBtnClass(false)}
+                onClick={() => setTool("pen")}
+                disabled={disabled}
+                aria-label="ペン"
+                aria-pressed="false"
+              >
+                ペン
+              </button>
+            )}
+            {tool === "eraser" ? (
+              <button
+                type="button"
+                className={toolBtnClass(true)}
+                onClick={() => setTool("eraser")}
+                disabled={disabled}
+                aria-label="消しゴム"
+                aria-pressed="true"
+              >
+                消しゴム
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={toolBtnClass(false)}
+                onClick={() => setTool("eraser")}
+                disabled={disabled}
+                aria-label="消しゴム"
+                aria-pressed="false"
+              >
+                消しゴム
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-0.5">
-            {(["s", "m", "l"] as const).map((size) => (
-              <button
-                key={size}
-                type="button"
-                className={toolBtnClass(penSize === size)}
-                onClick={() => setPenSize(size)}
-                disabled={disabled}
-                aria-label={PEN_SIZE_ARIA_LABELS[size]}
-                aria-pressed={penSize === size}
-              >
-                {PEN_SIZE_LABELS[size]}
-              </button>
-            ))}
+            {(["s", "m", "l"] as const).map((size) =>
+              penSize === size ? (
+                <button
+                  key={size}
+                  type="button"
+                  className={toolBtnClass(true)}
+                  onClick={() => setPenSize(size)}
+                  disabled={disabled}
+                  aria-label={PEN_SIZE_ARIA_LABELS[size]}
+                  aria-pressed="true"
+                >
+                  {PEN_SIZE_LABELS[size]}
+                </button>
+              ) : (
+                <button
+                  key={size}
+                  type="button"
+                  className={toolBtnClass(false)}
+                  onClick={() => setPenSize(size)}
+                  disabled={disabled}
+                  aria-label={PEN_SIZE_ARIA_LABELS[size]}
+                  aria-pressed="false"
+                >
+                  {PEN_SIZE_LABELS[size]}
+                </button>
+              ),
+            )}
           </div>
         </div>
         <canvas
@@ -510,7 +755,7 @@ export function HandwritingCanvas({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          onPointerLeave={handlePointerLeave}
+          onLostPointerCapture={handleLostPointerCapture}
           onContextMenu={(e) => {
             e.preventDefault();
           }}
