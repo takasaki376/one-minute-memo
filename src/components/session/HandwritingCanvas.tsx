@@ -478,7 +478,17 @@ export function HandwritingCanvas({
     snapshotCtx.drawImage(canvas, 0, 0);
     beforeStrokeCanvasRef.current = snapshot;
 
-    canvas.setPointerCapture(event.pointerId);
+    // iPad Safari + Apple Pencil の既知バグ:
+    // pen / touch に対して setPointerCapture を呼ぶと即座に pointercancel が発火し、
+    // recovery → setPointerCapture → pointercancel の無限ループになる。
+    // マウスのみ setPointerCapture を使い、pen / touch はブラウザのデフォルト配送に委ねる。
+    if (event.nativeEvent.pointerType === "mouse") {
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // noop
+      }
+    }
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
 
