@@ -675,7 +675,11 @@ export function HandwritingCanvas({
   const handleLostPointerCapture: React.PointerEventHandler<
     HTMLCanvasElement
   > = (event) => {
-    // On Safari/iPad, capture can be lost before pointerup; finalize safely.
+    // pen/touch では setPointerCapture を呼ばないため、本来 lostpointercapture は発火しない。
+    // しかし iOS Safari は暗黙的にキャプチャし、前ストロークの lostpointercapture を
+    // 遅延発火させることがある。Apple Pencil は常に同じ pointerId を使うため、
+    // 遅延発火が次ストロークを中断させる。pen/touch では lostpointercapture を無視する。
+    if (event.nativeEvent.pointerType !== "mouse") return;
     finishDrawing(event, { export: true });
   };
 
