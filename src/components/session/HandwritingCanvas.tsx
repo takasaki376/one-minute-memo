@@ -31,7 +31,8 @@ function freehandOptions(penSize: PenSize, last: boolean): StrokeOptions {
     thinning: 0.65,
     smoothing: 0.65,
     streamline: 0.65,
-    simulatePressure: true,
+    // Prefer real stylus pressure when available.
+    simulatePressure: false,
     last,
   };
 }
@@ -182,6 +183,7 @@ export function HandwritingCanvas({
 
   useEffect(() => {
     mountedRef.current = true;
+    const pendingImages = pendingImagesRef.current;
 
     return () => {
       mountedRef.current = false;
@@ -189,12 +191,12 @@ export function HandwritingCanvas({
         cancelAnimationFrame(resizeRafIdRef.current);
         resizeRafIdRef.current = null;
       }
-      for (const img of pendingImagesRef.current) {
+      for (const img of pendingImages) {
         img.onload = null;
         img.onerror = null;
         img.src = "";
       }
-      pendingImagesRef.current.clear();
+      pendingImages.clear();
     };
   }, []);
 
@@ -381,7 +383,7 @@ export function HandwritingCanvas({
 
   const pointerPressure = (e: { pressure?: number }) => {
     const p = e.pressure;
-    if (typeof p === "number" && p > 0 && p <= 1) return p;
+    if (typeof p === "number" && p >= 0 && p <= 1) return p;
     return 0.5;
   };
 
@@ -434,15 +436,16 @@ export function HandwritingCanvas({
     const snapshotCanvas = beforeStrokeCanvasRef.current;
     if (!snapshotCanvas) return;
 
-    // drawImage は現在の transform の影響を受けるので、一度 identity に戻して device px で復元する
+    // Snapshot を復元（現在の transform 無視して device px で描画）
     const dpr = dprRef.current;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "source-over";
     ctx.drawImage(snapshotCanvas, 0, 0);
     ctx.restore();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    // ストロークを描画（論理座標系で）
     let points = strokePointsRef.current;
     if (points.length === 0) return;
     if (points.length === 1) {
@@ -450,10 +453,10 @@ export function HandwritingCanvas({
       points = [a, a];
     }
 
-    const outline = getStroke(points, freehandOptions(penSizeRef.current, last)) as [
-      number,
-      number,
-    ][];
+    const outline = getStroke(
+      points,
+      freehandOptions(penSizeRef.current, last),
+    ) as [number, number][];
     fillFreehandOutline(ctx, outline, toolRef.current);
   };
 
@@ -466,10 +469,7 @@ export function HandwritingCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.setPointerCapture(event.pointerId);
-    isDrawingRef.current = true;
-    activePointerIdRef.current = event.pointerId;
-
+    // Prepare snapshot first to avoid entering a partial drawing state.
     const snapshot = document.createElement("canvas");
     snapshot.width = canvas.width;
     snapshot.height = canvas.height;
@@ -477,6 +477,10 @@ export function HandwritingCanvas({
     if (!snapshotCtx) return;
     snapshotCtx.drawImage(canvas, 0, 0);
     beforeStrokeCanvasRef.current = snapshot;
+
+    canvas.setPointerCapture(event.pointerId);
+    isDrawingRef.current = true;
+    activePointerIdRef.current = event.pointerId;
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
@@ -583,8 +587,8 @@ export function HandwritingCanvas({
   const handleLostPointerCapture: React.PointerEventHandler<
     HTMLCanvasElement
   > = (event) => {
-    // 出力はせずに状態だけ戻す（ストローク中の取りこぼし対策）
-    finishDrawing(event, { export: false });
+    // On Safari/iPad, capture can be lost before pointerup; finalize safely.
+    finishDrawing(event, { export: true });
   };
 
   const handleClear = () => {
@@ -668,41 +672,81 @@ export function HandwritingCanvas({
       <div ref={wrapperRef} className={canvasWrapperClass}>
         <div className={toolbarClass} role="toolbar" aria-label="手書きツール">
           <div className="flex items-center gap-0.5 border-r border-slate-200 pr-2">
-            <button
-              type="button"
-              className={toolBtnClass(tool === "pen")}
-              onClick={() => setTool("pen")}
-              disabled={disabled}
-              aria-label="ペン"
-              aria-pressed={tool === "pen"}
-            >
-              ペン
-            </button>
-            <button
-              type="button"
-              className={toolBtnClass(tool === "eraser")}
-              onClick={() => setTool("eraser")}
-              disabled={disabled}
-              aria-label="消しゴム"
-              aria-pressed={tool === "eraser"}
-            >
-              消しゴム
-            </button>
+            {tool === "pen" ? (
+              <button
+                type="button"
+                className={toolBtnClass(true)}
+                onClick={() => setTool("pen")}
+                disabled={disabled}
+                aria-label="ペン"
+                aria-pressed="true"
+              >
+                ペン
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={toolBtnClass(false)}
+                onClick={() => setTool("pen")}
+                disabled={disabled}
+                aria-label="ペン"
+                aria-pressed="false"
+              >
+                ペン
+              </button>
+            )}
+            {tool === "eraser" ? (
+              <button
+                type="button"
+                className={toolBtnClass(true)}
+                onClick={() => setTool("eraser")}
+                disabled={disabled}
+                aria-label="消しゴム"
+                aria-pressed="true"
+              >
+                消しゴム
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={toolBtnClass(false)}
+                onClick={() => setTool("eraser")}
+                disabled={disabled}
+                aria-label="消しゴム"
+                aria-pressed="false"
+              >
+                消しゴム
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-0.5">
-            {(["s", "m", "l"] as const).map((size) => (
-              <button
-                key={size}
-                type="button"
-                className={toolBtnClass(penSize === size)}
-                onClick={() => setPenSize(size)}
-                disabled={disabled}
-                aria-label={PEN_SIZE_ARIA_LABELS[size]}
-                aria-pressed={penSize === size}
-              >
-                {PEN_SIZE_LABELS[size]}
-              </button>
-            ))}
+            {(["s", "m", "l"] as const).map((size) =>
+              penSize === size ? (
+                <button
+                  key={size}
+                  type="button"
+                  className={toolBtnClass(true)}
+                  onClick={() => setPenSize(size)}
+                  disabled={disabled}
+                  aria-label={PEN_SIZE_ARIA_LABELS[size]}
+                  aria-pressed="true"
+                >
+                  {PEN_SIZE_LABELS[size]}
+                </button>
+              ) : (
+                <button
+                  key={size}
+                  type="button"
+                  className={toolBtnClass(false)}
+                  onClick={() => setPenSize(size)}
+                  disabled={disabled}
+                  aria-label={PEN_SIZE_ARIA_LABELS[size]}
+                  aria-pressed="false"
+                >
+                  {PEN_SIZE_LABELS[size]}
+                </button>
+              ),
+            )}
           </div>
         </div>
         <canvas
