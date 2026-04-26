@@ -380,7 +380,7 @@ export function HandwritingCanvas({
     };
   };
 
-  const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const getCanvasPos = (event: PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     return getCanvasPosFromClient(canvas, event.clientX, event.clientY);
@@ -394,12 +394,11 @@ export function HandwritingCanvas({
 
   const appendStrokeSamples = (
     canvas: HTMLCanvasElement,
-    event: React.PointerEvent<HTMLCanvasElement>,
+    event: PointerEvent,
   ) => {
-    const native = event.nativeEvent;
     const coalesced =
-      typeof native.getCoalescedEvents === "function"
-        ? native.getCoalescedEvents()
+      typeof event.getCoalescedEvents === "function"
+        ? event.getCoalescedEvents()
         : [];
     const samples: { clientX: number; clientY: number; pressure: number }[] =
       coalesced.length > 0
@@ -412,14 +411,14 @@ export function HandwritingCanvas({
             {
               clientX: event.clientX,
               clientY: event.clientY,
-              pressure: pointerPressure(event.nativeEvent),
+              pressure: pointerPressure(event),
             },
           ]
         : [
             {
               clientX: event.clientX,
               clientY: event.clientY,
-              pressure: pointerPressure(event.nativeEvent),
+              pressure: pointerPressure(event),
             },
           ];
 
@@ -465,12 +464,10 @@ export function HandwritingCanvas({
     fillFreehandOutline(ctx, outline, toolRef.current);
   };
 
-  const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
+  const handlePointerDown = (event: PointerEvent) => {
     if (disabled) return;
     // 再入防止: 描画中に別のポインター（指＋ペン等）の pointerdown が来ても無視する。
-    // 同じ pointerId の場合はそのまま処理（状態リセット後の recovery に使用）。
+    // 同じ pointerId の場合はそのまま処理。
     if (isDrawingRef.current && activePointerIdRef.current !== event.pointerId)
       return;
     const canvas = canvasRef.current;
@@ -491,7 +488,7 @@ export function HandwritingCanvas({
     // pen / touch に対して setPointerCapture を呼ぶと即座に pointercancel が発火し、
     // recovery → setPointerCapture → pointercancel の無限ループになる。
     // マウスのみ setPointerCapture を使い、pen / touch はブラウザのデフォルト配送に委ねる。
-    if (event.nativeEvent.pointerType === "mouse") {
+    if (event.pointerType === "mouse") {
       try {
         canvas.setPointerCapture(event.pointerId);
       } catch {
@@ -500,45 +497,24 @@ export function HandwritingCanvas({
     }
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
-    strokeStartTimeRef.current = event.nativeEvent.timeStamp;
+    strokeStartTimeRef.current = event.timeStamp;
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
-    strokePointsRef.current.push([
-      pos.x,
-      pos.y,
-      pointerPressure(event.nativeEvent),
-    ]);
+    strokePointsRef.current.push([pos.x, pos.y, pointerPressure(event)]);
 
     applyStrokeForTool(ctx, toolRef.current, penSizeRef.current);
 
     redrawCurrentStroke(ctx, canvas, false);
   };
 
-  const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
+  const handlePointerMove = (event: PointerEvent) => {
     if (disabled) return;
-
-    // iPad / Apple Pencil: pointerdown が届かなかった場合の回復処理。
-    // Safari では Apple Pencil の buttons が 0 になる既知バグがあるため、
-    // pressure > 0 を補完条件として接触を判定する。
-    if (!isDrawingRef.current) {
-      const native = event.nativeEvent;
-      const isContact =
-        native.buttons !== 0 ||
-        (native.pointerType !== "mouse" &&
-          typeof native.pressure === "number" &&
-          native.pressure > 0);
-      if (isContact) {
-        handlePointerDown(event);
-      }
-      return;
-    }
+    if (!isDrawingRef.current) return;
 
     if (activePointerIdRef.current !== event.pointerId) return;
     // マルチタッチ / ジェスチャーによる余計な move をガード（デモサイト準拠）
-    if (event.nativeEvent.buttons > 1) return;
+    if (event.buttons > 1) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -558,7 +534,7 @@ export function HandwritingCanvas({
   };
 
   const finishDrawing = (
-    event: React.PointerEvent<HTMLCanvasElement>,
+    event: PointerEvent,
     options?: { export?: boolean },
   ) => {
     if (!isDrawingRef.current) return;
@@ -616,16 +592,14 @@ export function HandwritingCanvas({
    * iOS Safari が前ストロークの lostpointercapture を遅延発火させるバグがあり、
    * pen/touch で処理すると次ストロークを誤って中断させるため。
    */
-  const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
+  const handlePointerUp = (event: PointerEvent) => {
     // iOS Safari は前ストロークの pointerup を遅延発火させることがある。
     // Apple Pencil は常に同じ pointerId を使うため、古い pointerup が
     // 現在の stroke2 を中断させる。タイムスタンプで除外する。
     if (
-      event.nativeEvent.pointerType !== "mouse" &&
+      event.pointerType !== "mouse" &&
       isDrawingRef.current &&
-      event.nativeEvent.timeStamp < strokeStartTimeRef.current
+      event.timeStamp < strokeStartTimeRef.current
     ) {
       return;
     }
@@ -641,15 +615,13 @@ export function HandwritingCanvas({
    * setPointerCapture 直後に iPad Safari が pointercancel を発火するケースへの対策。
    * 描画途中のストロークをスナップショットで巻き戻し、エクスポートは行わない。
    */
-  const handlePointerCancel: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
+  const handlePointerCancel = (event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
     // iOS Safari は前ストロークの pointercancel を遅延発火させることがある。
     // Apple Pencil は常に同じ pointerId を使うため、前ストロークの cancel が
     // 現在のストロークに一致してしまう。タイムスタンプで古い cancel を除外する。
-    if (event.nativeEvent.timeStamp < strokeStartTimeRef.current) {
+    if (event.timeStamp < strokeStartTimeRef.current) {
       return;
     }
     isDrawingRef.current = false;
@@ -696,16 +668,44 @@ export function HandwritingCanvas({
     }
   };
 
-  const handleLostPointerCapture: React.PointerEventHandler<
-    HTMLCanvasElement
-  > = (event) => {
+  const handleLostPointerCapture = (event: PointerEvent) => {
     // pen/touch では setPointerCapture を呼ばないため、本来 lostpointercapture は発火しない。
     // しかし iOS Safari は暗黙的にキャプチャし、前ストロークの lostpointercapture を
     // 遅延発火させることがある。Apple Pencil は常に同じ pointerId を使うため、
     // 遅延発火が次ストロークを中断させる。pen/touch では lostpointercapture を無視する。
-    if (event.nativeEvent.pointerType !== "mouse") return;
+    if (event.pointerType !== "mouse") return;
     finishDrawing(event, { export: true });
   };
+
+  // Pointer events は React 合成イベントを経由せず、canvas の native listener で処理する。
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || disabled) return;
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointercancel", handlePointerCancel);
+    canvas.addEventListener("lostpointercapture", handleLostPointerCapture);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointercancel", handlePointerCancel);
+      canvas.removeEventListener(
+        "lostpointercapture",
+        handleLostPointerCapture,
+      );
+    };
+  }, [
+    disabled,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+    handleLostPointerCapture,
+  ]);
 
   const handleClear = () => {
     const canvas = canvasRef.current;
@@ -868,11 +868,6 @@ export function HandwritingCanvas({
         </div>
         <canvas
           ref={canvasRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-          onLostPointerCapture={handleLostPointerCapture}
           onContextMenu={(e) => {
             e.preventDefault();
           }}

@@ -345,7 +345,7 @@ describe("HandwritingCanvas", () => {
       expect(onChange).not.toHaveBeenCalled();
     });
 
-    it("pointercancel 後の pointermove（buttons: 1）で recovery し描画が再開される", async () => {
+    it("pointercancel 後の pointermove（buttons: 1）では描画は再開されない", async () => {
       const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
       const canvas = getCanvas(container);
       setupCanvasForPointer(canvas);
@@ -368,8 +368,9 @@ describe("HandwritingCanvas", () => {
       });
 
       mockCtx.fill.mockClear();
+      mockCtx.drawImage.mockClear();
 
-      // キャンセル後に pointermove（buttons > 0）で recovery
+      // 2の適用後は recovery を行わないため、move だけでは描画が再開しない
       await act(async () => {
         fireEvent.pointerMove(canvas, {
           clientX: 20,
@@ -379,8 +380,8 @@ describe("HandwritingCanvas", () => {
         });
       });
 
-      // recovery で handlePointerDown が呼ばれ、ストロークの初期描画（fill）が実行される
-      expect(mockCtx.fill).toHaveBeenCalled();
+      expect(mockCtx.fill).not.toHaveBeenCalled();
+      expect(mockCtx.drawImage).not.toHaveBeenCalled();
     });
 
     it("pointercancel 後も pointerup では onChange が呼ばれない（cancel がストロークを確定させない）", async () => {
