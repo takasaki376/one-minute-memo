@@ -345,7 +345,10 @@ export function HandwritingCanvas({
     if (!canvas || disabled) return;
 
     const onPointerDownCapture = (e: PointerEvent) => {
-      if (e.pointerType === "touch" || e.pointerType === "pen") {
+      // pen には preventDefault() を呼ばない。
+      // touch-action: none で十分であり、pen で preventDefault() を呼ぶと
+      // Safari で後続の pointermove 配信に影響するケースがある。
+      if (e.pointerType === "touch") {
         e.preventDefault();
       }
     };
@@ -464,6 +467,8 @@ export function HandwritingCanvas({
     event,
   ) => {
     if (disabled) return;
+    // 再入防止: 描画中に別の pointerdown が来ても無視する
+    if (isDrawingRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -511,15 +516,24 @@ export function HandwritingCanvas({
     if (disabled) return;
 
     // iPad / Apple Pencil: pointerdown が届かなかった場合の回復処理。
-    // ペン・タッチが押下中（buttons !== 0）なのに描画中でない場合は pointerdown を再現する。
+    // Safari では Apple Pencil の buttons が 0 になる既知バグがあるため、
+    // pressure > 0 を補完条件として接触を判定する。
     if (!isDrawingRef.current) {
-      if (event.buttons !== 0) {
+      const native = event.nativeEvent;
+      const isContact =
+        native.buttons !== 0 ||
+        (native.pointerType !== "mouse" &&
+          typeof native.pressure === "number" &&
+          native.pressure > 0);
+      if (isContact) {
         handlePointerDown(event);
       }
       return;
     }
 
     if (activePointerIdRef.current !== event.pointerId) return;
+    // マルチタッチ / ジェスチャーによる余計な move をガード（デモサイト準拠）
+    if (event.nativeEvent.buttons > 1) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
