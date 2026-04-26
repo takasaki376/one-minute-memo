@@ -116,6 +116,8 @@ export function HandwritingCanvas({
   const strokeLastFlagRef = useRef(false);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
+  /** 現在ストロークの開始タイムスタンプ（event.timeStamp）— 遅延 pointercancel の検出に使用 */
+  const strokeStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
     penSizeRef.current = penSize;
@@ -496,6 +498,7 @@ export function HandwritingCanvas({
     }
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
+    strokeStartTimeRef.current = event.nativeEvent.timeStamp;
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
@@ -627,7 +630,12 @@ export function HandwritingCanvas({
   ) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
-
+    // iOS Safari は前ストロークの pointercancel を遅延発火させることがある。
+    // Apple Pencil は常に同じ pointerId を使うため、前ストロークの cancel が
+    // 現在のストロークに一致してしまう。タイムスタンプで古い cancel を除外する。
+    if (event.nativeEvent.timeStamp < strokeStartTimeRef.current) {
+      return;
+    }
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
 
