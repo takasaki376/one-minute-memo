@@ -469,8 +469,10 @@ export function HandwritingCanvas({
     event,
   ) => {
     if (disabled) return;
-    // 再入防止: 描画中に別の pointerdown が来ても無視する
-    if (isDrawingRef.current) return;
+    // 再入防止: 描画中に別のポインター（指＋ペン等）の pointerdown が来ても無視する。
+    // 同じ pointerId の場合はそのまま処理（状態リセット後の recovery に使用）。
+    if (isDrawingRef.current && activePointerIdRef.current !== event.pointerId)
+      return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -608,7 +610,11 @@ export function HandwritingCanvas({
   /**
    * ストローク終了に pointerleave は使わない。
    * iPad Safari では leave / up の順序や余計な leave が連続ストロークの pointerdown を阻害することがある。
-   * lostpointercapture は「描画の確定」には使わず、取りこぼし対策として状態リセットのみ行う。
+   *
+   * lostpointercapture はマウスのみ処理し、ストローク確定（エクスポートあり）に使う。
+   * pen/touch では setPointerCapture を呼ばないため除外する。
+   * iOS Safari が前ストロークの lostpointercapture を遅延発火させるバグがあり、
+   * pen/touch で処理すると次ストロークを誤って中断させるため。
    */
   const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
     event,
