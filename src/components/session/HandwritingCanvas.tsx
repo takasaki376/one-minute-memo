@@ -3,6 +3,8 @@
 import type React from "react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import cc from "classcat";
+import getStroke from "perfect-freehand";
+import type { StrokeOptions } from "perfect-freehand";
 
 const PEN_WIDTHS = { s: 2, m: 4, l: 8 } as const;
 export type PenSize = keyof typeof PEN_WIDTHS;
@@ -21,6 +23,65 @@ const PEN_SIZE_ARIA_LABELS: Record<PenSize, string> = {
 
 const PEN_STROKE_COLOR = "#111827";
 const ERASER_STROKE_COLOR = "rgba(0,0,0,1)";
+const ERASER_PREVIEW_COLOR = "rgba(248,113,113,0.35)";
+
+function freehandOptions(penSize: PenSize, last: boolean): StrokeOptions {
+  const w = PEN_WIDTHS[penSize];
+  return {
+    size: Math.max(6, w * 2 + 4),
+    thinning: 0.65,
+    smoothing: 0.65,
+    streamline: 0.65,
+    // Prefer real stylus pressure when available.
+    simulatePressure: false,
+    last,
+  };
+}
+
+const average = (a: number, b: number) => (a + b) / 2;
+
+function getSvgPathFromStroke(points: [number, number][], closed = true) {
+  const len = points.length;
+
+  if (len < 4) return "";
+
+  let a = points[0];
+  let b = points[1];
+  const c = points[2];
+
+  let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
+    2,
+  )},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(
+    b[1],
+    c[1],
+  ).toFixed(2)} T`;
+
+  for (let i = 2, max = len - 1; i < max; i++) {
+    a = points[i];
+    b = points[i + 1];
+    result += `${average(a[0], b[0]).toFixed(2)},${average(
+      a[1],
+      b[1],
+    ).toFixed(2)} `;
+  }
+
+  if (closed) result += "Z";
+
+  return result;
+}
+
+function getRenderableStrokePoints(points: number[][]) {
+  if (points.length !== 1) return points;
+  const a = points[0];
+  return [a, a];
+}
+
+function getFreehandOutline(points: number[][], penSize: PenSize, last: boolean) {
+  return getStroke(
+    getRenderableStrokePoints(points),
+    freehandOptions(penSize, last),
+  ) as [number, number][];
+}
 
 /**
  * 線の見た目（結合・端・太さ・合成・色）を一箇所で設定する。
@@ -50,7 +111,12 @@ export interface HandwritingCanvasProps {
   className?: string;
 }
 
-export function HandwritingCanvas({
+type SvgStroke = {
+  d: string;
+  tool: "pen" | "eraser";
+};
+
+function PerfectFreehandCanvas({
   value,
   onChange,
   disabled = false,
@@ -58,11 +124,22 @@ export function HandwritingCanvas({
 }: HandwritingCanvasProps) {
   const [penSize, setPenSize] = useState<PenSize>("m");
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const [svgViewBoxSize, setSvgViewBoxSize] = useState({
+    width: 1,
+    height: 1,
+  });
+  const penSizeRef = useRef<PenSize>("m");
+  const toolRef = useRef<"pen" | "eraser">("pen");
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const committedStrokeLayerRef = useRef<SVGGElement | null>(null);
+  const activeStrokePathRef = useRef<SVGPathElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
+  const activeStrokeStartTimeRef = useRef(0);
   const logicalSizeRef = useRef({ width: 0, height: 0 });
+  const dprRef = useRef(1);
   const latestValueRef = useRef<string | null | undefined>(value);
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
   const mountedRef = useRef(true);
@@ -70,13 +147,35 @@ export function HandwritingCanvas({
   const resizeRafIdRef = useRef<number | null>(null);
   const pendingResizeRef = useRef(false);
   const resizeFnRef = useRef<(() => void) | null>(null);
+  /** perfect-freehand 用: 現在ストロークの [x, y, pressure?]（論理座標） */
+  const strokePointsRef = useRef<number[][]>([]);
+  const pendingSvgStrokesRef = useRef<SvgStroke[]>([]);
+  const exportTimerIdRef = useRef<number | null>(null);
+  const latestExportRequestIdRef = useRef(0);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
+  useEffect(() => {
+    penSizeRef.current = penSize;
+  }, [penSize]);
+
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
+
+  const selectPenSize = useCallback((nextPenSize: PenSize) => {
+    penSizeRef.current = nextPenSize;
+    setPenSize(nextPenSize);
+  }, []);
+
+  const selectTool = useCallback((nextTool: "pen" | "eraser") => {
+    toolRef.current = nextTool;
+    setTool(nextTool);
+  }, []);
 
   /** 画像読み込み後・クリア後・ストローク終了後など「ペンで書き足せる状態」に戻す */
   const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
-    applyStrokeForTool(ctx, "pen", penSize);
-  }, [penSize]);
+    applyStrokeForTool(ctx, "pen", penSizeRef.current);
+  }, []);
 
   const clearCanvas = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -131,6 +230,7 @@ export function HandwritingCanvas({
 
   useEffect(() => {
     mountedRef.current = true;
+    const pendingImages = pendingImagesRef.current;
 
     return () => {
       mountedRef.current = false;
@@ -138,12 +238,16 @@ export function HandwritingCanvas({
         cancelAnimationFrame(resizeRafIdRef.current);
         resizeRafIdRef.current = null;
       }
-      for (const img of pendingImagesRef.current) {
+      if (exportTimerIdRef.current !== null) {
+        window.clearTimeout(exportTimerIdRef.current);
+        exportTimerIdRef.current = null;
+      }
+      for (const img of pendingImages) {
         img.onload = null;
         img.onerror = null;
         img.src = "";
       }
-      pendingImagesRef.current.clear();
+      pendingImages.clear();
     };
   }, []);
 
@@ -158,6 +262,9 @@ export function HandwritingCanvas({
     if (!value) {
       pendingLocalExportRef.current = false;
       latestCanvasDataUrlRef.current = null;
+      pendingSvgStrokesRef.current = [];
+      committedStrokeLayerRef.current?.replaceChildren();
+      activeStrokePathRef.current?.setAttribute("d", "");
       clearCanvas(ctx);
       return;
     }
@@ -172,6 +279,9 @@ export function HandwritingCanvas({
 
     pendingLocalExportRef.current = false;
     latestCanvasDataUrlRef.current = value;
+    pendingSvgStrokesRef.current = [];
+    committedStrokeLayerRef.current?.replaceChildren();
+    activeStrokePathRef.current?.setAttribute("d", "");
     drawDataUrl(ctx, value);
   }, [drawDataUrl, clearCanvas, value]);
 
@@ -191,6 +301,7 @@ export function HandwritingCanvas({
       const displayHeight = Math.max(1, wrapper.clientHeight);
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      dprRef.current = dpr;
 
       const prevLogical = logicalSizeRef.current;
 
@@ -223,6 +334,7 @@ export function HandwritingCanvas({
       const prevH = prevLogical.height;
 
       logicalSizeRef.current = { width: displayWidth, height: displayHeight };
+      setSvgViewBoxSize({ width: displayWidth, height: displayHeight });
 
       canvas.style.width = `${displayWidth}px`;
       canvas.style.height = `${displayHeight}px`;
@@ -285,76 +397,167 @@ export function HandwritingCanvas({
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
 
-  const getCanvasPos = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+  const getCanvasPosFromClient = useCallback((
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number,
+  ) => {
     const rect = canvas.getBoundingClientRect();
     const { width: logicalWidth, height: logicalHeight } =
       logicalSizeRef.current;
     const scaleX = logicalWidth / rect.width;
     const scaleY = logicalHeight / rect.height;
     return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
-  };
+  }, []);
 
-  const lastPosRef = useRef({ x: 0, y: 0 });
+  const getCanvasPos = useCallback((event: PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    return getCanvasPosFromClient(canvas, event.clientX, event.clientY);
+  }, [getCanvasPosFromClient]);
 
-  const handlePointerDown: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
+  const pointerPressure = useCallback((e: { pressure?: number }) => {
+    const p = e.pressure;
+    if (typeof p === "number" && p >= 0 && p <= 1) return p;
+    return 0.5;
+  }, []);
+
+  const appendStrokeSamples = useCallback((
+    canvas: HTMLCanvasElement,
+    event: PointerEvent,
   ) => {
-    if (disabled) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const coalesced =
+      typeof event.getCoalescedEvents === "function"
+        ? event.getCoalescedEvents()
+        : [];
+    const samples: { clientX: number; clientY: number; pressure: number }[] =
+      coalesced.length > 0
+        ? [
+            ...coalesced.map((e) => ({
+              clientX: e.clientX,
+              clientY: e.clientY,
+              pressure: pointerPressure(e),
+            })),
+            {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              pressure: pointerPressure(event),
+            },
+          ]
+        : [
+            {
+              clientX: event.clientX,
+              clientY: event.clientY,
+              pressure: pointerPressure(event),
+            },
+          ];
 
-    canvas.setPointerCapture(event.pointerId);
-    isDrawingRef.current = true;
-
-    applyStrokeForTool(ctx, tool, penSize);
-
-    const pos = getCanvasPos(event);
-    lastPosRef.current = pos;
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-  };
-
-  const handlePointerMove: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
-    if (!isDrawingRef.current) return;
-    if (disabled) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    applyStrokeForTool(ctx, tool, penSize);
-
-    const pos = getCanvasPos(event);
-    ctx.beginPath();
-    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    lastPosRef.current = pos;
-  };
-
-  const finishDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    isDrawingRef.current = false;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    try {
-      canvas.releasePointerCapture(event.pointerId);
-    } catch {
-      // noop
+    for (const sample of samples) {
+      const pos = getCanvasPosFromClient(
+        canvas,
+        sample.clientX,
+        sample.clientY,
+      );
+      strokePointsRef.current.push([pos.x, pos.y, sample.pressure]);
     }
+  }, [getCanvasPosFromClient, pointerPressure]);
+
+  const updateActiveStrokePath = useCallback((last: boolean) => {
+    const outline = getFreehandOutline(
+      strokePointsRef.current,
+      penSizeRef.current,
+      last,
+    );
+    activeStrokePathRef.current?.setAttribute(
+      "d",
+      getSvgPathFromStroke(outline),
+    );
+  }, []);
+
+  const clearActiveStrokePath = useCallback(() => {
+    activeStrokePathRef.current?.setAttribute("d", "");
+  }, []);
+
+  const applyActiveStrokeStyle = useCallback((nextTool: "pen" | "eraser") => {
+    const path = activeStrokePathRef.current;
+    if (!path) return;
+
+    path.setAttribute(
+      "fill",
+      nextTool === "eraser" ? ERASER_PREVIEW_COLOR : PEN_STROKE_COLOR,
+    );
+    path.setAttribute("stroke", "transparent");
+    path.setAttribute("stroke-width", "0");
+  }, []);
+
+  const appendCommittedSvgStroke = useCallback((stroke: SvgStroke) => {
+    if (!stroke.d) return;
+
+    pendingSvgStrokesRef.current.push(stroke);
+
+    const layer = committedStrokeLayerRef.current;
+    if (!layer) return;
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", stroke.d);
+    path.setAttribute(
+      "fill",
+      stroke.tool === "eraser" ? ERASER_PREVIEW_COLOR : PEN_STROKE_COLOR,
+    );
+    path.setAttribute("stroke", "transparent");
+    path.setAttribute("stroke-width", "0");
+    layer.appendChild(path);
+  }, []);
+
+  const commitCurrentStrokeToSvg = useCallback(() => {
+    const outline = getFreehandOutline(
+      strokePointsRef.current,
+      penSizeRef.current,
+      true,
+    );
+    appendCommittedSvgStroke({
+      d: getSvgPathFromStroke(outline),
+      tool: toolRef.current,
+    });
+  }, [appendCommittedSvgStroke]);
+
+  const clearCommittedSvgStrokes = useCallback(() => {
+    pendingSvgStrokesRef.current = [];
+    committedStrokeLayerRef.current?.replaceChildren();
+  }, []);
+
+  const flushCommittedSvgStrokesToCanvas = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const strokes = pendingSvgStrokesRef.current;
+      if (strokes.length === 0) return;
+      if (typeof Path2D === "undefined") return;
+
+      for (const stroke of strokes) {
+        const path = new Path2D(stroke.d);
+        ctx.globalCompositeOperation =
+          stroke.tool === "eraser" ? "destination-out" : "source-over";
+        ctx.fillStyle =
+          stroke.tool === "eraser" ? ERASER_STROKE_COLOR : PEN_STROKE_COLOR;
+        ctx.fill(path);
+      }
+
+      clearCommittedSvgStrokes();
+      applyCanvasStyle(ctx);
+    },
+    [applyCanvasStyle, clearCommittedSvgStrokes],
+  );
+
+  const exportCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || isDrawingRef.current) return false;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
 
     try {
+      flushCommittedSvgStrokesToCanvas(ctx);
       const dataUrl = canvas.toDataURL("image/png");
       pendingLocalExportRef.current = true;
       latestCanvasDataUrlRef.current = dataUrl;
@@ -363,7 +566,159 @@ export function HandwritingCanvas({
       console.error("Failed to export canvas as dataURL", e);
     }
 
+    return true;
+  }, [flushCommittedSvgStrokesToCanvas, onChange]);
+
+  const scheduleExport = useCallback(() => {
+    latestExportRequestIdRef.current += 1;
+    const requestId = latestExportRequestIdRef.current;
+
+    if (exportTimerIdRef.current !== null) {
+      window.clearTimeout(exportTimerIdRef.current);
+    }
+
+    const runExport = () => {
+      exportTimerIdRef.current = null;
+      if (requestId !== latestExportRequestIdRef.current) return;
+      if (isDrawingRef.current) {
+        exportTimerIdRef.current = window.setTimeout(runExport, 120);
+        return;
+      }
+      exportCanvas();
+    };
+
+    exportTimerIdRef.current = window.setTimeout(runExport, 120);
+  }, [exportCanvas]);
+
+  const handlePointerDown = useCallback((event: PointerEvent) => {
+    if (disabled) return;
+    event.preventDefault();
+
+    if (isDrawingRef.current) {
+      if (strokePointsRef.current.length > 0) {
+        commitCurrentStrokeToSvg();
+      }
+      isDrawingRef.current = false;
+      activePointerIdRef.current = null;
+      strokePointsRef.current = [];
+      clearActiveStrokePath();
+      scheduleExport();
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    isDrawingRef.current = true;
+    activePointerIdRef.current = event.pointerId;
+    activeStrokeStartTimeRef.current = event.timeStamp;
+    applyActiveStrokeStyle(toolRef.current);
+
+    strokePointsRef.current = [];
+    const pos = getCanvasPos(event);
+    strokePointsRef.current.push([pos.x, pos.y, pointerPressure(event)]);
+
+    applyStrokeForTool(ctx, toolRef.current, penSizeRef.current);
+    updateActiveStrokePath(false);
+  }, [
+    clearActiveStrokePath,
+    applyActiveStrokeStyle,
+    commitCurrentStrokeToSvg,
+    disabled,
+    getCanvasPos,
+    pointerPressure,
+    scheduleExport,
+    updateActiveStrokePath,
+  ]);
+
+  const handlePointerMove = useCallback((event: PointerEvent) => {
+    if (disabled) return;
+    if (!isDrawingRef.current) return;
+
+    if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
+    event.preventDefault();
+    // perfect-freehand のデモと同じく、複数ボタン操作だけを除外する。
+    // iPad / Apple Pencil では buttons が 0 になる move があり、厳密な === 1 判定だと点を落とす。
+    if (event.buttons > 1) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    appendStrokeSamples(canvas, event);
+    updateActiveStrokePath(false);
+  }, [appendStrokeSamples, disabled, updateActiveStrokePath]);
+
+  const finishDrawing = useCallback((
+    event: PointerEvent,
+    options?: { export?: boolean },
+  ) => {
+    if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
+    isDrawingRef.current = false;
+    activePointerIdRef.current = null;
+    const ctx = canvasRef.current?.getContext("2d");
+    if (ctx) {
+      applyCanvasStyle(ctx);
+    }
+
+    commitCurrentStrokeToSvg();
+    strokePointsRef.current = [];
+    clearActiveStrokePath();
+
+    if (options?.export !== false) {
+      scheduleExport();
+    }
+
+    if (pendingResizeRef.current) {
+      pendingResizeRef.current = false;
+      resizeFnRef.current?.();
+    }
+  }, [
+    applyCanvasStyle,
+    clearActiveStrokePath,
+    commitCurrentStrokeToSvg,
+    scheduleExport,
+  ]);
+
+  /**
+   * ストローク終了に pointerleave は使わない。
+   * iPad Safari では leave / up の順序や余計な leave が連続ストロークの pointerdown を阻害することがある。
+   *
+   * lostpointercapture はマウスのみ処理し、ストローク確定（エクスポートあり）に使う。
+   * pen/touch では setPointerCapture を呼ばないため除外する。
+   * iOS Safari が前ストロークの lostpointercapture を遅延発火させるバグがあり、
+   * pen/touch で処理すると次ストロークを誤って中断させるため。
+   */
+  const handlePointerUp = useCallback((event: PointerEvent) => {
+    if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
+    event.preventDefault();
+    const canvas = canvasRef.current;
+    if (canvas) {
+      appendStrokeSamples(canvas, event);
+    }
+    finishDrawing(event, { export: true });
+  }, [appendStrokeSamples, finishDrawing]);
+
+  /**
+   * pointercancel: ブラウザやシステムがポインターを強制終了した場合。
+   * 描画中の SVG ストロークだけを破棄し、Canvas への確定とエクスポートは行わない。
+   */
+  const handlePointerCancel = useCallback((event: PointerEvent) => {
+    if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
+    event.preventDefault();
+    isDrawingRef.current = false;
+    activePointerIdRef.current = null;
+    const canvas = canvasRef.current;
+    strokePointsRef.current = [];
+    clearActiveStrokePath();
+
+    const ctx = canvas?.getContext("2d");
     if (ctx) {
       applyCanvasStyle(ctx);
     }
@@ -372,19 +727,52 @@ export function HandwritingCanvas({
       pendingResizeRef.current = false;
       resizeFnRef.current?.();
     }
-  };
+  }, [applyCanvasStyle, clearActiveStrokePath]);
 
-  const handlePointerUp: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
-    finishDrawing(event);
-  };
+  // Pointer events は React 合成イベントを経由せず、canvas の native listener で処理する。
+  // perfect-freehand のデモと同じ入力モデルに寄せ、pointer capture / lostpointercapture には依存しない。
+  // iPad Safari では前ストロークの lostpointercapture が次ストローク開始後に遅延発火し、
+  // 同じ pointerId の新しいストロークを終了させることがある。
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || disabled) return;
+    const preventTouchDefault = (event: TouchEvent) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    };
+    const touchOptions: AddEventListenerOptions = { passive: false };
 
-  const handlePointerLeave: React.PointerEventHandler<HTMLCanvasElement> = (
-    event,
-  ) => {
-    finishDrawing(event);
-  };
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointercancel", handlePointerCancel);
+    canvas.addEventListener("touchstart", preventTouchDefault, touchOptions);
+    canvas.addEventListener("touchmove", preventTouchDefault, touchOptions);
+    canvas.addEventListener("touchend", preventTouchDefault, touchOptions);
+    canvas.addEventListener("touchcancel", preventTouchDefault, touchOptions);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointercancel", handlePointerCancel);
+      canvas.removeEventListener("touchstart", preventTouchDefault);
+      canvas.removeEventListener("touchmove", preventTouchDefault);
+      canvas.removeEventListener("touchend", preventTouchDefault);
+      canvas.removeEventListener("touchcancel", preventTouchDefault);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+    };
+  }, [
+    disabled,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+  ]);
 
   const handleClear = () => {
     const canvas = canvasRef.current;
@@ -406,6 +794,8 @@ export function HandwritingCanvas({
     );
     applyCanvasStyle(ctx);
 
+    clearActiveStrokePath();
+    clearCommittedSvgStrokes();
     pendingLocalExportRef.current = false;
     latestCanvasDataUrlRef.current = null;
     onChange?.(null);
@@ -423,6 +813,7 @@ export function HandwritingCanvas({
     "border-slate-300",
     "bg-white",
     "select-none",
+    "touch-none",
     "[-webkit-touch-callout:none]",
     disabled && "opacity-70",
   ]);
@@ -464,58 +855,122 @@ export function HandwritingCanvas({
 
   return (
     <div className={containerClass}>
-      <div ref={wrapperRef} className={canvasWrapperClass}>
+      <div
+        ref={wrapperRef}
+        className={canvasWrapperClass}
+        style={{
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+        }}
+      >
         <div className={toolbarClass} role="toolbar" aria-label="手書きツール">
           <div className="flex items-center gap-0.5 border-r border-slate-200 pr-2">
-            <button
-              type="button"
-              className={toolBtnClass(tool === "pen")}
-              onClick={() => setTool("pen")}
-              disabled={disabled}
-              aria-label="ペン"
-              aria-pressed={tool === "pen"}
-            >
-              ペン
-            </button>
-            <button
-              type="button"
-              className={toolBtnClass(tool === "eraser")}
-              onClick={() => setTool("eraser")}
-              disabled={disabled}
-              aria-label="消しゴム"
-              aria-pressed={tool === "eraser"}
-            >
-              消しゴム
-            </button>
+            {tool === "pen" ? (
+              <button
+                type="button"
+                className={toolBtnClass(true)}
+                onClick={() => selectTool("pen")}
+                disabled={disabled}
+                aria-label="ペン"
+                aria-pressed="true"
+              >
+                ペン
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={toolBtnClass(false)}
+                onClick={() => selectTool("pen")}
+                disabled={disabled}
+                aria-label="ペン"
+                aria-pressed="false"
+              >
+                ペン
+              </button>
+            )}
+            {tool === "eraser" ? (
+              <button
+                type="button"
+                className={toolBtnClass(true)}
+                onClick={() => selectTool("eraser")}
+                disabled={disabled}
+                aria-label="消しゴム"
+                aria-pressed="true"
+              >
+                消しゴム
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={toolBtnClass(false)}
+                onClick={() => selectTool("eraser")}
+                disabled={disabled}
+                aria-label="消しゴム"
+                aria-pressed="false"
+              >
+                消しゴム
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-0.5">
-            {(["s", "m", "l"] as const).map((size) => (
-              <button
-                key={size}
-                type="button"
-                className={toolBtnClass(penSize === size)}
-                onClick={() => setPenSize(size)}
-                disabled={disabled}
-                aria-label={PEN_SIZE_ARIA_LABELS[size]}
-                aria-pressed={penSize === size}
-              >
-                {PEN_SIZE_LABELS[size]}
-              </button>
-            ))}
+            {(["s", "m", "l"] as const).map((size) =>
+              penSize === size ? (
+                <button
+                  key={size}
+                  type="button"
+                  className={toolBtnClass(true)}
+                  onClick={() => selectPenSize(size)}
+                  disabled={disabled}
+                  aria-label={PEN_SIZE_ARIA_LABELS[size]}
+                  aria-pressed="true"
+                >
+                  {PEN_SIZE_LABELS[size]}
+                </button>
+              ) : (
+                <button
+                  key={size}
+                  type="button"
+                  className={toolBtnClass(false)}
+                  onClick={() => selectPenSize(size)}
+                  disabled={disabled}
+                  aria-label={PEN_SIZE_ARIA_LABELS[size]}
+                  aria-pressed="false"
+                >
+                  {PEN_SIZE_LABELS[size]}
+                </button>
+              ),
+            )}
           </div>
         </div>
         <canvas
           ref={canvasRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          onPointerLeave={handlePointerLeave}
           onContextMenu={(e) => {
             e.preventDefault();
           }}
           className={canvasClass}
+          style={{
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
         />
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[1] h-full w-full touch-none select-none"
+          style={{
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
+          viewBox={`0 0 ${svgViewBoxSize.width} ${svgViewBoxSize.height}`}
+          preserveAspectRatio="none"
+        >
+          <g ref={committedStrokeLayerRef} />
+          <path
+            ref={activeStrokePathRef}
+          />
+        </svg>
       </div>
       <button
         type="button"
@@ -527,4 +982,8 @@ export function HandwritingCanvas({
       </button>
     </div>
   );
+}
+
+export function HandwritingCanvas(props: HandwritingCanvasProps) {
+  return <PerfectFreehandCanvas {...props} />;
 }
