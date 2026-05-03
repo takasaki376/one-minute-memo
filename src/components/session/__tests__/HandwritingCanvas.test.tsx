@@ -220,6 +220,92 @@ describe("HandwritingCanvas", () => {
     expect(mockCtx.fill).toHaveBeenCalled();
   });
 
+  it("pointermove は Apple Pencil 対策として buttons: 0 でも描画を継続する", async () => {
+    const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
+    const canvas = getCanvas(container);
+    setupCanvasForPointer(canvas);
+
+    await act(async () => {
+      fireEvent.pointerDown(canvas, {
+        clientX: 10,
+        clientY: 10,
+        pointerId: 10,
+        buttons: 1,
+      });
+    });
+
+    mockCtx.drawImage.mockClear();
+    mockCtx.fill.mockClear();
+
+    await act(async () => {
+      fireEvent.pointerMove(canvas, {
+        clientX: 20,
+        clientY: 20,
+        pointerId: 10,
+        buttons: 0,
+      });
+    });
+
+    expect(mockCtx.drawImage).toHaveBeenCalled();
+    expect(mockCtx.fill).toHaveBeenCalled();
+  });
+
+  it("前ストローク由来の lostpointercapture が遅延発火しても次ストロークを終了しない", async () => {
+    const onChange = vi.fn();
+    const { container } = render(<HandwritingCanvas onChange={onChange} />);
+    const canvas = getCanvas(container);
+    setupCanvasForPointer(canvas);
+
+    await act(async () => {
+      fireEvent.pointerDown(canvas, {
+        clientX: 10,
+        clientY: 10,
+        pointerId: 1,
+        buttons: 1,
+      });
+      fireEvent.pointerUp(canvas, {
+        clientX: 10,
+        clientY: 10,
+        pointerId: 1,
+        buttons: 0,
+      });
+    });
+
+    onChange.mockClear();
+
+    await act(async () => {
+      fireEvent.pointerDown(canvas, {
+        clientX: 20,
+        clientY: 20,
+        pointerId: 1,
+        buttons: 1,
+      });
+      fireEvent(
+        canvas,
+        new Event("lostpointercapture", { bubbles: true }),
+      );
+      fireEvent.pointerMove(canvas, {
+        clientX: 30,
+        clientY: 30,
+        pointerId: 1,
+        buttons: 1,
+      });
+    });
+
+    expect(onChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.pointerUp(canvas, {
+        clientX: 30,
+        clientY: 30,
+        pointerId: 1,
+        buttons: 0,
+      });
+    });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it("ストローク終了後は idle 用に globalCompositeOperation が source-over に戻る", async () => {
     const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
     const canvas = getCanvas(container);

@@ -83,7 +83,7 @@ export interface HandwritingCanvasProps {
   className?: string;
 }
 
-export function HandwritingCanvas({
+function PerfectFreehandCanvas({
   value,
   onChange,
   disabled = false,
@@ -458,11 +458,6 @@ export function HandwritingCanvas({
     snapshotCtx.drawImage(canvas, 0, 0);
     beforeStrokeCanvasRef.current = snapshot;
 
-    try {
-      canvas.setPointerCapture(event.pointerId);
-    } catch {
-      // noop
-    }
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
 
@@ -480,8 +475,9 @@ export function HandwritingCanvas({
     if (!isDrawingRef.current) return;
 
     if (activePointerIdRef.current !== event.pointerId) return;
-    // デモ寄せ: 1ボタン押下中の move のみ描画対象にする
-    if (event.buttons !== 1) return;
+    // perfect-freehand のデモと同じく、複数ボタン操作だけを除外する。
+    // iPad / Apple Pencil では buttons が 0 になる move があり、厳密な === 1 判定だと点を落とす。
+    if (event.buttons > 1) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -511,12 +507,6 @@ export function HandwritingCanvas({
 
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    try {
-      canvas.releasePointerCapture(event.pointerId);
-    } catch {
-      // noop
-    }
 
     const ctx = canvas.getContext("2d");
     if (strokeRafIdRef.current !== null) {
@@ -578,12 +568,6 @@ export function HandwritingCanvas({
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
 
-    try {
-      canvasRef.current?.releasePointerCapture(event.pointerId);
-    } catch {
-      // noop
-    }
-
     if (strokeRafIdRef.current !== null) {
       cancelAnimationFrame(strokeRafIdRef.current);
       strokeRafIdRef.current = null;
@@ -619,13 +603,10 @@ export function HandwritingCanvas({
     }
   };
 
-  const handleLostPointerCapture = (event: PointerEvent) => {
-    // lostpointercapture は pointer capture の解除時に発火するため、
-    // pointer type を限定せず描画確定として扱う。
-    finishDrawing(event, { export: true });
-  };
-
   // Pointer events は React 合成イベントを経由せず、canvas の native listener で処理する。
+  // perfect-freehand のデモと同じ入力モデルに寄せ、pointer capture / lostpointercapture には依存しない。
+  // iPad Safari では前ストロークの lostpointercapture が次ストローク開始後に遅延発火し、
+  // 同じ pointerId の新しいストロークを終了させることがある。
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || disabled) return;
@@ -634,17 +615,12 @@ export function HandwritingCanvas({
     canvas.addEventListener("pointermove", handlePointerMove);
     canvas.addEventListener("pointerup", handlePointerUp);
     canvas.addEventListener("pointercancel", handlePointerCancel);
-    canvas.addEventListener("lostpointercapture", handleLostPointerCapture);
 
     return () => {
       canvas.removeEventListener("pointerdown", handlePointerDown);
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointercancel", handlePointerCancel);
-      canvas.removeEventListener(
-        "lostpointercapture",
-        handleLostPointerCapture,
-      );
     };
   }, [
     disabled,
@@ -652,7 +628,6 @@ export function HandwritingCanvas({
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
-    handleLostPointerCapture,
   ]);
 
   const handleClear = () => {
@@ -832,4 +807,8 @@ export function HandwritingCanvas({
       </button>
     </div>
   );
+}
+
+export function HandwritingCanvas(props: HandwritingCanvasProps) {
+  return <PerfectFreehandCanvas {...props} />;
 }
