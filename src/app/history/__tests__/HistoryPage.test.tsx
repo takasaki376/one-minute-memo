@@ -31,6 +31,9 @@ const themeB: ThemeRecord = {
   updatedAt: "2025-01-01T00:00:00.000Z",
 };
 
+const tinyPng =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
 const mockMemos: MemoRecord[] = [
   {
     id: "memo-new",
@@ -38,7 +41,8 @@ const mockMemos: MemoRecord[] = [
     themeId: "theme-b",
     order: 1,
     textContent: "新しいメモの本文",
-    handwritingType: "none",
+    handwritingType: "dataUrl",
+    handwritingDataUrl: tinyPng,
     createdAt: "2025-01-11T10:00:00.000Z",
     updatedAt: "2025-01-11T10:00:00.000Z",
   },
@@ -147,6 +151,9 @@ describe("HistoryPage", () => {
     expect(
       screen.getByText(/入力内容: 古いメモの本文/),
     ).toBeInTheDocument();
+    const images = screen.getAllByRole("img");
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    expect(images[0]).toHaveAttribute("src", tinyPng);
 
     const detailLinks = screen.getAllByRole("link", { name: "詳細を見る" });
     expect(detailLinks).toHaveLength(2);
@@ -208,7 +215,7 @@ describe("HistoryPage", () => {
     });
 
     const dayKey = isoToLocalDateKey(mockMemos[1].createdAt);
-    await user.type(screen.getByLabelText("日付"), dayKey);
+    await user.click(screen.getByTestId(`history-cal-${dayKey}`));
 
     await waitFor(() => {
       expect(screen.getByText("1 件を表示（全 2 件）")).toBeInTheDocument();
@@ -236,7 +243,8 @@ describe("HistoryPage", () => {
     });
 
     await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
-    await user.type(screen.getByLabelText("日付"), "2099-01-01");
+    const onlyThemeBDay = isoToLocalDateKey(mockMemos[0].createdAt);
+    await user.click(screen.getByTestId(`history-cal-${onlyThemeBDay}`));
 
     await waitFor(() => {
       expect(

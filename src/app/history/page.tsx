@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { HistoryFilterCalendar } from "@/components/history/HistoryFilterCalendar";
 import { HistoryMemoCard } from "@/components/history/HistoryMemoCard";
 import { getAllMemos } from "@/lib/db/memosRepo";
 import { getThemesByIds } from "@/lib/db/themesRepo";
@@ -80,6 +81,24 @@ export default function HistoryPage() {
       return true;
     });
   }, [memos, filterDate, filterThemeId]);
+
+  /** カレンダー上の「メモあり」表示用（テーマ絞り込み時はその条件後の日付のみ） */
+  const memosForDateHints = useMemo(() => {
+    return memos.filter((m) => !filterThemeId || m.themeId === filterThemeId);
+  }, [memos, filterThemeId]);
+
+  const memoDateKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of memosForDateHints) {
+      s.add(isoToLocalDateKey(m.createdAt));
+    }
+    return s;
+  }, [memosForDateHints]);
+
+  const calendarInitialMonth = useMemo(() => {
+    const first = memos[0]?.createdAt;
+    return first ? new Date(first) : new Date(0);
+  }, [memos]);
 
   const filtersActive = Boolean(filterDate || filterThemeId);
 
@@ -171,44 +190,48 @@ export default function HistoryPage() {
         className="mb-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
         aria-label="絞り込み"
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <label className="flex min-w-[12rem] flex-col gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span className="font-medium">日付</span>
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-slate-100"
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="shrink-0 lg:w-[min(100%,20rem)]">
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              日付
+            </p>
+            <HistoryFilterCalendar
+              memoDateKeys={memoDateKeys}
+              selectedDate={filterDate}
+              onSelectDate={setFilterDate}
+              initialMonth={calendarInitialMonth}
             />
-          </label>
-          <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span className="font-medium">テーマ</span>
-            <select
-              value={filterThemeId}
-              onChange={(e) => setFilterThemeId(e.target.value)}
-              className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-slate-100"
-            >
-              <option value="">すべて</option>
-              {themeOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {filtersActive ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-stretch sm:self-auto"
-              onClick={() => {
-                setFilterDate("");
-                setFilterThemeId("");
-              }}
-            >
-              条件をクリア
-            </Button>
-          ) : null}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm text-slate-700 dark:text-slate-200">
+              <span className="font-medium">テーマ</span>
+              <select
+                value={filterThemeId}
+                onChange={(e) => setFilterThemeId(e.target.value)}
+                className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-slate-100"
+              >
+                <option value="">すべて</option>
+                {themeOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {filtersActive ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-stretch sm:self-auto"
+                onClick={() => {
+                  setFilterDate("");
+                  setFilterThemeId("");
+                }}
+              >
+                条件をクリア
+              </Button>
+            ) : null}
+          </div>
         </div>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
           {filteredMemos.length} 件を表示（全 {memos.length} 件）
