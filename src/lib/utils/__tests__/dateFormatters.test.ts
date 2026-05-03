@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { formatSessionDateTime } from "../dateFormatters";
+import { formatSessionDateTime, isoToLocalDateKey } from "../dateFormatters";
 
 describe("formatSessionDateTime", () => {
   it("formats a valid date correctly", () => {
@@ -73,5 +73,14 @@ describe("formatSessionDateTime", () => {
     expect(result).toMatch(/2025/);
     // 時刻が含まれることを確認
     expect(result).toMatch(/\d{1,2}:\d{2}/);
+  });
+});
+
+describe("isoToLocalDateKey", () => {
+  it("matches local YYYY-MM-DD for the same instant as manual getFullYear/getMonth/getDate", () => {
+    const iso = "2025-06-15T12:30:00.000Z";
+    const d = new Date(iso);
+    const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    expect(isoToLocalDateKey(iso)).toBe(expected);
   });
 });

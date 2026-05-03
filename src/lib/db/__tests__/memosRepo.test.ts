@@ -60,6 +60,10 @@ vi.mock("../openDB", () => {
     async get(_storeName: string, key: string) {
       return store.get(key);
     },
+    async getAll(_storeName: string) {
+      void _storeName;
+      return Array.from(store.values());
+    },
   };
 
   function __reset() {
@@ -79,6 +83,7 @@ vi.mock("../openDB", () => {
 // モック定義の後で memosRepo をインポート
 import {
   saveMemo,
+  getAllMemos,
   getMemosBySession,
   getMemosByTheme,
   deleteMemosBySession,
@@ -162,6 +167,29 @@ describe("memosRepo", () => {
       expect(new Date(second.updatedAt).getTime()).toBeGreaterThan(
         new Date(first.updatedAt).getTime(),
       );
+    });
+  });
+
+  describe("getAllMemos", () => {
+    it("すべてのメモを createdAt 降順で返す", async () => {
+      await saveMemo({
+        sessionId: "s1",
+        themeId: "t1",
+        order: 1,
+        textContent: "古い",
+        handwritingType: "none",
+      });
+      await new Promise((r) => setTimeout(r, 15));
+      await saveMemo({
+        sessionId: "s1",
+        themeId: "t1",
+        order: 2,
+        textContent: "新しい",
+        handwritingType: "none",
+      });
+
+      const all = await getAllMemos();
+      expect(all.map((m) => m.textContent)).toEqual(["新しい", "古い"]);
     });
   });
 

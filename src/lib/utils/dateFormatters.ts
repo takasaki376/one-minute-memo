@@ -13,3 +13,12 @@ export function formatSessionDateTime(date: Date | null): string {
     minute: "2-digit",
   });
 }
+
+/** ISO 日時をローカル暦の YYYY-MM-DD に変換（日付フィルタとの突き合わせ用） */
+export function isoToLocalDateKey(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
