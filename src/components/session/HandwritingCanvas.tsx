@@ -140,6 +140,7 @@ function PerfectFreehandCanvas({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
+  const activeStrokeStartTimeRef = useRef(0);
   const logicalSizeRef = useRef({ width: 0, height: 0 });
   const dprRef = useRef(1);
   const latestValueRef = useRef<string | null | undefined>(value);
@@ -573,15 +574,18 @@ function PerfectFreehandCanvas({
   const handlePointerDown = useCallback((event: PointerEvent) => {
     if (disabled) return;
     event.preventDefault();
-    // 再入防止: 描画中に別のポインター（指＋ペン等）の pointerdown が来ても無視する。
-    // 同じ pointerId の場合はそのまま処理。
-    if (isDrawingRef.current && activePointerIdRef.current !== event.pointerId) {
+
+    if (isDrawingRef.current) {
+      if (strokePointsRef.current.length > 0) {
+        commitCurrentStrokeToSvg();
+      }
       isDrawingRef.current = false;
       activePointerIdRef.current = null;
       strokePointsRef.current = [];
       clearActiveStrokePath();
       scheduleExport();
     }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -589,6 +593,7 @@ function PerfectFreehandCanvas({
 
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
+    activeStrokeStartTimeRef.current = event.timeStamp;
     setActiveStrokeTool(toolRef.current);
 
     strokePointsRef.current = [];
@@ -599,6 +604,7 @@ function PerfectFreehandCanvas({
     updateActiveStrokePath(false);
   }, [
     clearActiveStrokePath,
+    commitCurrentStrokeToSvg,
     disabled,
     getCanvasPos,
     pointerPressure,
@@ -611,6 +617,7 @@ function PerfectFreehandCanvas({
     if (!isDrawingRef.current) return;
 
     if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
     event.preventDefault();
     // perfect-freehand のデモと同じく、複数ボタン操作だけを除外する。
     // iPad / Apple Pencil では buttons が 0 になる move があり、厳密な === 1 判定だと点を落とす。
@@ -628,6 +635,7 @@ function PerfectFreehandCanvas({
   ) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
     const ctx = canvasRef.current?.getContext("2d");
@@ -666,6 +674,7 @@ function PerfectFreehandCanvas({
   const handlePointerUp = useCallback((event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
     event.preventDefault();
     const canvas = canvasRef.current;
     if (canvas) {
@@ -681,6 +690,7 @@ function PerfectFreehandCanvas({
   const handlePointerCancel = useCallback((event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
+    if (event.timeStamp < activeStrokeStartTimeRef.current) return;
     event.preventDefault();
     isDrawingRef.current = false;
     activePointerIdRef.current = null;

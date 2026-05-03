@@ -101,6 +101,32 @@ describe("HandwritingCanvas", () => {
     return getActiveStrokePath(container)?.getAttribute("d") ?? "";
   }
 
+  function dispatchPointerEvent(
+    target: HTMLElement,
+    type: string,
+    init: {
+      clientX: number;
+      clientY: number;
+      pointerId: number;
+      buttons: number;
+      timeStamp: number;
+      pointerType?: string;
+    },
+  ) {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      clientX: init.clientX,
+      clientY: init.clientY,
+      buttons: init.buttons,
+    });
+    Object.defineProperty(event, "pointerId", { value: init.pointerId });
+    Object.defineProperty(event, "pointerType", {
+      value: init.pointerType ?? "pen",
+    });
+    Object.defineProperty(event, "timeStamp", { value: init.timeStamp });
+    target.dispatchEvent(event as unknown as PointerEvent);
+  }
+
   it("初期状態で太さ「中」が選択されている（aria-pressed）", () => {
     render(<HandwritingCanvas onChange={vi.fn()} />);
 
@@ -316,6 +342,68 @@ describe("HandwritingCanvas", () => {
     });
 
     await act(async () => {
+      vi.advanceTimersByTime(120);
+    });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("前ストローク由来の遅延 pointerup が次ストロークを終了しない", async () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { container } = render(<HandwritingCanvas onChange={onChange} />);
+    const canvas = getCanvas(container);
+    setupCanvasForPointer(canvas);
+
+    await act(async () => {
+      dispatchPointerEvent(canvas, "pointerdown", {
+        clientX: 10,
+        clientY: 10,
+        pointerId: 1,
+        buttons: 1,
+        timeStamp: 100,
+      });
+      dispatchPointerEvent(canvas, "pointermove", {
+        clientX: 20,
+        clientY: 20,
+        pointerId: 1,
+        buttons: 1,
+        timeStamp: 110,
+      });
+      dispatchPointerEvent(canvas, "pointerdown", {
+        clientX: 30,
+        clientY: 30,
+        pointerId: 1,
+        buttons: 1,
+        timeStamp: 200,
+      });
+      dispatchPointerEvent(canvas, "pointerup", {
+        clientX: 20,
+        clientY: 20,
+        pointerId: 1,
+        buttons: 0,
+        timeStamp: 150,
+      });
+      dispatchPointerEvent(canvas, "pointermove", {
+        clientX: 40,
+        clientY: 40,
+        pointerId: 1,
+        buttons: 1,
+        timeStamp: 210,
+      });
+    });
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(getActiveStrokePathData(container)).toContain("M");
+
+    await act(async () => {
+      dispatchPointerEvent(canvas, "pointerup", {
+        clientX: 40,
+        clientY: 40,
+        pointerId: 1,
+        buttons: 0,
+        timeStamp: 220,
+      });
       vi.advanceTimersByTime(120);
     });
 
