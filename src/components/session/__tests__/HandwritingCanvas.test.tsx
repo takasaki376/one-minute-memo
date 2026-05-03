@@ -97,6 +97,10 @@ describe("HandwritingCanvas", () => {
     return container.querySelector("svg path");
   }
 
+  function getActiveStrokePathData(container: HTMLElement): string {
+    return getActiveStrokePath(container)?.getAttribute("d") ?? "";
+  }
+
   it("初期状態で太さ「中」が選択されている（aria-pressed）", () => {
     render(<HandwritingCanvas onChange={vi.fn()} />);
 
@@ -223,7 +227,7 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.drawImage).not.toHaveBeenCalled();
     expect(mockCtx.fill).not.toHaveBeenCalled();
-    expect(getActiveStrokePath(container)?.getAttribute("d")).toContain("M");
+    expect(getActiveStrokePathData(container)).toContain("M");
   });
 
   it("pointermove は Apple Pencil 対策として buttons: 0 でも SVG path の更新を継続する", async () => {
@@ -254,7 +258,7 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.drawImage).not.toHaveBeenCalled();
     expect(mockCtx.fill).not.toHaveBeenCalled();
-    expect(getActiveStrokePath(container)?.getAttribute("d")).toContain("M");
+    expect(getActiveStrokePathData(container)).toContain("M");
   });
 
   it("前ストローク由来の lostpointercapture が遅延発火しても次ストロークを終了しない", async () => {
@@ -391,7 +395,7 @@ describe("HandwritingCanvas", () => {
         });
       });
 
-      expect(getActiveStrokePath(container)).toBeInTheDocument();
+      expect(getActiveStrokePathData(container)).toContain("M");
       mockCtx.drawImage.mockClear();
 
       await act(async () => {
@@ -403,7 +407,7 @@ describe("HandwritingCanvas", () => {
       });
 
       expect(mockCtx.drawImage).not.toHaveBeenCalled();
-      expect(getActiveStrokePath(container)).not.toBeInTheDocument();
+      expect(getActiveStrokePathData(container)).toBe("");
     });
 
     it("pointercancel 後は globalCompositeOperation が source-over（idle 状態）に戻る", async () => {

@@ -137,7 +137,6 @@ function PerfectFreehandCanvas({
 }: HandwritingCanvasProps) {
   const [penSize, setPenSize] = useState<PenSize>("m");
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
-  const [activeStrokePathData, setActiveStrokePathData] = useState("");
   const [activeStrokeTool, setActiveStrokeTool] = useState<"pen" | "eraser">(
     "pen",
   );
@@ -149,6 +148,7 @@ function PerfectFreehandCanvas({
   const toolRef = useRef<"pen" | "eraser">("pen");
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const activeStrokePathRef = useRef<SVGPathElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
@@ -394,7 +394,7 @@ function PerfectFreehandCanvas({
     };
   }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
 
-  const getCanvasPosFromClient = (
+  const getCanvasPosFromClient = useCallback((
     canvas: HTMLCanvasElement,
     clientX: number,
     clientY: number,
@@ -408,21 +408,21 @@ function PerfectFreehandCanvas({
       x: (clientX - rect.left) * scaleX,
       y: (clientY - rect.top) * scaleY,
     };
-  };
+  }, []);
 
-  const getCanvasPos = (event: PointerEvent) => {
+  const getCanvasPos = useCallback((event: PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     return getCanvasPosFromClient(canvas, event.clientX, event.clientY);
-  };
+  }, [getCanvasPosFromClient]);
 
-  const pointerPressure = (e: { pressure?: number }) => {
+  const pointerPressure = useCallback((e: { pressure?: number }) => {
     const p = e.pressure;
     if (typeof p === "number" && p >= 0 && p <= 1) return p;
     return 0.5;
-  };
+  }, []);
 
-  const appendStrokeSamples = (
+  const appendStrokeSamples = useCallback((
     canvas: HTMLCanvasElement,
     event: PointerEvent,
   ) => {
@@ -460,7 +460,7 @@ function PerfectFreehandCanvas({
       );
       strokePointsRef.current.push([pos.x, pos.y, sample.pressure]);
     }
-  };
+  }, [getCanvasPosFromClient, pointerPressure]);
 
   const exportCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -505,7 +505,14 @@ function PerfectFreehandCanvas({
       penSizeRef.current,
       last,
     );
-    setActiveStrokePathData(getSvgPathFromStroke(outline));
+    activeStrokePathRef.current?.setAttribute(
+      "d",
+      getSvgPathFromStroke(outline),
+    );
+  }, []);
+
+  const clearActiveStrokePath = useCallback(() => {
+    activeStrokePathRef.current?.setAttribute("d", "");
   }, []);
 
   const commitCurrentStroke = useCallback(
@@ -521,7 +528,7 @@ function PerfectFreehandCanvas({
     [applyCanvasStyle],
   );
 
-  const handlePointerDown = (event: PointerEvent) => {
+  const handlePointerDown = useCallback((event: PointerEvent) => {
     if (disabled) return;
     event.preventDefault();
     // 再入防止: 描画中に別のポインター（指＋ペン等）の pointerdown が来ても無視する。
@@ -530,7 +537,7 @@ function PerfectFreehandCanvas({
       isDrawingRef.current = false;
       activePointerIdRef.current = null;
       strokePointsRef.current = [];
-      setActiveStrokePathData("");
+      clearActiveStrokePath();
       scheduleExport();
     }
     const canvas = canvasRef.current;
@@ -548,9 +555,16 @@ function PerfectFreehandCanvas({
 
     applyStrokeForTool(ctx, toolRef.current, penSizeRef.current);
     updateActiveStrokePath(false);
-  };
+  }, [
+    clearActiveStrokePath,
+    disabled,
+    getCanvasPos,
+    pointerPressure,
+    scheduleExport,
+    updateActiveStrokePath,
+  ]);
 
-  const handlePointerMove = (event: PointerEvent) => {
+  const handlePointerMove = useCallback((event: PointerEvent) => {
     if (disabled) return;
     if (!isDrawingRef.current) return;
 
@@ -564,9 +578,9 @@ function PerfectFreehandCanvas({
 
     appendStrokeSamples(canvas, event);
     updateActiveStrokePath(false);
-  };
+  }, [appendStrokeSamples, disabled, updateActiveStrokePath]);
 
-  const finishDrawing = (
+  const finishDrawing = useCallback((
     event: PointerEvent,
     options?: { export?: boolean },
   ) => {
@@ -583,7 +597,7 @@ function PerfectFreehandCanvas({
       commitCurrentStroke(ctx);
     }
     strokePointsRef.current = [];
-    setActiveStrokePathData("");
+    clearActiveStrokePath();
 
     if (options?.export !== false) {
       scheduleExport();
@@ -593,7 +607,7 @@ function PerfectFreehandCanvas({
       pendingResizeRef.current = false;
       resizeFnRef.current?.();
     }
-  };
+  }, [clearActiveStrokePath, commitCurrentStroke, scheduleExport]);
 
   /**
    * ストローク終了に pointerleave は使わない。
@@ -604,7 +618,7 @@ function PerfectFreehandCanvas({
    * iOS Safari が前ストロークの lostpointercapture を遅延発火させるバグがあり、
    * pen/touch で処理すると次ストロークを誤って中断させるため。
    */
-  const handlePointerUp = (event: PointerEvent) => {
+  const handlePointerUp = useCallback((event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
     event.preventDefault();
@@ -613,13 +627,13 @@ function PerfectFreehandCanvas({
       appendStrokeSamples(canvas, event);
     }
     finishDrawing(event, { export: true });
-  };
+  }, [appendStrokeSamples, finishDrawing]);
 
   /**
    * pointercancel: ブラウザやシステムがポインターを強制終了した場合。
    * 描画中の SVG ストロークだけを破棄し、Canvas への確定とエクスポートは行わない。
    */
-  const handlePointerCancel = (event: PointerEvent) => {
+  const handlePointerCancel = useCallback((event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
     event.preventDefault();
@@ -627,7 +641,7 @@ function PerfectFreehandCanvas({
     activePointerIdRef.current = null;
     const canvas = canvasRef.current;
     strokePointsRef.current = [];
-    setActiveStrokePathData("");
+    clearActiveStrokePath();
 
     const ctx = canvas?.getContext("2d");
     if (ctx) {
@@ -638,7 +652,7 @@ function PerfectFreehandCanvas({
       pendingResizeRef.current = false;
       resizeFnRef.current?.();
     }
-  };
+  }, [applyCanvasStyle, clearActiveStrokePath]);
 
   // Pointer events は React 合成イベントを経由せず、canvas の native listener で処理する。
   // perfect-freehand のデモと同じ入力モデルに寄せ、pointer capture / lostpointercapture には依存しない。
@@ -843,18 +857,17 @@ function PerfectFreehandCanvas({
           viewBox={`0 0 ${svgViewBoxSize.width} ${svgViewBoxSize.height}`}
           preserveAspectRatio="none"
         >
-          {activeStrokePathData ? (
-            <path
-              d={activeStrokePathData}
-              fill={
-                activeStrokeTool === "eraser"
-                  ? ERASER_PREVIEW_COLOR
-                  : PEN_STROKE_COLOR
-              }
-              stroke="transparent"
-              strokeWidth={0}
-            />
-          ) : null}
+          <path
+            ref={activeStrokePathRef}
+            d=""
+            fill={
+              activeStrokeTool === "eraser"
+                ? ERASER_PREVIEW_COLOR
+                : PEN_STROKE_COLOR
+            }
+            stroke="transparent"
+            strokeWidth={0}
+          />
         </svg>
       </div>
       <button
