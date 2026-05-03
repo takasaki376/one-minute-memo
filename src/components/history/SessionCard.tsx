@@ -43,7 +43,7 @@ function SessionMemoEntry({
   return (
     <div
       className={cc([
-        "rounded-md border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-600/80 dark:bg-slate-900/40",
+        "w-full min-w-0 rounded-md border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-600/80 dark:bg-slate-900/40",
       ])}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -63,14 +63,14 @@ function SessionMemoEntry({
         </p>
       ) : null}
       {showHandwriting ? (
-        <div className="mt-2">
+        <div className="mt-2 w-full min-w-0">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
             手書き
           </p>
           <img
             src={memo.handwritingDataUrl}
             alt=""
-            className="mt-1 max-h-56 w-auto max-w-full rounded-md border border-slate-200 bg-white object-contain dark:border-slate-600"
+            className="mt-1 block h-auto w-full max-h-64 rounded-md border border-slate-200 bg-white object-contain dark:border-slate-600"
             loading="lazy"
             decoding="async"
           />
