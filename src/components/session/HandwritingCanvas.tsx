@@ -162,6 +162,16 @@ function PerfectFreehandCanvas({
     toolRef.current = tool;
   }, [tool]);
 
+  const selectPenSize = useCallback((nextPenSize: PenSize) => {
+    penSizeRef.current = nextPenSize;
+    setPenSize(nextPenSize);
+  }, []);
+
+  const selectTool = useCallback((nextTool: "pen" | "eraser") => {
+    toolRef.current = nextTool;
+    setTool(nextTool);
+  }, []);
+
   /** 画像読み込み後・クリア後・ストローク終了後など「ペンで書き足せる状態」に戻す */
   const applyCanvasStyle = useCallback((ctx: CanvasRenderingContext2D) => {
     applyStrokeForTool(ctx, "pen", penSizeRef.current);
@@ -860,7 +870,7 @@ function PerfectFreehandCanvas({
               <button
                 type="button"
                 className={toolBtnClass(true)}
-                onClick={() => setTool("pen")}
+                onClick={() => selectTool("pen")}
                 disabled={disabled}
                 aria-label="ペン"
                 aria-pressed="true"
@@ -871,7 +881,7 @@ function PerfectFreehandCanvas({
               <button
                 type="button"
                 className={toolBtnClass(false)}
-                onClick={() => setTool("pen")}
+                onClick={() => selectTool("pen")}
                 disabled={disabled}
                 aria-label="ペン"
                 aria-pressed="false"
@@ -883,7 +893,7 @@ function PerfectFreehandCanvas({
               <button
                 type="button"
                 className={toolBtnClass(true)}
-                onClick={() => setTool("eraser")}
+                onClick={() => selectTool("eraser")}
                 disabled={disabled}
                 aria-label="消しゴム"
                 aria-pressed="true"
@@ -894,7 +904,7 @@ function PerfectFreehandCanvas({
               <button
                 type="button"
                 className={toolBtnClass(false)}
-                onClick={() => setTool("eraser")}
+                onClick={() => selectTool("eraser")}
                 disabled={disabled}
                 aria-label="消しゴム"
                 aria-pressed="false"
@@ -910,7 +920,7 @@ function PerfectFreehandCanvas({
                   key={size}
                   type="button"
                   className={toolBtnClass(true)}
-                  onClick={() => setPenSize(size)}
+                  onClick={() => selectPenSize(size)}
                   disabled={disabled}
                   aria-label={PEN_SIZE_ARIA_LABELS[size]}
                   aria-pressed="true"
@@ -922,7 +932,7 @@ function PerfectFreehandCanvas({
                   key={size}
                   type="button"
                   className={toolBtnClass(false)}
-                  onClick={() => setPenSize(size)}
+                  onClick={() => selectPenSize(size)}
                   disabled={disabled}
                   aria-label={PEN_SIZE_ARIA_LABELS[size]}
                   aria-pressed="false"
