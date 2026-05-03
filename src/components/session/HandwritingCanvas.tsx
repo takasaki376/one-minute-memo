@@ -38,24 +38,6 @@ function freehandOptions(penSize: PenSize, last: boolean): StrokeOptions {
   };
 }
 
-function fillFreehandOutline(
-  ctx: CanvasRenderingContext2D,
-  outline: [number, number][],
-  tool: "pen" | "eraser",
-) {
-  if (outline.length < 2) return;
-  ctx.globalCompositeOperation =
-    tool === "eraser" ? "destination-out" : "source-over";
-  ctx.fillStyle = tool === "eraser" ? ERASER_STROKE_COLOR : PEN_STROKE_COLOR;
-  ctx.beginPath();
-  ctx.moveTo(outline[0][0], outline[0][1]);
-  for (let i = 1; i < outline.length; i++) {
-    ctx.lineTo(outline[i][0], outline[i][1]);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
 const average = (a: number, b: number) => (a + b) / 2;
 
 function getSvgPathFromStroke(points: [number, number][], closed = true) {
@@ -129,6 +111,11 @@ export interface HandwritingCanvasProps {
   className?: string;
 }
 
+type SvgStroke = {
+  d: string;
+  tool: "pen" | "eraser";
+};
+
 function PerfectFreehandCanvas({
   value,
   onChange,
@@ -148,6 +135,7 @@ function PerfectFreehandCanvas({
   const toolRef = useRef<"pen" | "eraser">("pen");
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const committedStrokeLayerRef = useRef<SVGGElement | null>(null);
   const activeStrokePathRef = useRef<SVGPathElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
@@ -163,6 +151,7 @@ function PerfectFreehandCanvas({
   const resizeFnRef = useRef<(() => void) | null>(null);
   /** perfect-freehand 用: 現在ストロークの [x, y, pressure?]（論理座標） */
   const strokePointsRef = useRef<number[][]>([]);
+  const pendingSvgStrokesRef = useRef<SvgStroke[]>([]);
   const exportTimerIdRef = useRef<number | null>(null);
   const latestExportRequestIdRef = useRef(0);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
@@ -265,6 +254,9 @@ function PerfectFreehandCanvas({
     if (!value) {
       pendingLocalExportRef.current = false;
       latestCanvasDataUrlRef.current = null;
+      pendingSvgStrokesRef.current = [];
+      committedStrokeLayerRef.current?.replaceChildren();
+      activeStrokePathRef.current?.setAttribute("d", "");
       clearCanvas(ctx);
       return;
     }
@@ -279,6 +271,9 @@ function PerfectFreehandCanvas({
 
     pendingLocalExportRef.current = false;
     latestCanvasDataUrlRef.current = value;
+    pendingSvgStrokesRef.current = [];
+    committedStrokeLayerRef.current?.replaceChildren();
+    activeStrokePathRef.current?.setAttribute("d", "");
     drawDataUrl(ctx, value);
   }, [drawDataUrl, clearCanvas, value]);
 
@@ -462,11 +457,87 @@ function PerfectFreehandCanvas({
     }
   }, [getCanvasPosFromClient, pointerPressure]);
 
+  const updateActiveStrokePath = useCallback((last: boolean) => {
+    const outline = getFreehandOutline(
+      strokePointsRef.current,
+      penSizeRef.current,
+      last,
+    );
+    activeStrokePathRef.current?.setAttribute(
+      "d",
+      getSvgPathFromStroke(outline),
+    );
+  }, []);
+
+  const clearActiveStrokePath = useCallback(() => {
+    activeStrokePathRef.current?.setAttribute("d", "");
+  }, []);
+
+  const appendCommittedSvgStroke = useCallback((stroke: SvgStroke) => {
+    if (!stroke.d) return;
+
+    pendingSvgStrokesRef.current.push(stroke);
+
+    const layer = committedStrokeLayerRef.current;
+    if (!layer) return;
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", stroke.d);
+    path.setAttribute(
+      "fill",
+      stroke.tool === "eraser" ? ERASER_PREVIEW_COLOR : PEN_STROKE_COLOR,
+    );
+    path.setAttribute("stroke", "transparent");
+    path.setAttribute("stroke-width", "0");
+    layer.appendChild(path);
+  }, []);
+
+  const commitCurrentStrokeToSvg = useCallback(() => {
+    const outline = getFreehandOutline(
+      strokePointsRef.current,
+      penSizeRef.current,
+      true,
+    );
+    appendCommittedSvgStroke({
+      d: getSvgPathFromStroke(outline),
+      tool: toolRef.current,
+    });
+  }, [appendCommittedSvgStroke]);
+
+  const clearCommittedSvgStrokes = useCallback(() => {
+    pendingSvgStrokesRef.current = [];
+    committedStrokeLayerRef.current?.replaceChildren();
+  }, []);
+
+  const flushCommittedSvgStrokesToCanvas = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const strokes = pendingSvgStrokesRef.current;
+      if (strokes.length === 0) return;
+      if (typeof Path2D === "undefined") return;
+
+      for (const stroke of strokes) {
+        const path = new Path2D(stroke.d);
+        ctx.globalCompositeOperation =
+          stroke.tool === "eraser" ? "destination-out" : "source-over";
+        ctx.fillStyle =
+          stroke.tool === "eraser" ? ERASER_STROKE_COLOR : PEN_STROKE_COLOR;
+        ctx.fill(path);
+      }
+
+      clearCommittedSvgStrokes();
+      applyCanvasStyle(ctx);
+    },
+    [applyCanvasStyle, clearCommittedSvgStrokes],
+  );
+
   const exportCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || isDrawingRef.current) return false;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
 
     try {
+      flushCommittedSvgStrokesToCanvas(ctx);
       const dataUrl = canvas.toDataURL("image/png");
       pendingLocalExportRef.current = true;
       latestCanvasDataUrlRef.current = dataUrl;
@@ -476,7 +547,7 @@ function PerfectFreehandCanvas({
     }
 
     return true;
-  }, [onChange]);
+  }, [flushCommittedSvgStrokesToCanvas, onChange]);
 
   const scheduleExport = useCallback(() => {
     latestExportRequestIdRef.current += 1;
@@ -498,35 +569,6 @@ function PerfectFreehandCanvas({
 
     exportTimerIdRef.current = window.setTimeout(runExport, 120);
   }, [exportCanvas]);
-
-  const updateActiveStrokePath = useCallback((last: boolean) => {
-    const outline = getFreehandOutline(
-      strokePointsRef.current,
-      penSizeRef.current,
-      last,
-    );
-    activeStrokePathRef.current?.setAttribute(
-      "d",
-      getSvgPathFromStroke(outline),
-    );
-  }, []);
-
-  const clearActiveStrokePath = useCallback(() => {
-    activeStrokePathRef.current?.setAttribute("d", "");
-  }, []);
-
-  const commitCurrentStroke = useCallback(
-    (ctx: CanvasRenderingContext2D) => {
-      const outline = getFreehandOutline(
-        strokePointsRef.current,
-        penSizeRef.current,
-        true,
-      );
-      fillFreehandOutline(ctx, outline, toolRef.current);
-      applyCanvasStyle(ctx);
-    },
-    [applyCanvasStyle],
-  );
 
   const handlePointerDown = useCallback((event: PointerEvent) => {
     if (disabled) return;
@@ -588,14 +630,12 @@ function PerfectFreehandCanvas({
     if (activePointerIdRef.current !== event.pointerId) return;
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
+    const ctx = canvasRef.current?.getContext("2d");
     if (ctx) {
-      commitCurrentStroke(ctx);
+      applyCanvasStyle(ctx);
     }
+
+    commitCurrentStrokeToSvg();
     strokePointsRef.current = [];
     clearActiveStrokePath();
 
@@ -607,7 +647,12 @@ function PerfectFreehandCanvas({
       pendingResizeRef.current = false;
       resizeFnRef.current?.();
     }
-  }, [clearActiveStrokePath, commitCurrentStroke, scheduleExport]);
+  }, [
+    applyCanvasStyle,
+    clearActiveStrokePath,
+    commitCurrentStrokeToSvg,
+    scheduleExport,
+  ]);
 
   /**
    * ストローク終了に pointerleave は使わない。
@@ -705,6 +750,8 @@ function PerfectFreehandCanvas({
     );
     applyCanvasStyle(ctx);
 
+    clearActiveStrokePath();
+    clearCommittedSvgStrokes();
     pendingLocalExportRef.current = false;
     latestCanvasDataUrlRef.current = null;
     onChange?.(null);
@@ -857,6 +904,7 @@ function PerfectFreehandCanvas({
           viewBox={`0 0 ${svgViewBoxSize.width} ${svgViewBoxSize.height}`}
           preserveAspectRatio="none"
         >
+          <g ref={committedStrokeLayerRef} />
           <path
             ref={activeStrokePathRef}
             d=""
