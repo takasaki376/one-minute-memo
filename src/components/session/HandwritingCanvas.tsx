@@ -124,9 +124,6 @@ function PerfectFreehandCanvas({
 }: HandwritingCanvasProps) {
   const [penSize, setPenSize] = useState<PenSize>("m");
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
-  const [activeStrokeTool, setActiveStrokeTool] = useState<"pen" | "eraser">(
-    "pen",
-  );
   const [svgViewBoxSize, setSvgViewBoxSize] = useState({
     width: 1,
     height: 1,
@@ -474,6 +471,18 @@ function PerfectFreehandCanvas({
     activeStrokePathRef.current?.setAttribute("d", "");
   }, []);
 
+  const applyActiveStrokeStyle = useCallback((nextTool: "pen" | "eraser") => {
+    const path = activeStrokePathRef.current;
+    if (!path) return;
+
+    path.setAttribute(
+      "fill",
+      nextTool === "eraser" ? ERASER_PREVIEW_COLOR : PEN_STROKE_COLOR,
+    );
+    path.setAttribute("stroke", "transparent");
+    path.setAttribute("stroke-width", "0");
+  }, []);
+
   const appendCommittedSvgStroke = useCallback((stroke: SvgStroke) => {
     if (!stroke.d) return;
 
@@ -594,7 +603,7 @@ function PerfectFreehandCanvas({
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
     activeStrokeStartTimeRef.current = event.timeStamp;
-    setActiveStrokeTool(toolRef.current);
+    applyActiveStrokeStyle(toolRef.current);
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
@@ -604,6 +613,7 @@ function PerfectFreehandCanvas({
     updateActiveStrokePath(false);
   }, [
     clearActiveStrokePath,
+    applyActiveStrokeStyle,
     commitCurrentStrokeToSvg,
     disabled,
     getCanvasPos,
@@ -716,11 +726,21 @@ function PerfectFreehandCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || disabled) return;
+    const preventTouchDefault = (event: TouchEvent) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    };
+    const touchOptions: AddEventListenerOptions = { passive: false };
 
     canvas.addEventListener("pointerdown", handlePointerDown);
     canvas.addEventListener("pointermove", handlePointerMove);
     canvas.addEventListener("pointerup", handlePointerUp);
     canvas.addEventListener("pointercancel", handlePointerCancel);
+    canvas.addEventListener("touchstart", preventTouchDefault, touchOptions);
+    canvas.addEventListener("touchmove", preventTouchDefault, touchOptions);
+    canvas.addEventListener("touchend", preventTouchDefault, touchOptions);
+    canvas.addEventListener("touchcancel", preventTouchDefault, touchOptions);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("pointercancel", handlePointerCancel);
 
@@ -729,6 +749,10 @@ function PerfectFreehandCanvas({
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointercancel", handlePointerCancel);
+      canvas.removeEventListener("touchstart", preventTouchDefault);
+      canvas.removeEventListener("touchmove", preventTouchDefault);
+      canvas.removeEventListener("touchend", preventTouchDefault);
+      canvas.removeEventListener("touchcancel", preventTouchDefault);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerCancel);
     };
@@ -821,7 +845,15 @@ function PerfectFreehandCanvas({
 
   return (
     <div className={containerClass}>
-      <div ref={wrapperRef} className={canvasWrapperClass}>
+      <div
+        ref={wrapperRef}
+        className={canvasWrapperClass}
+        style={{
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+        }}
+      >
         <div className={toolbarClass} role="toolbar" aria-label="手書きツール">
           <div className="flex items-center gap-0.5 border-r border-slate-200 pr-2">
             {tool === "pen" ? (
@@ -907,24 +939,26 @@ function PerfectFreehandCanvas({
             e.preventDefault();
           }}
           className={canvasClass}
+          style={{
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
         />
         <svg
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-[1] h-full w-full touch-none select-none"
+          style={{
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
           viewBox={`0 0 ${svgViewBoxSize.width} ${svgViewBoxSize.height}`}
           preserveAspectRatio="none"
         >
           <g ref={committedStrokeLayerRef} />
           <path
             ref={activeStrokePathRef}
-            d=""
-            fill={
-              activeStrokeTool === "eraser"
-                ? ERASER_PREVIEW_COLOR
-                : PEN_STROKE_COLOR
-            }
-            stroke="transparent"
-            strokeWidth={0}
           />
         </svg>
       </div>
