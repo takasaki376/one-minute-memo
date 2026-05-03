@@ -114,6 +114,8 @@ function PerfectFreehandCanvas({
   /** ストローク描画を rAF で 1 フレームにまとめる */
   const strokeRafIdRef = useRef<number | null>(null);
   const strokeLastFlagRef = useRef(false);
+  const exportTimerIdRef = useRef<number | null>(null);
+  const latestExportRequestIdRef = useRef(0);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
   const pendingLocalExportRef = useRef(false);
   useEffect(() => {
@@ -189,6 +191,10 @@ function PerfectFreehandCanvas({
       if (resizeRafIdRef.current !== null) {
         cancelAnimationFrame(resizeRafIdRef.current);
         resizeRafIdRef.current = null;
+      }
+      if (exportTimerIdRef.current !== null) {
+        window.clearTimeout(exportTimerIdRef.current);
+        exportTimerIdRef.current = null;
       }
       for (const img of pendingImages) {
         img.onload = null;
@@ -406,6 +412,43 @@ function PerfectFreehandCanvas({
     }
   };
 
+  const exportCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || isDrawingRef.current) return false;
+
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      pendingLocalExportRef.current = true;
+      latestCanvasDataUrlRef.current = dataUrl;
+      onChange?.(dataUrl);
+    } catch (e) {
+      console.error("Failed to export canvas as dataURL", e);
+    }
+
+    return true;
+  }, [onChange]);
+
+  const scheduleExport = useCallback(() => {
+    latestExportRequestIdRef.current += 1;
+    const requestId = latestExportRequestIdRef.current;
+
+    if (exportTimerIdRef.current !== null) {
+      window.clearTimeout(exportTimerIdRef.current);
+    }
+
+    const runExport = () => {
+      exportTimerIdRef.current = null;
+      if (requestId !== latestExportRequestIdRef.current) return;
+      if (isDrawingRef.current) {
+        exportTimerIdRef.current = window.setTimeout(runExport, 120);
+        return;
+      }
+      exportCanvas();
+    };
+
+    exportTimerIdRef.current = window.setTimeout(runExport, 120);
+  }, [exportCanvas]);
+
   const redrawCurrentStroke = (
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
@@ -440,10 +483,16 @@ function PerfectFreehandCanvas({
 
   const handlePointerDown = (event: PointerEvent) => {
     if (disabled) return;
+    event.preventDefault();
     // 再入防止: 描画中に別のポインター（指＋ペン等）の pointerdown が来ても無視する。
     // 同じ pointerId の場合はそのまま処理。
-    if (isDrawingRef.current && activePointerIdRef.current !== event.pointerId)
-      return;
+    if (isDrawingRef.current && activePointerIdRef.current !== event.pointerId) {
+      isDrawingRef.current = false;
+      activePointerIdRef.current = null;
+      beforeStrokeCanvasRef.current = null;
+      strokePointsRef.current = [];
+      scheduleExport();
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -475,6 +524,7 @@ function PerfectFreehandCanvas({
     if (!isDrawingRef.current) return;
 
     if (activePointerIdRef.current !== event.pointerId) return;
+    event.preventDefault();
     // perfect-freehand のデモと同じく、複数ボタン操作だけを除外する。
     // iPad / Apple Pencil では buttons が 0 になる move があり、厳密な === 1 判定だと点を落とす。
     if (event.buttons > 1) return;
@@ -520,14 +570,7 @@ function PerfectFreehandCanvas({
     strokePointsRef.current = [];
 
     if (options?.export !== false) {
-      try {
-        const dataUrl = canvas.toDataURL("image/png");
-        pendingLocalExportRef.current = true;
-        latestCanvasDataUrlRef.current = dataUrl;
-        onChange?.(dataUrl);
-      } catch (e) {
-        console.error("Failed to export canvas as dataURL", e);
-      }
+      scheduleExport();
     }
 
     if (ctx) {
@@ -550,6 +593,9 @@ function PerfectFreehandCanvas({
    * pen/touch で処理すると次ストロークを誤って中断させるため。
    */
   const handlePointerUp = (event: PointerEvent) => {
+    if (!isDrawingRef.current) return;
+    if (activePointerIdRef.current !== event.pointerId) return;
+    event.preventDefault();
     const canvas = canvasRef.current;
     if (canvas) {
       appendStrokeSamples(canvas, event);
@@ -565,6 +611,7 @@ function PerfectFreehandCanvas({
   const handlePointerCancel = (event: PointerEvent) => {
     if (!isDrawingRef.current) return;
     if (activePointerIdRef.current !== event.pointerId) return;
+    event.preventDefault();
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
 
@@ -615,12 +662,16 @@ function PerfectFreehandCanvas({
     canvas.addEventListener("pointermove", handlePointerMove);
     canvas.addEventListener("pointerup", handlePointerUp);
     canvas.addEventListener("pointercancel", handlePointerCancel);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
 
     return () => {
       canvas.removeEventListener("pointerdown", handlePointerDown);
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointercancel", handlePointerCancel);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
     };
   }, [
     disabled,

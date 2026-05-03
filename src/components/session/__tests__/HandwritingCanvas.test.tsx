@@ -62,6 +62,7 @@ describe("HandwritingCanvas", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -251,6 +252,7 @@ describe("HandwritingCanvas", () => {
   });
 
   it("前ストローク由来の lostpointercapture が遅延発火しても次ストロークを終了しない", async () => {
+    vi.useFakeTimers();
     const onChange = vi.fn();
     const { container } = render(<HandwritingCanvas onChange={onChange} />);
     const canvas = getCanvas(container);
@@ -301,6 +303,10 @@ describe("HandwritingCanvas", () => {
         pointerId: 1,
         buttons: 0,
       });
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(120);
     });
 
     expect(onChange).toHaveBeenCalledTimes(1);
