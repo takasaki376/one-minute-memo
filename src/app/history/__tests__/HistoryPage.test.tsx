@@ -4,9 +4,11 @@ import userEvent from "@testing-library/user-event";
 
 import HistoryPage from "../page";
 import * as memosRepo from "@/lib/db/memosRepo";
+import * as sessionsRepo from "@/lib/db/sessionsRepo";
 import * as themesRepo from "@/lib/db/themesRepo";
 import { isoToLocalDateKey } from "@/lib/utils/dateFormatters";
 import type { MemoRecord } from "@/types/memo";
+import type { SessionRecord } from "@/types/session";
 import type { ThemeRecord } from "@/types/theme";
 
 const mockReload = vi.fn();
@@ -58,15 +60,43 @@ const mockMemos: MemoRecord[] = [
   },
 ];
 
+const mockAllSessions: SessionRecord[] = [
+  {
+    id: "session-2",
+    startedAt: "2025-01-11T10:00:00.000Z",
+    endedAt: "2025-01-11T10:20:00.000Z",
+    themeIds: ["theme-b", "theme-b2"],
+    memoCount: 1,
+  },
+  {
+    id: "session-1",
+    startedAt: "2025-01-10T09:00:00.000Z",
+    endedAt: "2025-01-10T09:10:00.000Z",
+    themeIds: ["theme-a", "theme-a2"],
+    memoCount: 1,
+  },
+];
+
 vi.mock("@/lib/db/memosRepo", () => {
   const getAllMemos = vi.fn();
   return { getAllMemos };
+});
+
+vi.mock("@/lib/db/sessionsRepo", () => {
+  const getAllSessions = vi.fn();
+  return { getAllSessions };
 });
 
 vi.mock("@/lib/db/themesRepo", () => {
   const getThemesByIds = vi.fn();
   return { getThemesByIds };
 });
+
+function mockLoadedHistory() {
+  (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
+  (sessionsRepo.getAllSessions as Mock).mockResolvedValue(mockAllSessions);
+  (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+}
 
 describe("HistoryPage", () => {
   beforeEach(() => {
@@ -82,6 +112,9 @@ describe("HistoryPage", () => {
 
   it("displays loading state initially", async () => {
     (memosRepo.getAllMemos as Mock).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    (sessionsRepo.getAllSessions as Mock).mockImplementation(
       () => new Promise(() => {}),
     );
 
@@ -115,6 +148,7 @@ describe("HistoryPage", () => {
 
   it("displays empty state when no memos exist", async () => {
     (memosRepo.getAllMemos as Mock).mockResolvedValue([]);
+    (sessionsRepo.getAllSessions as Mock).mockResolvedValue([]);
     (themesRepo.getThemesByIds as Mock).mockResolvedValue([]);
 
     await act(async () => {
@@ -131,9 +165,8 @@ describe("HistoryPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("displays memo cards with content and detail links", async () => {
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+  it("displays session cards with memos, order badges, and no detail links", async () => {
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -143,6 +176,7 @@ describe("HistoryPage", () => {
       expect(screen.getByText("履歴一覧")).toBeInTheDocument();
     });
 
+    expect(screen.getAllByText("1/2")).toHaveLength(2);
     expect(screen.getByText(/テーマ: 別のテーマ/)).toBeInTheDocument();
     expect(screen.getByText(/テーマ: 今気になっていることは？/)).toBeInTheDocument();
     expect(
@@ -155,15 +189,11 @@ describe("HistoryPage", () => {
     expect(images.length).toBeGreaterThanOrEqual(1);
     expect(images[0]).toHaveAttribute("src", tinyPng);
 
-    const detailLinks = screen.getAllByRole("link", { name: "詳細を見る" });
-    expect(detailLinks).toHaveLength(2);
-    expect(detailLinks[0]).toHaveAttribute("href", "/history/session-2");
-    expect(detailLinks[1]).toHaveAttribute("href", "/history/session-1");
+    expect(screen.queryByRole("link", { name: "詳細を見る" })).toBeNull();
   });
 
-  it("keeps memo order as returned by getAllMemos (newest first)", async () => {
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+  it("sorts sessions newest-first (endedAt / startedAt)", async () => {
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -173,15 +203,16 @@ describe("HistoryPage", () => {
       expect(screen.getByText("履歴一覧")).toBeInTheDocument();
     });
 
-    const detailLinks = screen.getAllByRole("link", { name: "詳細を見る" });
-    expect(detailLinks[0]).toHaveAttribute("href", "/history/session-2");
-    expect(detailLinks[1]).toHaveAttribute("href", "/history/session-1");
+    const main = screen.getByRole("main");
+    const html = main.textContent ?? "";
+    expect(html.indexOf("新しいメモの本文")).toBeLessThan(
+      html.indexOf("古いメモの本文"),
+    );
   });
 
   it("filters by theme", async () => {
     const user = userEvent.setup();
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -194,7 +225,9 @@ describe("HistoryPage", () => {
     await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
 
     await waitFor(() => {
-      expect(screen.getByText("1 件を表示（全 2 件）")).toBeInTheDocument();
+      expect(
+        screen.getByText("1 件のメモを表示（全 2 件）"),
+      ).toBeInTheDocument();
     });
 
     expect(screen.getByText(/テーマ: 今気になっていることは？/)).toBeInTheDocument();
@@ -203,8 +236,7 @@ describe("HistoryPage", () => {
 
   it("filters by date and combines with theme filter", async () => {
     const user = userEvent.setup();
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -218,12 +250,16 @@ describe("HistoryPage", () => {
     await user.click(screen.getByTestId(`history-cal-${dayKey}`));
 
     await waitFor(() => {
-      expect(screen.getByText("1 件を表示（全 2 件）")).toBeInTheDocument();
+      expect(
+        screen.getByText("1 件のメモを表示（全 2 件）"),
+      ).toBeInTheDocument();
     });
 
     await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
 
-    expect(screen.getByText("1 件を表示（全 2 件）")).toBeInTheDocument();
+    expect(
+      screen.getByText("1 件のメモを表示（全 2 件）"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/入力内容: 古いメモの本文/),
     ).toBeInTheDocument();
@@ -231,8 +267,7 @@ describe("HistoryPage", () => {
 
   it("shows no-results message when filters match nothing", async () => {
     const user = userEvent.setup();
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -256,8 +291,7 @@ describe("HistoryPage", () => {
 
   it("clears filters when clicking 条件をクリア", async () => {
     const user = userEvent.setup();
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -276,14 +310,16 @@ describe("HistoryPage", () => {
     await user.click(screen.getByRole("button", { name: "条件をクリア" }));
 
     await waitFor(() => {
-      expect(screen.getByText("2 件を表示（全 2 件）")).toBeInTheDocument();
+      expect(
+        screen.getByText("2 件のメモを表示（全 2 件）"),
+      ).toBeInTheDocument();
     });
-    expect(screen.getAllByRole("link", { name: "詳細を見る" })).toHaveLength(2);
+    expect(screen.getByText(/入力内容: 新しいメモの本文/)).toBeInTheDocument();
+    expect(screen.getByText(/入力内容: 古いメモの本文/)).toBeInTheDocument();
   });
 
   it("renders navigation links correctly", async () => {
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -299,9 +335,8 @@ describe("HistoryPage", () => {
     expect(newSessionButton).toHaveAttribute("href", "/session");
   });
 
-  it("calls getAllMemos and getThemesByIds on mount", async () => {
-    (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
-    (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+  it("calls getAllMemos, getAllSessions, and getThemesByIds on mount", async () => {
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -310,6 +345,7 @@ describe("HistoryPage", () => {
     await waitFor(() => {
       expect(memosRepo.getAllMemos).toHaveBeenCalledTimes(1);
     });
+    expect(sessionsRepo.getAllSessions).toHaveBeenCalledTimes(1);
     expect(themesRepo.getThemesByIds).toHaveBeenCalledWith(
       expect.arrayContaining(["theme-a", "theme-b"]),
     );

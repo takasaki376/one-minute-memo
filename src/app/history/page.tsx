@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { HistoryFilterCalendar } from "@/components/history/HistoryFilterCalendar";
-import { HistoryMemoCard } from "@/components/history/HistoryMemoCard";
+import { SessionCard } from "@/components/history/SessionCard";
 import { getAllMemos } from "@/lib/db/memosRepo";
+import { getAllSessions } from "@/lib/db/sessionsRepo";
 import { getThemesByIds } from "@/lib/db/themesRepo";
 import { isoToLocalDateKey } from "@/lib/utils/dateFormatters";
 import type { MemoRecord } from "@/types/memo";
+import type { SessionRecord } from "@/types/session";
 import type { ThemeRecord } from "@/types/theme";
 
 type LoadStage = "idle" | "loading" | "loaded" | "error";
@@ -17,9 +19,18 @@ function themeFallbackTitle(order: number): string {
   return `テーマ ${order}`;
 }
 
+function sortSessionsDesc(a: SessionRecord, b: SessionRecord): number {
+  const aKey = a.endedAt ?? a.startedAt;
+  const bKey = b.endedAt ?? b.startedAt;
+  const aTime = aKey ? new Date(aKey).getTime() : 0;
+  const bTime = bKey ? new Date(bKey).getTime() : 0;
+  return bTime - aTime;
+}
+
 export default function HistoryPage() {
   const [stage, setStage] = useState<LoadStage>("idle");
   const [memos, setMemos] = useState<MemoRecord[]>([]);
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [themes, setThemes] = useState<ThemeRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filterDate, setFilterDate] = useState("");
@@ -31,11 +42,15 @@ export default function HistoryPage() {
         setStage("loading");
         setError(null);
 
-        const allMemos = await getAllMemos();
+        const [allMemos, allSessions] = await Promise.all([
+          getAllMemos(),
+          getAllSessions(),
+        ]);
         const themeIds = Array.from(new Set(allMemos.map((m) => m.themeId)));
         const themeRows = await getThemesByIds(themeIds);
 
         setMemos(allMemos);
+        setSessions(allSessions);
         setThemes(themeRows);
         setStage("loaded");
       } catch (e) {
@@ -47,6 +62,14 @@ export default function HistoryPage() {
 
     void load();
   }, []);
+
+  const sessionMap = useMemo(() => {
+    const map = new Map<string, SessionRecord>();
+    for (const s of sessions) {
+      map.set(s.id, s);
+    }
+    return map;
+  }, [sessions]);
 
   const themeMap = useMemo(() => {
     const map = new Map<string, ThemeRecord>();
@@ -82,6 +105,17 @@ export default function HistoryPage() {
     });
   }, [memos, filterDate, filterThemeId]);
 
+  const sortedSessionsForList = useMemo(() => {
+    const ids = new Set(filteredMemos.map((m) => m.sessionId));
+    const list: SessionRecord[] = [];
+    for (const id of ids) {
+      const s = sessionMap.get(id);
+      if (s) list.push(s);
+    }
+    list.sort(sortSessionsDesc);
+    return list;
+  }, [filteredMemos, sessionMap]);
+
   /** カレンダー上の「メモあり」表示用（テーマ絞り込み時はその条件後の日付のみ） */
   const memosForDateHints = useMemo(() => {
     return memos.filter((m) => !filterThemeId || m.themeId === filterThemeId);
@@ -101,6 +135,12 @@ export default function HistoryPage() {
   }, [memos]);
 
   const filtersActive = Boolean(filterDate || filterThemeId);
+
+  const resolveThemeTitle = useMemo(
+    () => (memo: MemoRecord) =>
+      themeMap.get(memo.themeId)?.title ?? themeFallbackTitle(memo.order),
+    [themeMap],
+  );
 
   // ローディング中
   if (stage === "idle" || stage === "loading") {
@@ -234,7 +274,7 @@ export default function HistoryPage() {
           </div>
         </div>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          {filteredMemos.length} 件を表示（全 {memos.length} 件）
+          {filteredMemos.length} 件のメモを表示（全 {memos.length} 件）
         </p>
       </section>
 
@@ -248,17 +288,17 @@ export default function HistoryPage() {
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {filteredMemos.map((memo) => {
-            const theme = themeMap.get(memo.themeId);
-            const themeTitle =
-              theme?.title ?? themeFallbackTitle(memo.order);
+        <ul className="flex flex-col gap-4">
+          {sortedSessionsForList.map((session) => {
+            const memosInSession = filteredMemos.filter(
+              (m) => m.sessionId === session.id,
+            );
             return (
-              <li key={memo.id}>
-                <HistoryMemoCard
-                  memo={memo}
-                  themeTitle={themeTitle}
-                  detailHref={`/history/${memo.sessionId}`}
+              <li key={session.id}>
+                <SessionCard
+                  session={session}
+                  memos={memosInSession}
+                  resolveThemeTitle={resolveThemeTitle}
                 />
               </li>
             );
