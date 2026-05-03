@@ -93,6 +93,10 @@ describe("HandwritingCanvas", () => {
     canvas.releasePointerCapture = vi.fn();
   }
 
+  function getActiveStrokePath(container: HTMLElement): SVGPathElement | null {
+    return container.querySelector("svg path");
+  }
+
   it("初期状態で太さ「中」が選択されている（aria-pressed）", () => {
     render(<HandwritingCanvas onChange={vi.fn()} />);
 
@@ -140,7 +144,7 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.lineWidth).toBe(8);
     expect(mockCtx.globalCompositeOperation).toBe("source-over");
-    expect(mockCtx.fill).toHaveBeenCalled();
+    expect(mockCtx.fill).not.toHaveBeenCalled();
   });
 
   it("初期はペン（pen）が選択され、消しゴムに切り替えられる", () => {
@@ -186,10 +190,10 @@ describe("HandwritingCanvas", () => {
 
     expect(mockCtx.globalCompositeOperation).toBe("destination-out");
     expect(mockCtx.lineWidth).toBe(4);
-    expect(mockCtx.fill).toHaveBeenCalled();
+    expect(mockCtx.fill).not.toHaveBeenCalled();
   });
 
-  it("pointermove でスナップショット復元（drawImage）→ fill で再描画される", async () => {
+  it("pointermove で Canvas に焼き込まず SVG path を更新する", async () => {
     const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
     const canvas = getCanvas(container);
     setupCanvasForPointer(canvas);
@@ -217,11 +221,12 @@ describe("HandwritingCanvas", () => {
       canvas.dispatchEvent(move as unknown as PointerEvent);
     });
 
-    expect(mockCtx.drawImage).toHaveBeenCalled();
-    expect(mockCtx.fill).toHaveBeenCalled();
+    expect(mockCtx.drawImage).not.toHaveBeenCalled();
+    expect(mockCtx.fill).not.toHaveBeenCalled();
+    expect(getActiveStrokePath(container)?.getAttribute("d")).toContain("M");
   });
 
-  it("pointermove は Apple Pencil 対策として buttons: 0 でも描画を継続する", async () => {
+  it("pointermove は Apple Pencil 対策として buttons: 0 でも SVG path の更新を継続する", async () => {
     const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
     const canvas = getCanvas(container);
     setupCanvasForPointer(canvas);
@@ -247,8 +252,9 @@ describe("HandwritingCanvas", () => {
       });
     });
 
-    expect(mockCtx.drawImage).toHaveBeenCalled();
-    expect(mockCtx.fill).toHaveBeenCalled();
+    expect(mockCtx.drawImage).not.toHaveBeenCalled();
+    expect(mockCtx.fill).not.toHaveBeenCalled();
+    expect(getActiveStrokePath(container)?.getAttribute("d")).toContain("M");
   });
 
   it("前ストローク由来の lostpointercapture が遅延発火しても次ストロークを終了しない", async () => {
@@ -365,7 +371,7 @@ describe("HandwritingCanvas", () => {
       expect(onChange).not.toHaveBeenCalled();
     });
 
-    it("pointercancel でスナップショットを drawImage で復元する（ストロークの巻き戻し）", async () => {
+    it("pointercancel で SVG の描画中ストロークを破棄する", async () => {
       const { container } = render(<HandwritingCanvas onChange={vi.fn()} />);
       const canvas = getCanvas(container);
       setupCanvasForPointer(canvas);
@@ -377,8 +383,15 @@ describe("HandwritingCanvas", () => {
           pointerId: 1,
           buttons: 1,
         });
+        fireEvent.pointerMove(canvas, {
+          clientX: 20,
+          clientY: 20,
+          pointerId: 1,
+          buttons: 1,
+        });
       });
-      // pointerdown で行われた drawImage の呼び出しをリセット
+
+      expect(getActiveStrokePath(container)).toBeInTheDocument();
       mockCtx.drawImage.mockClear();
 
       await act(async () => {
@@ -389,8 +402,8 @@ describe("HandwritingCanvas", () => {
         });
       });
 
-      // キャンセル時にスナップショットを drawImage で貼り直す
-      expect(mockCtx.drawImage).toHaveBeenCalled();
+      expect(mockCtx.drawImage).not.toHaveBeenCalled();
+      expect(getActiveStrokePath(container)).not.toBeInTheDocument();
     });
 
     it("pointercancel 後は globalCompositeOperation が source-over（idle 状態）に戻る", async () => {

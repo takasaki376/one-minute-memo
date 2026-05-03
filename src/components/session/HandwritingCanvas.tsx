@@ -23,6 +23,7 @@ const PEN_SIZE_ARIA_LABELS: Record<PenSize, string> = {
 
 const PEN_STROKE_COLOR = "#111827";
 const ERASER_STROKE_COLOR = "rgba(0,0,0,1)";
+const ERASER_PREVIEW_COLOR = "rgba(248,113,113,0.35)";
 
 function freehandOptions(penSize: PenSize, last: boolean): StrokeOptions {
   const w = PEN_WIDTHS[penSize];
@@ -53,6 +54,51 @@ function fillFreehandOutline(
   }
   ctx.closePath();
   ctx.fill();
+}
+
+const average = (a: number, b: number) => (a + b) / 2;
+
+function getSvgPathFromStroke(points: [number, number][], closed = true) {
+  const len = points.length;
+
+  if (len < 4) return "";
+
+  let a = points[0];
+  let b = points[1];
+  const c = points[2];
+
+  let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
+    2,
+  )},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(
+    b[1],
+    c[1],
+  ).toFixed(2)} T`;
+
+  for (let i = 2, max = len - 1; i < max; i++) {
+    a = points[i];
+    b = points[i + 1];
+    result += `${average(a[0], b[0]).toFixed(2)},${average(
+      a[1],
+      b[1],
+    ).toFixed(2)} `;
+  }
+
+  if (closed) result += "Z";
+
+  return result;
+}
+
+function getRenderableStrokePoints(points: number[][]) {
+  if (points.length !== 1) return points;
+  const a = points[0];
+  return [a, a];
+}
+
+function getFreehandOutline(points: number[][], penSize: PenSize, last: boolean) {
+  return getStroke(
+    getRenderableStrokePoints(points),
+    freehandOptions(penSize, last),
+  ) as [number, number][];
 }
 
 /**
@@ -91,6 +137,14 @@ function PerfectFreehandCanvas({
 }: HandwritingCanvasProps) {
   const [penSize, setPenSize] = useState<PenSize>("m");
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const [activeStrokePathData, setActiveStrokePathData] = useState("");
+  const [activeStrokeTool, setActiveStrokeTool] = useState<"pen" | "eraser">(
+    "pen",
+  );
+  const [svgViewBoxSize, setSvgViewBoxSize] = useState({
+    width: 1,
+    height: 1,
+  });
   const penSizeRef = useRef<PenSize>("m");
   const toolRef = useRef<"pen" | "eraser">("pen");
 
@@ -109,11 +163,6 @@ function PerfectFreehandCanvas({
   const resizeFnRef = useRef<(() => void) | null>(null);
   /** perfect-freehand 用: 現在ストロークの [x, y, pressure?]（論理座標） */
   const strokePointsRef = useRef<number[][]>([]);
-  /** ストローク開始直前のキャンバス（device px）— move では drawImage で復元する */
-  const beforeStrokeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  /** ストローク描画を rAF で 1 フレームにまとめる */
-  const strokeRafIdRef = useRef<number | null>(null);
-  const strokeLastFlagRef = useRef(false);
   const exportTimerIdRef = useRef<number | null>(null);
   const latestExportRequestIdRef = useRef(0);
   /** 直近の onChange がローカル描画の反映であるとき、親からの同じ value で二重デコード・全貼り直しを避ける */
@@ -282,6 +331,7 @@ function PerfectFreehandCanvas({
       const prevH = prevLogical.height;
 
       logicalSizeRef.current = { width: displayWidth, height: displayHeight };
+      setSvgViewBoxSize({ width: displayWidth, height: displayHeight });
 
       canvas.style.width = `${displayWidth}px`;
       canvas.style.height = `${displayHeight}px`;
@@ -449,37 +499,27 @@ function PerfectFreehandCanvas({
     exportTimerIdRef.current = window.setTimeout(runExport, 120);
   }, [exportCanvas]);
 
-  const redrawCurrentStroke = (
-    ctx: CanvasRenderingContext2D,
-    canvas: HTMLCanvasElement,
-    last: boolean,
-  ) => {
-    const snapshotCanvas = beforeStrokeCanvasRef.current;
-    if (!snapshotCanvas) return;
+  const updateActiveStrokePath = useCallback((last: boolean) => {
+    const outline = getFreehandOutline(
+      strokePointsRef.current,
+      penSizeRef.current,
+      last,
+    );
+    setActiveStrokePathData(getSvgPathFromStroke(outline));
+  }, []);
 
-    // Snapshot を復元（現在の transform 無視して device px で描画）
-    const dpr = dprRef.current;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalCompositeOperation = "source-over";
-    ctx.drawImage(snapshotCanvas, 0, 0);
-    ctx.restore();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // ストロークを描画（論理座標系で）
-    let points = strokePointsRef.current;
-    if (points.length === 0) return;
-    if (points.length === 1) {
-      const a = points[0];
-      points = [a, a];
-    }
-
-    const outline = getStroke(
-      points,
-      freehandOptions(penSizeRef.current, last),
-    ) as [number, number][];
-    fillFreehandOutline(ctx, outline, toolRef.current);
-  };
+  const commitCurrentStroke = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const outline = getFreehandOutline(
+        strokePointsRef.current,
+        penSizeRef.current,
+        true,
+      );
+      fillFreehandOutline(ctx, outline, toolRef.current);
+      applyCanvasStyle(ctx);
+    },
+    [applyCanvasStyle],
+  );
 
   const handlePointerDown = (event: PointerEvent) => {
     if (disabled) return;
@@ -489,8 +529,8 @@ function PerfectFreehandCanvas({
     if (isDrawingRef.current && activePointerIdRef.current !== event.pointerId) {
       isDrawingRef.current = false;
       activePointerIdRef.current = null;
-      beforeStrokeCanvasRef.current = null;
       strokePointsRef.current = [];
+      setActiveStrokePathData("");
       scheduleExport();
     }
     const canvas = canvasRef.current;
@@ -498,25 +538,16 @@ function PerfectFreehandCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Prepare snapshot first to avoid entering a partial drawing state.
-    const snapshot = document.createElement("canvas");
-    snapshot.width = canvas.width;
-    snapshot.height = canvas.height;
-    const snapshotCtx = snapshot.getContext("2d");
-    if (!snapshotCtx) return;
-    snapshotCtx.drawImage(canvas, 0, 0);
-    beforeStrokeCanvasRef.current = snapshot;
-
     isDrawingRef.current = true;
     activePointerIdRef.current = event.pointerId;
+    setActiveStrokeTool(toolRef.current);
 
     strokePointsRef.current = [];
     const pos = getCanvasPos(event);
     strokePointsRef.current.push([pos.x, pos.y, pointerPressure(event)]);
 
     applyStrokeForTool(ctx, toolRef.current, penSizeRef.current);
-
-    redrawCurrentStroke(ctx, canvas, false);
+    updateActiveStrokePath(false);
   };
 
   const handlePointerMove = (event: PointerEvent) => {
@@ -530,20 +561,9 @@ function PerfectFreehandCanvas({
     if (event.buttons > 1) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
 
     appendStrokeSamples(canvas, event);
-    strokeLastFlagRef.current = false;
-    if (strokeRafIdRef.current !== null) return;
-    strokeRafIdRef.current = requestAnimationFrame(() => {
-      strokeRafIdRef.current = null;
-      const c = canvasRef.current;
-      if (!c) return;
-      const cctx = c.getContext("2d");
-      if (!cctx) return;
-      redrawCurrentStroke(cctx, c, strokeLastFlagRef.current);
-    });
+    updateActiveStrokePath(false);
   };
 
   const finishDrawing = (
@@ -559,22 +579,14 @@ function PerfectFreehandCanvas({
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    if (strokeRafIdRef.current !== null) {
-      cancelAnimationFrame(strokeRafIdRef.current);
-      strokeRafIdRef.current = null;
+    if (ctx) {
+      commitCurrentStroke(ctx);
     }
-    if (ctx && beforeStrokeCanvasRef.current) {
-      redrawCurrentStroke(ctx, canvas, true);
-    }
-    beforeStrokeCanvasRef.current = null;
     strokePointsRef.current = [];
+    setActiveStrokePathData("");
 
     if (options?.export !== false) {
       scheduleExport();
-    }
-
-    if (ctx) {
-      applyCanvasStyle(ctx);
     }
 
     if (pendingResizeRef.current) {
@@ -605,8 +617,7 @@ function PerfectFreehandCanvas({
 
   /**
    * pointercancel: ブラウザやシステムがポインターを強制終了した場合。
-   * setPointerCapture 直後に pointercancel が発火するケースもあるため、
-   * 描画途中のストロークをスナップショットで巻き戻し、エクスポートは行わない。
+   * 描画中の SVG ストロークだけを破棄し、Canvas への確定とエクスポートは行わない。
    */
   const handlePointerCancel = (event: PointerEvent) => {
     if (!isDrawingRef.current) return;
@@ -614,30 +625,9 @@ function PerfectFreehandCanvas({
     event.preventDefault();
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
-
-    if (strokeRafIdRef.current !== null) {
-      cancelAnimationFrame(strokeRafIdRef.current);
-      strokeRafIdRef.current = null;
-    }
-
-    // キャンセルされたストロークをスナップショットで巻き戻す
     const canvas = canvasRef.current;
-    const snapshotCanvas = beforeStrokeCanvasRef.current;
-    if (canvas && snapshotCanvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        const dpr = dprRef.current;
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalCompositeOperation = "source-over";
-        ctx.drawImage(snapshotCanvas, 0, 0);
-        ctx.restore();
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-    }
-
-    beforeStrokeCanvasRef.current = null;
     strokePointsRef.current = [];
+    setActiveStrokePathData("");
 
     const ctx = canvas?.getContext("2d");
     if (ctx) {
@@ -847,6 +837,25 @@ function PerfectFreehandCanvas({
           }}
           className={canvasClass}
         />
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[1] h-full w-full touch-none select-none"
+          viewBox={`0 0 ${svgViewBoxSize.width} ${svgViewBoxSize.height}`}
+          preserveAspectRatio="none"
+        >
+          {activeStrokePathData ? (
+            <path
+              d={activeStrokePathData}
+              fill={
+                activeStrokeTool === "eraser"
+                  ? ERASER_PREVIEW_COLOR
+                  : PEN_STROKE_COLOR
+              }
+              stroke="transparent"
+              strokeWidth={0}
+            />
+          ) : null}
+        </svg>
       </div>
       <button
         type="button"
