@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { importOpenDBTestModule } from "./openDBTestModule";
 
@@ -171,7 +171,16 @@ describe("memosRepo", () => {
   });
 
   describe("getAllMemos", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("すべてのメモを createdAt 降順で返す", async () => {
+      vi.setSystemTime(new Date("2025-01-01T10:00:00.000Z"));
       await saveMemo({
         sessionId: "s1",
         themeId: "t1",
@@ -179,7 +188,7 @@ describe("memosRepo", () => {
         textContent: "古い",
         handwritingType: "none",
       });
-      await new Promise((r) => setTimeout(r, 15));
+      vi.setSystemTime(new Date("2025-01-02T10:00:00.000Z"));
       await saveMemo({
         sessionId: "s1",
         themeId: "t1",

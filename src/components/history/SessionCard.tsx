@@ -18,10 +18,10 @@ export interface SessionCardProps {
   resolveThemeTitle?: (memo: MemoRecord) => string;
 }
 
+/** 手書き canvas の保存は handwritingType === \"dataUrl\" のときのみ（none はテキストのみ） */
 function hasHandwritingImage(memo: MemoRecord): boolean {
   return Boolean(
-    memo.handwritingDataUrl &&
-      (memo.handwritingType === "dataUrl" || memo.handwritingType === "none"),
+    memo.handwritingDataUrl && memo.handwritingType === "dataUrl",
   );
 }
 
@@ -69,7 +69,7 @@ function SessionMemoEntry({
           </p>
           <img
             src={memo.handwritingDataUrl}
-            alt=""
+            alt={`手書きメモ（${memo.order}/${orderTotal}）`}
             className="mt-1 block h-auto w-full max-h-64 rounded-md border border-slate-200 bg-white object-contain dark:border-slate-600"
             loading="lazy"
             decoding="async"

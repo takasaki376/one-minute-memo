@@ -83,4 +83,8 @@ describe("isoToLocalDateKey", () => {
     const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     expect(isoToLocalDateKey(iso)).toBe(expected);
   });
+
+  it("returns empty string when iso is not parseable", () => {
+    expect(isoToLocalDateKey("not-a-date")).toBe("");
+  });
 });

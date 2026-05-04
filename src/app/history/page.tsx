@@ -98,8 +98,11 @@ export default function HistoryPage() {
       if (filterThemeId && m.themeId !== filterThemeId) {
         return false;
       }
-      if (filterDate && isoToLocalDateKey(m.createdAt) !== filterDate) {
-        return false;
+      if (filterDate) {
+        const dayKey = isoToLocalDateKey(m.createdAt);
+        if (!dayKey || dayKey !== filterDate) {
+          return false;
+        }
       }
       return true;
     });
@@ -116,6 +119,20 @@ export default function HistoryPage() {
     return list;
   }, [filteredMemos, sessionMap]);
 
+  /** filteredMemos を sessionId ごとにまとめる（セッション×メモの二重ループを避ける） */
+  const memosBySessionId = useMemo(() => {
+    const map = new Map<string, MemoRecord[]>();
+    for (const m of filteredMemos) {
+      const arr = map.get(m.sessionId);
+      if (arr) {
+        arr.push(m);
+      } else {
+        map.set(m.sessionId, [m]);
+      }
+    }
+    return map;
+  }, [filteredMemos]);
+
   /** カレンダー上の「メモあり」表示用（テーマ絞り込み時はその条件後の日付のみ） */
   const memosForDateHints = useMemo(() => {
     return memos.filter((m) => !filterThemeId || m.themeId === filterThemeId);
@@ -124,7 +141,10 @@ export default function HistoryPage() {
   const memoDateKeys = useMemo(() => {
     const s = new Set<string>();
     for (const m of memosForDateHints) {
-      s.add(isoToLocalDateKey(m.createdAt));
+      const key = isoToLocalDateKey(m.createdAt);
+      if (key) {
+        s.add(key);
+      }
     }
     return s;
   }, [memosForDateHints]);
@@ -289,20 +309,15 @@ export default function HistoryPage() {
         </div>
       ) : (
         <ul className="flex flex-col gap-4">
-          {sortedSessionsForList.map((session) => {
-            const memosInSession = filteredMemos.filter(
-              (m) => m.sessionId === session.id,
-            );
-            return (
-              <li key={session.id}>
-                <SessionCard
-                  session={session}
-                  memos={memosInSession}
-                  resolveThemeTitle={resolveThemeTitle}
-                />
-              </li>
-            );
-          })}
+          {sortedSessionsForList.map((session) => (
+            <li key={session.id}>
+              <SessionCard
+                session={session}
+                memos={memosBySessionId.get(session.id) ?? []}
+                resolveThemeTitle={resolveThemeTitle}
+              />
+            </li>
+          ))}
         </ul>
       )}
 
