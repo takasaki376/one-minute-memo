@@ -54,6 +54,17 @@ export async function saveMemo(
 }
 
 /**
+ * すべてのメモを取得する（履歴一覧 `/history` 用）
+ * - createdAt 降順（新しい順）。createdAt は ISO 8601 文字列を想定し、文字列比較でソート
+ */
+export async function getAllMemos(): Promise<MemoRecord[]> {
+  const db = await getDB();
+  const memos = await db.getAll(MEMO_STORE);
+  memos.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return memos;
+}
+
+/**
  * 指定セッションに紐づくメモをすべて取得する
  * - セッション詳細画面 `/history/[id]` 用
  * - order 昇順に並び替えて返す

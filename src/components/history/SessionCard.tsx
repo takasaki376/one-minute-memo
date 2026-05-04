@@ -4,20 +4,99 @@ import cc from "classcat";
 
 import { Button } from "@/components/ui/Button";
 import { formatSessionDateTime } from "@/lib/utils/dateFormatters";
+import type { MemoRecord } from "@/types/memo";
 import type { SessionRecord } from "@/types/session";
 
 export interface SessionCardProps {
   session: SessionRecord;
-  href?: string; // クリック時に飛ぶ先（例: `/history/${session.id}`）
+  /** 指定時のみ「詳細を見る」を表示 */
+  detailHref?: string;
   className?: string;
+  /** セッション内のメモ（履歴一覧用）。指定時は各メモの内容をカード内に表示 */
+  memos?: MemoRecord[];
+  /** メモごとのテーマ表示名 */
+  resolveThemeTitle?: (memo: MemoRecord) => string;
+}
+
+/** 手書き canvas の保存は handwritingType === \"dataUrl\" のときのみ（none はテキストのみ） */
+function hasHandwritingImage(memo: MemoRecord): boolean {
+  return Boolean(
+    memo.handwritingDataUrl && memo.handwritingType === "dataUrl",
+  );
+}
+
+function SessionMemoEntry({
+  memo,
+  themeTitle,
+  orderTotal,
+}: {
+  memo: MemoRecord;
+  themeTitle: string;
+  orderTotal: number;
+}) {
+  const at = memo.createdAt ? new Date(memo.createdAt) : null;
+  const when = formatSessionDateTime(at);
+  const text = memo.textContent.trim();
+  const showHandwriting = hasHandwritingImage(memo);
+  const showEmpty = text.length === 0 && !showHandwriting;
+
+  return (
+    <div
+      className={cc([
+        "w-full min-w-0 rounded-md border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-600/80 dark:bg-slate-900/40",
+      ])}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-800 dark:bg-slate-600 dark:text-slate-100">
+          {memo.order}/{orderTotal}
+        </span>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          {when}
+        </p>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+        テーマ: {themeTitle}
+      </p>
+      {text.length > 0 ? (
+        <p className="mt-2 text-sm text-slate-700 dark:text-slate-200 line-clamp-4 whitespace-pre-wrap break-words">
+          入力内容: {text}
+        </p>
+      ) : null}
+      {showHandwriting ? (
+        <div className="mt-2 w-full min-w-0">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            手書き
+          </p>
+          <img
+            src={memo.handwritingDataUrl}
+            alt={`手書きメモ（${memo.order}/${orderTotal}）`}
+            className="mt-1 block h-auto w-full max-h-64 rounded-md border border-slate-200 bg-white object-contain dark:border-slate-600"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      ) : null}
+      {showEmpty ? (
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          入力内容: （入力なし）
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
- * セッション履歴一覧で使うカードコンポーネント（PJ1-107）
- * - session を渡し、href で詳細画面へ遷移
- * - classcat / Tailwind、未完了時は「未完了」表示
+ * セッション履歴用カード（PJ1-107）
+ * - detailHref があるときだけ詳細リンクを表示
+ * - memos + resolveThemeTitle で一覧にメモ内容を埋め込める
  */
-export function SessionCard({ session, href, className }: SessionCardProps) {
+export function SessionCard({
+  session,
+  detailHref,
+  className,
+  memos,
+  resolveThemeTitle,
+}: SessionCardProps) {
   const started = session.startedAt ? new Date(session.startedAt) : null;
   const ended = session.endedAt ? new Date(session.endedAt) : null;
 
@@ -25,6 +104,16 @@ export function SessionCard({ session, href, className }: SessionCardProps) {
   const endedLabel = ended ? formatSessionDateTime(ended) : "未完了";
 
   const themeCount = session.themeIds.length;
+  const orderTotal = Math.max(themeCount, 1);
+
+  const sortedMemos =
+    memos && memos.length > 0
+      ? [...memos].sort((a, b) => a.order - b.order)
+      : [];
+
+  const titleResolver =
+    resolveThemeTitle ??
+    ((m: MemoRecord) => `テーマ ${m.order}`);
 
   return (
     <div
@@ -33,8 +122,7 @@ export function SessionCard({ session, href, className }: SessionCardProps) {
         className,
       ])}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        {/* セッション概要 */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex-1">
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
             {startedLabel} 開始
@@ -45,21 +133,28 @@ export function SessionCard({ session, href, className }: SessionCardProps) {
           </p>
         </div>
 
-        {/* アクション */}
-        <div className="mt-2 flex gap-2 sm:mt-0">
-          {href ? (
-            <Button href={href} variant="secondary" size="sm">
+        {detailHref ? (
+          <div className="mt-2 shrink-0 sm:mt-0">
+            <Button href={detailHref} variant="secondary" size="sm">
               詳細を見る
             </Button>
-          ) : (
-            <span title="詳細画面への遷移先が設定されていません">
-              <Button disabled variant="secondary" size="sm">
-                詳細
-              </Button>
-            </span>
-          )}
-        </div>
+          </div>
+        ) : null}
       </div>
+
+      {sortedMemos.length > 0 ? (
+        <ul className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 dark:border-slate-700">
+          {sortedMemos.map((memo) => (
+            <li key={memo.id}>
+              <SessionMemoEntry
+                memo={memo}
+                themeTitle={titleResolver(memo)}
+                orderTotal={orderTotal}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

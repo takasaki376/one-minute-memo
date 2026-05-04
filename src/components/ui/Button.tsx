@@ -55,7 +55,7 @@ export function Button({
   const isDisabled = disabled || isLoading;
 
   const baseClasses =
-    "inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
+    "inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-900";
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
@@ -63,7 +63,7 @@ export function Button({
     secondary:
       "bg-slate-200 text-slate-900 hover:bg-slate-300 active:bg-slate-400",
     ghost:
-      "bg-transparent text-slate-700 hover:bg-slate-100 focus:ring-slate-300",
+      "bg-transparent text-slate-700 hover:bg-slate-100 focus:ring-slate-300 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus:ring-slate-500",
     outline:
       "border-2 border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100",
   };
