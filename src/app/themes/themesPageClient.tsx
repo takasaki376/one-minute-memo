@@ -45,12 +45,37 @@ export default function ThemesPageClient() {
   const [editFormError, setEditFormError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
   const canLoad = isReady && !seedError;
 
   const themes = useMemo(() => {
     if (state.status !== "success") return [];
     return state.themes;
   }, [state]);
+
+  const categories = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        themes
+          .map((t) => t.category.trim())
+          .filter((c) => c.length > 0),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "ja"));
+    return unique;
+  }, [themes]);
+
+  const filteredThemes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const category = categoryFilter;
+    return themes.filter((t) => {
+      if (category !== "all" && t.category !== category) return false;
+      if (q.length === 0) return true;
+      const title = t.title.trim().toLowerCase();
+      return title.includes(q);
+    });
+  }, [themes, searchQuery, categoryFilter]);
 
   const updateThemeActive = async (theme: ThemeRecord, nextActive: boolean) => {
     setUpdateError(null);
@@ -302,7 +327,7 @@ export default function ThemesPageClient() {
         <div className="flex flex-wrap items-center gap-2">
           {state.status === "success" && (
             <>
-              <span className="text-sm text-slate-600">{`${themes.length} 件`}</span>
+              <span className="text-sm text-slate-600">{`${filteredThemes.length} / ${themes.length} 件`}</span>
               <Button
                 type="button"
                 variant="primary"
@@ -358,7 +383,68 @@ export default function ThemesPageClient() {
           テーマがありません。「テーマを追加」から登録できます。
         </div>
       ) : (
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <>
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex-1">
+                <label
+                  htmlFor="themes-search"
+                  className="block text-xs font-medium text-slate-600"
+                >
+                  テーマ名で検索
+                </label>
+                <input
+                  id="themes-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="例: 仕事、健康、学び…"
+                />
+              </div>
+              <div className="w-full sm:w-64">
+                <label
+                  htmlFor="themes-category"
+                  className="block text-xs font-medium text-slate-600"
+                >
+                  カテゴリで絞り込み
+                </label>
+                <select
+                  id="themes-category"
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                >
+                  <option value="all">すべて</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {(searchQuery.trim().length > 0 || categoryFilter !== "all") && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-slate-500">
+                  {filteredThemes.length} 件ヒット
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCategoryFilter("all");
+                  }}
+                >
+                  フィルタをクリア
+                </Button>
+              </div>
+            )}
+          </section>
+
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="grid grid-cols-12 gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
             <div className="col-span-6 sm:col-span-4">テーマ名</div>
             <div className="col-span-3 sm:col-span-3">カテゴリ</div>
@@ -367,7 +453,12 @@ export default function ThemesPageClient() {
             <div className="col-span-1 sm:col-span-2 text-right">source</div>
           </div>
           <ul className="divide-y divide-slate-100">
-            {themes.map((t) => (
+            {filteredThemes.length === 0 ? (
+              <li className="px-4 py-8 text-center text-sm text-slate-600">
+                条件に一致するテーマがありません。
+              </li>
+            ) : (
+              filteredThemes.map((t) => (
               <li key={t.id} className="px-4 py-3">
                 {(() => {
                   const isUpdating = updatingIds.has(t.id);
@@ -447,9 +538,11 @@ export default function ThemesPageClient() {
                   );
                 })()}
               </li>
-            ))}
+              ))
+            )}
           </ul>
         </section>
+        </>
       )}
 
       {addOpen && (
