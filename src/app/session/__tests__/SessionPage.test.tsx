@@ -801,5 +801,49 @@ describe("/session page", () => {
         );
       });
     });
+
+    it("shows warning when active themes are fewer than theme_count", async () => {
+      const customSettings: SettingsRecord = {
+        id: "default",
+        theme_count: 3,
+        time_limit: "60",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      };
+      mockGetSettings.mockResolvedValue(customSettings);
+
+      const { pickRandomActiveThemes } = await import("@/lib/utils/selectRandomThemes");
+      (pickRandomActiveThemes as unknown as Mock).mockResolvedValueOnce([
+        {
+          id: "theme-1",
+          title: "theme 1",
+          category: "general",
+          isActive: true,
+          source: "builtin",
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-01T00:00:00.000Z",
+        },
+        {
+          id: "theme-2",
+          title: "theme 2",
+          category: "general",
+          isActive: true,
+          source: "builtin",
+          createdAt: "2025-01-01T00:00:00.000Z",
+          updatedAt: "2025-01-01T00:00:00.000Z",
+        },
+      ]);
+
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("theme-shortage-warning")).toHaveTextContent(
+        "有効なテーマが不足しているため、2件で開始します（設定:3件）。",
+      );
+    });
   });
 });
