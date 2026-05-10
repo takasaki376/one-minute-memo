@@ -121,6 +121,69 @@ export async function createUserTheme(
   return record;
 }
 
+export type UpdateThemeInput = Pick<
+  ThemeRecord,
+  'title' | 'category' | 'isActive'
+>;
+
+/**
+ * 既存テーマの title / category / isActive を更新する（source と id は変更しない）
+ */
+export async function updateTheme(
+  id: string,
+  input: UpdateThemeInput,
+): Promise<ThemeRecord> {
+  const title = input.title.trim();
+  const categoryRaw = input.category.trim();
+  if (title.length === 0) {
+    throw new Error('テーマ名を入力してください');
+  }
+  if (title.length > USER_THEME_TITLE_MAX) {
+    throw new Error(
+      `テーマ名は${String(USER_THEME_TITLE_MAX)}文字以内にしてください`,
+    );
+  }
+  if (categoryRaw.length > USER_THEME_CATEGORY_MAX) {
+    throw new Error(
+      `カテゴリは${String(USER_THEME_CATEGORY_MAX)}文字以内にしてください`,
+    );
+  }
+
+  const all = await getAllThemes();
+  const normalizedTitle = title.toLowerCase();
+  if (
+    all.some(
+      (t) =>
+        t.id !== id && t.title.trim().toLowerCase() === normalizedTitle,
+    )
+  ) {
+    throw new Error('同じ名前のテーマが既に存在します');
+  }
+
+  const db = await getDB();
+  const tx = db.transaction(THEME_STORE, 'readwrite');
+  const store = tx.store;
+  const existing = await store.get(id);
+  if (!existing) {
+    await tx.done;
+    throw new Error('テーマが見つかりません');
+  }
+
+  const prev = stripIndex(existing);
+  const now = new Date().toISOString();
+  const updated: ThemeRecord = {
+    ...prev,
+    title,
+    category: categoryRaw.length > 0 ? categoryRaw : '未分類',
+    isActive: input.isActive,
+    updatedAt: now,
+  };
+
+  await store.put(withIndex(updated));
+  await tx.done;
+  return updated;
+}
+
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(THEME_STORE, 'readwrite');
