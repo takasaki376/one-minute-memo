@@ -30,6 +30,7 @@ const mockGetAllThemes = vi.fn();
 const mockToggleThemeActive = vi.fn();
 const mockCreateUserTheme = vi.fn();
 const mockUpdateTheme = vi.fn();
+const mockGetMemoCountsByThemeIds = vi.fn();
 
 vi.mock("@/components/providers/ThemeSeedProvider", () => {
   return {
@@ -50,11 +51,22 @@ vi.mock("@/lib/db/themesRepo", () => {
   };
 });
 
+vi.mock("@/lib/db/memosRepo", () => {
+  return {
+    getMemoCountsByThemeIds: (...args: unknown[]) =>
+      mockGetMemoCountsByThemeIds(...args),
+  };
+});
+
 describe("/themes page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAllThemes.mockResolvedValue([...baseThemes]);
     mockToggleThemeActive.mockResolvedValue(undefined);
+    mockGetMemoCountsByThemeIds.mockResolvedValue({
+      "theme-0001": 3,
+      "theme-0002": 1,
+    });
     mockCreateUserTheme.mockImplementation(
       async (input: { title: string; category: string; isActive: boolean }) => ({
       id: "user-theme-1",
@@ -93,6 +105,12 @@ describe("/themes page", () => {
     });
     expect(screen.getByText("健康について")).toBeInTheDocument();
     expect(screen.getByText("2 / 2 件")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockGetMemoCountsByThemeIds).toHaveBeenCalledTimes(1);
+    });
+    const row = screen.getByText("theme-0001").closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("3")).toBeInTheDocument();
   });
 
   it("filters by search query and category", async () => {

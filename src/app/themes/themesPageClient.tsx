@@ -11,6 +11,7 @@ import {
   toggleThemeActive,
   updateTheme,
 } from "@/lib/db/themesRepo";
+import { getMemoCountsByThemeIds } from "@/lib/db/memosRepo";
 import type { ThemeRecord } from "@/types/theme";
 
 const ADD_TITLE_MAX = 200;
@@ -47,6 +48,7 @@ export default function ThemesPageClient() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [memoCounts, setMemoCounts] = useState<Record<string, number>>({});
 
   const canLoad = isReady && !seedError;
 
@@ -76,6 +78,16 @@ export default function ThemesPageClient() {
       return title.includes(q);
     });
   }, [themes, searchQuery, categoryFilter]);
+
+  useEffect(() => {
+    if (themes.length === 0) {
+      setMemoCounts({});
+      return;
+    }
+    getMemoCountsByThemeIds(themes.map((t) => t.id))
+      .then((counts) => setMemoCounts(counts))
+      .catch(() => setMemoCounts({}));
+  }, [themes]);
 
   const updateThemeActive = async (theme: ThemeRecord, nextActive: boolean) => {
     setUpdateError(null);
@@ -450,6 +462,7 @@ export default function ThemesPageClient() {
           <div className="grid grid-cols-12 gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
             <div className="col-span-6 sm:col-span-4">テーマ名</div>
             <div className="col-span-3 sm:col-span-3">カテゴリ</div>
+            <div className="hidden sm:block sm:col-span-1 text-right">メモ数</div>
             <div className="col-span-2 sm:col-span-2">状態</div>
             <div className="hidden sm:block sm:col-span-1">切替</div>
             <div className="col-span-1 sm:col-span-2 text-right">source</div>
@@ -492,6 +505,11 @@ export default function ThemesPageClient() {
                     <p className="truncate text-sm text-slate-700">
                       {t.category}
                     </p>
+                  </div>
+                  <div className="hidden sm:block sm:col-span-1 text-right">
+                    <span className="text-sm tabular-nums text-slate-700">
+                      {memoCounts[t.id] ?? 0}
+                    </span>
                   </div>
                   <div className="col-span-2 sm:col-span-2">
                     <span
