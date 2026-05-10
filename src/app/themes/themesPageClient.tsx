@@ -9,6 +9,7 @@ import {
   createUserTheme,
   getAllThemes,
   toggleThemeActive,
+  updateTheme,
 } from "@/lib/db/themesRepo";
 import type { ThemeRecord } from "@/types/theme";
 
@@ -36,6 +37,13 @@ export default function ThemesPageClient() {
   const [addIsActive, setAddIsActive] = useState(true);
   const [addFormError, setAddFormError] = useState<string | null>(null);
   const [addSaving, setAddSaving] = useState(false);
+
+  const [editingTheme, setEditingTheme] = useState<ThemeRecord | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const canLoad = isReady && !seedError;
 
@@ -100,22 +108,46 @@ export default function ThemesPageClient() {
     resetAddForm();
   }, [resetAddForm]);
 
+  const resetEditForm = useCallback(() => {
+    setEditingTheme(null);
+    setEditTitle("");
+    setEditCategory("");
+    setEditIsActive(true);
+    setEditFormError(null);
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    resetEditForm();
+  }, [resetEditForm]);
+
   const openAddModal = () => {
+    closeEditModal();
     resetAddForm();
     setAddOpen(true);
   };
 
+  const openEditModal = (theme: ThemeRecord) => {
+    setAddOpen(false);
+    resetAddForm();
+    setEditFormError(null);
+    setEditingTheme(theme);
+    setEditTitle(theme.title);
+    setEditCategory(theme.category === "未分類" ? "" : theme.category);
+    setEditIsActive(theme.isActive);
+  };
+
   useEffect(() => {
-    if (!addOpen) return;
+    if (!addOpen && !editingTheme) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        closeAddModal();
+        if (editingTheme) closeEditModal();
+        else closeAddModal();
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [addOpen, closeAddModal]);
+  }, [addOpen, editingTheme, closeAddModal, closeEditModal]);
 
   const submitAddTheme = async (e: FormEvent) => {
     e.preventDefault();
@@ -159,6 +191,55 @@ export default function ThemesPageClient() {
       );
     } finally {
       setAddSaving(false);
+    }
+  };
+
+  const submitEditTheme = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingTheme) return;
+    setEditFormError(null);
+    const t = editTitle.trim();
+    const c = editCategory.trim();
+    if (t.length === 0) {
+      setEditFormError("テーマ名を入力してください");
+      return;
+    }
+    if (t.length > ADD_TITLE_MAX) {
+      setEditFormError(
+        `テーマ名は${String(ADD_TITLE_MAX)}文字以内にしてください`,
+      );
+      return;
+    }
+    if (c.length > ADD_CATEGORY_MAX) {
+      setEditFormError(
+        `カテゴリは${String(ADD_CATEGORY_MAX)}文字以内にしてください`,
+      );
+      return;
+    }
+    const themeId = editingTheme.id;
+    setEditSaving(true);
+    try {
+      const saved = await updateTheme(themeId, {
+        title: editTitle,
+        category: editCategory,
+        isActive: editIsActive,
+      });
+      setState((prev) => {
+        if (prev.status !== "success") return prev;
+        return {
+          status: "success",
+          themes: prev.themes.map((row) =>
+            row.id === themeId ? saved : row,
+          ),
+        };
+      });
+      closeEditModal();
+    } catch (err) {
+      setEditFormError(
+        err instanceof Error ? err.message : "テーマの更新に失敗しました",
+      );
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -215,7 +296,7 @@ export default function ThemesPageClient() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold">テーマ管理</h1>
           <p className="mt-1 text-sm text-slate-600">
-            テーマの一覧を確認し、有効/無効や追加ができます（検索・編集は後続）。
+            テーマの一覧を確認し、編集・有効/無効・追加ができます（検索は後続）。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -293,10 +374,26 @@ export default function ThemesPageClient() {
                   return (
                 <div className="grid grid-cols-12 items-center gap-2">
                   <div className="col-span-6 sm:col-span-4">
-                    <p className="truncate text-sm font-medium text-slate-900">
-                      {t.title}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">{t.id}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-900">
+                          {t.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {t.id}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-slate-600"
+                        onClick={() => openEditModal(t)}
+                        data-testid={`themes-edit-${t.id}`}
+                      >
+                        編集
+                      </Button>
+                    </div>
                   </div>
                   <div className="col-span-3 sm:col-span-3">
                     <p className="truncate text-sm text-slate-700">
@@ -458,6 +555,127 @@ export default function ThemesPageClient() {
                 </Button>
                 <Button type="submit" isLoading={addSaving}>
                   追加
+                </Button>
+              </div>
+            </form>
+          </dialog>
+        </div>
+      )}
+
+      {editingTheme && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop mirrors session modals; Escape closes via document listener */}
+          <div
+            role="presentation"
+            aria-hidden="true"
+            className="absolute inset-0 cursor-pointer bg-slate-900/40"
+            onClick={closeEditModal}
+          />
+          <dialog
+            open
+            aria-labelledby="edit-theme-title"
+            className="relative z-10 m-0 w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl outline-none open:block dark:border-slate-700 dark:bg-slate-900"
+          >
+            <h2
+              id="edit-theme-title"
+              className="text-base font-semibold text-slate-900 dark:text-slate-100"
+            >
+              テーマを編集
+            </h2>
+            <dl className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="flex gap-2">
+                <dt className="font-medium text-slate-500">source</dt>
+                <dd>{formatSource(editingTheme.source)}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="font-medium text-slate-500">id</dt>
+                <dd className="truncate font-mono">{editingTheme.id}</dd>
+              </div>
+            </dl>
+            {editingTheme.source === "builtin" ? (
+              <p className="mt-2 text-xs text-slate-500">
+                内蔵テーマも、この端末上の表示名・カテゴリ・有効状態だけ変更できます。sourceはbuiltinのままです。
+              </p>
+            ) : null}
+            <form
+              className="mt-4 space-y-4"
+              onSubmit={(e) => {
+                void submitEditTheme(e);
+              }}
+            >
+              {editFormError && (
+                <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                  {editFormError}
+                </div>
+              )}
+              <div>
+                <label
+                  htmlFor="edit-theme-name"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                >
+                  テーマ名
+                  <span className="text-rose-600"> *</span>
+                </label>
+                <input
+                  id="edit-theme-name"
+                  type="text"
+                  value={editTitle}
+                  onChange={(ev) => setEditTitle(ev.target.value)}
+                  maxLength={ADD_TITLE_MAX}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  autoComplete="off"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {`${editTitle.length}/${String(ADD_TITLE_MAX)} 文字`}
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-theme-category"
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                >
+                  カテゴリ
+                </label>
+                <input
+                  id="edit-theme-category"
+                  type="text"
+                  value={editCategory}
+                  onChange={(ev) => setEditCategory(ev.target.value)}
+                  maxLength={ADD_CATEGORY_MAX}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  autoComplete="off"
+                  placeholder="未入力のときは「未分類」になります"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {`${editCategory.length}/${String(ADD_CATEGORY_MAX)} 文字`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="edit-theme-active"
+                  type="checkbox"
+                  checked={editIsActive}
+                  onChange={(ev) => setEditIsActive(ev.target.checked)}
+                  className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label
+                  htmlFor="edit-theme-active"
+                  className="text-sm text-slate-700 dark:text-slate-300"
+                >
+                  有効にする
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeEditModal}
+                  disabled={editSaving}
+                >
+                  キャンセル
+                </Button>
+                <Button type="submit" isLoading={editSaving}>
+                  保存
                 </Button>
               </div>
             </form>

@@ -78,6 +78,7 @@ import {
   initBuiltinThemesIfNeeded,
   getAllThemes,
   createUserTheme,
+  updateTheme,
 } from "../themesRepo";
 
 describe("themesRepo initBuiltinThemesIfNeeded", () => {
@@ -181,6 +182,66 @@ describe("themesRepo createUserTheme", () => {
         isActive: true,
       }),
     ).rejects.toThrow(/同じ名前/);
+  });
+});
+
+describe("themesRepo updateTheme", () => {
+  beforeEach(async () => {
+    const mod = await importOpenDBTestModule();
+    mod.__reset();
+  });
+
+  it("updates title, category, isActive and bumps updatedAt", async () => {
+    const created = await createUserTheme({
+      title: "Old",
+      category: "Cat",
+      isActive: true,
+    });
+    const updated = await updateTheme(created.id, {
+      title: "New name",
+      category: "Next",
+      isActive: false,
+    });
+    expect(updated.id).toBe(created.id);
+    expect(updated.source).toBe("user");
+    expect(updated.title).toBe("New name");
+    expect(updated.category).toBe("Next");
+    expect(updated.isActive).toBe(false);
+    expect(updated.createdAt).toBe(created.createdAt);
+    expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
+      new Date(created.updatedAt).getTime(),
+    );
+  });
+
+  it("throws when duplicate title is taken by another theme", async () => {
+    const a = await createUserTheme({
+      title: "A",
+      category: "x",
+      isActive: true,
+    });
+    const b = await createUserTheme({
+      title: "B",
+      category: "y",
+      isActive: true,
+    });
+    await expect(
+      updateTheme(b.id, {
+        title: "a",
+        category: "z",
+        isActive: true,
+      }),
+    ).rejects.toThrow(/同じ名前/);
+    expect(a.title).toBe("A");
+  });
+
+  it("throws when theme id is missing", async () => {
+    await expect(
+      updateTheme("missing-id", {
+        title: "X",
+        category: "y",
+        isActive: true,
+      }),
+    ).rejects.toThrow(/見つかりません/);
   });
 });
 
