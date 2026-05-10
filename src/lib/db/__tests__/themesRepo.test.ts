@@ -74,7 +74,11 @@ vi.mock("../openDB", () => {
   return { getDB, __reset };
 });
 
-import { initBuiltinThemesIfNeeded, getAllThemes } from "../themesRepo";
+import {
+  initBuiltinThemesIfNeeded,
+  getAllThemes,
+  createUserTheme,
+} from "../themesRepo";
 
 describe("themesRepo initBuiltinThemesIfNeeded", () => {
   beforeEach(async () => {
@@ -120,6 +124,63 @@ describe("themesRepo initBuiltinThemesIfNeeded", () => {
     const all = await getAllThemes();
     expect(all.some((t) => t.source === "user")).toBe(true);
     expect(all.some((t) => t.source === "builtin")).toBe(true);
+  });
+});
+
+describe("themesRepo createUserTheme", () => {
+  beforeEach(async () => {
+    const mod = await importOpenDBTestModule();
+    mod.__reset();
+  });
+
+  it("creates a user theme with generated id and timestamps", async () => {
+    const created = await createUserTheme({
+      title: "  私のテーマ  ",
+      category: " 試行 ",
+      isActive: true,
+    });
+    expect(created.id.startsWith("user-theme-")).toBe(true);
+    expect(created.title).toBe("私のテーマ");
+    expect(created.category).toBe("試行");
+    expect(created.source).toBe("user");
+    expect(created.isActive).toBe(true);
+    expect(typeof created.createdAt).toBe("string");
+    expect(typeof created.updatedAt).toBe("string");
+
+    const all = await getAllThemes();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe(created.id);
+  });
+
+  it("uses 未分類 when category is empty", async () => {
+    await createUserTheme({
+      title: "Only title",
+      category: "   ",
+      isActive: false,
+    });
+    const all = await getAllThemes();
+    expect(all[0].category).toBe("未分類");
+  });
+
+  it("throws when title is empty", async () => {
+    await expect(
+      createUserTheme({ title: "  ", category: "", isActive: true }),
+    ).rejects.toThrow(/テーマ名/);
+  });
+
+  it("throws when duplicate title exists", async () => {
+    await createUserTheme({
+      title: "Same",
+      category: "a",
+      isActive: true,
+    });
+    await expect(
+      createUserTheme({
+        title: "same",
+        category: "b",
+        isActive: true,
+      }),
+    ).rejects.toThrow(/同じ名前/);
   });
 });
 

@@ -3,7 +3,22 @@ import type { ThemeRecord } from '@/types/theme';
 import { builtinThemes } from '@/lib/data/builtinThemes';
 
 const THEME_STORE = 'themes';
+
+const USER_THEME_TITLE_MAX = 200;
+const USER_THEME_CATEGORY_MAX = 100;
+
 type ThemeRecordWithIndex = ThemeRecord & { isActiveIndex: number };
+
+function generateUserThemeId(): string {
+  if (
+    typeof globalThis !== 'undefined' &&
+    'crypto' in globalThis &&
+    'randomUUID' in globalThis.crypto
+  ) {
+    return `user-theme-${globalThis.crypto.randomUUID()}`;
+  }
+  return `user-theme-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 function withIndex(theme: ThemeRecord): ThemeRecordWithIndex {
   return {
@@ -13,7 +28,8 @@ function withIndex(theme: ThemeRecord): ThemeRecordWithIndex {
 }
 
 function stripIndex(theme: ThemeRecord | ThemeRecordWithIndex): ThemeRecord {
-  const { isActiveIndex: _ignored, ...rest } = theme as ThemeRecordWithIndex;
+  const { isActiveIndex, ...rest } = theme as ThemeRecordWithIndex;
+  void isActiveIndex;
   return rest;
 }
 
@@ -52,6 +68,57 @@ export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]>
     .map(stripIndex);
   await tx.done;
   return themes;
+}
+
+export type CreateUserThemeInput = Pick<
+  ThemeRecord,
+  'title' | 'category' | 'isActive'
+>;
+
+/**
+ * ユーザー追加テーマを1件保存する（source は常に user）
+ * カテゴリ未入力時は「未分類」として保存する。
+ */
+export async function createUserTheme(
+  input: CreateUserThemeInput,
+): Promise<ThemeRecord> {
+  const title = input.title.trim();
+  const categoryRaw = input.category.trim();
+  if (title.length === 0) {
+    throw new Error('テーマ名を入力してください');
+  }
+  if (title.length > USER_THEME_TITLE_MAX) {
+    throw new Error(
+      `テーマ名は${String(USER_THEME_TITLE_MAX)}文字以内にしてください`,
+    );
+  }
+  if (categoryRaw.length > USER_THEME_CATEGORY_MAX) {
+    throw new Error(
+      `カテゴリは${String(USER_THEME_CATEGORY_MAX)}文字以内にしてください`,
+    );
+  }
+
+  const all = await getAllThemes();
+  const normalizedTitle = title.toLowerCase();
+  if (
+    all.some((t) => t.title.trim().toLowerCase() === normalizedTitle)
+  ) {
+    throw new Error('同じ名前のテーマが既に存在します');
+  }
+
+  const now = new Date().toISOString();
+  const record: ThemeRecord = {
+    id: generateUserThemeId(),
+    title,
+    category: categoryRaw.length > 0 ? categoryRaw : '未分類',
+    isActive: input.isActive,
+    source: 'user',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await upsertThemes([record]);
+  return record;
 }
 
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
