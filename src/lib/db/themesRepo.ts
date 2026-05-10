@@ -87,15 +87,34 @@ export async function toggleThemeActive(
   await tx.done;
 }
 
+async function hasAnyBuiltinTheme(): Promise<boolean> {
+  const db = await getDB();
+  const tx = db.transaction(THEME_STORE, 'readonly');
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    const record = stripIndex(cursor.value);
+    if (record.source === 'builtin') {
+      await tx.done;
+      return true;
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+  return false;
+}
+
 /**
  * 初期テーマをDBに投入する（初回起動時のみ）
- * 既にテーマが存在する場合は何もしない
+ * 既に builtin テーマが投入済みの場合は何もしない
+ *
+ * NOTE:
+ * - ユーザーテーマだけが先に存在するケースでも builtinThemes は投入したいので、
+ *   「themes 件数」ではなく「builtin の有無」で判定する。
+ * - 既存のIDがある場合は上書きせずスキップする（不足分だけ追加）。
  */
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
-  const db = await getDB();
-  const count = await db.count(THEME_STORE);
-  if (count > 0) {
-    // data already exists; skip seeding
+  const seeded = await hasAnyBuiltinTheme();
+  if (seeded) {
     return;
   }
 
@@ -110,5 +129,12 @@ export async function initBuiltinThemesIfNeeded(): Promise<void> {
     updatedAt: now,
   }));
 
-  await upsertThemes(themes);
+  const existing = await getThemesByIds(themes.map((t) => t.id));
+  const existingIds = new Set(existing.map((t) => t.id));
+  const missing = themes.filter((t) => !existingIds.has(t.id));
+  if (missing.length === 0) {
+    return;
+  }
+
+  await upsertThemes(missing);
 }
