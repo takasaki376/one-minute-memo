@@ -460,12 +460,12 @@ export default function ThemesPageClient() {
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="grid grid-cols-12 gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
-            <div className="col-span-6 sm:col-span-4">テーマ名</div>
+            <div className="col-span-5 sm:col-span-4">テーマ名</div>
             <div className="col-span-3 sm:col-span-3">カテゴリ</div>
-            <div className="hidden sm:block sm:col-span-1 text-right">メモ数</div>
             <div className="col-span-2 sm:col-span-2">状態</div>
             <div className="hidden sm:block sm:col-span-1">切替</div>
-            <div className="col-span-1 sm:col-span-2 text-right">source</div>
+            <div className="col-span-1 sm:col-span-1 text-right">source</div>
+            <div className="hidden sm:block sm:col-span-1 text-right">メモ数</div>
           </div>
           <ul className="divide-y divide-slate-100">
             {filteredThemes.length === 0 ? (
@@ -479,7 +479,7 @@ export default function ThemesPageClient() {
                   const isUpdating = updatingIds.has(t.id);
                   return (
                 <div className="grid grid-cols-12 items-center gap-2">
-                  <div className="col-span-6 sm:col-span-4">
+                  <div className="col-span-5 sm:col-span-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-slate-900">
@@ -505,11 +505,6 @@ export default function ThemesPageClient() {
                     <p className="truncate text-sm text-slate-700">
                       {t.category}
                     </p>
-                  </div>
-                  <div className="hidden sm:block sm:col-span-1 text-right">
-                    <span className="text-sm tabular-nums text-slate-700">
-                      {memoCounts[t.id] ?? 0}
-                    </span>
                   </div>
                   <div className="col-span-2 sm:col-span-2">
                     <span
@@ -549,9 +544,14 @@ export default function ThemesPageClient() {
                       />
                     </button>
                   </div>
-                  <div className="col-span-1 sm:col-span-2 text-right">
+                  <div className="col-span-1 sm:col-span-1 text-right">
                     <span className="text-xs text-slate-600">
                       {formatSource(t.source)}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block sm:col-span-1 text-right">
+                    <span className="text-sm tabular-nums text-slate-700">
+                      {memoCounts[t.id] ?? 0}
                     </span>
                   </div>
                 </div>
