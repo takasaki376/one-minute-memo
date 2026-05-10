@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useThemeSeedState } from "@/components/providers/ThemeSeedProvider";
 import { Button } from "@/components/ui/Button";
-import { getAllThemes } from "@/lib/db/themesRepo";
+import { getAllThemes, toggleThemeActive } from "@/lib/db/themesRepo";
 import type { ThemeRecord } from "@/types/theme";
 
 type LoadState =
@@ -19,6 +19,8 @@ function formatSource(source: ThemeRecord["source"]) {
 export default function ThemesPageClient() {
   const { isReady, isSeeding, error: seedError } = useThemeSeedState();
   const [state, setState] = useState<LoadState>({ status: "idle" });
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(() => new Set());
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const canLoad = isReady && !seedError;
 
@@ -26,6 +28,50 @@ export default function ThemesPageClient() {
     if (state.status !== "success") return [];
     return state.themes;
   }, [state]);
+
+  const updateThemeActive = async (theme: ThemeRecord, nextActive: boolean) => {
+    setUpdateError(null);
+    setUpdatingIds((prev) => {
+      const next = new Set(prev);
+      next.add(theme.id);
+      return next;
+    });
+
+    // optimistic update
+    setState((prev) => {
+      if (prev.status !== "success") return prev;
+      return {
+        status: "success",
+        themes: prev.themes.map((t) =>
+          t.id === theme.id ? { ...t, isActive: nextActive } : t,
+        ),
+      };
+    });
+
+    try {
+      await toggleThemeActive(theme.id, nextActive);
+    } catch (e) {
+      // rollback on error
+      setState((prev) => {
+        if (prev.status !== "success") return prev;
+        return {
+          status: "success",
+          themes: prev.themes.map((t) =>
+            t.id === theme.id ? { ...t, isActive: theme.isActive } : t,
+          ),
+        };
+      });
+      setUpdateError(
+        e instanceof Error ? e.message : "テーマの更新に失敗しました",
+      );
+    } finally {
+      setUpdatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(theme.id);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     if (!canLoad) return;
@@ -88,6 +134,12 @@ export default function ThemesPageClient() {
         </div>
       </header>
 
+      {updateError && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {updateError}
+        </div>
+      )}
+
       {state.status === "loading" || state.status === "idle" ? (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
           読み込み中…
@@ -125,16 +177,20 @@ export default function ThemesPageClient() {
       ) : (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="grid grid-cols-12 gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
-            <div className="col-span-6 sm:col-span-5">テーマ名</div>
+            <div className="col-span-6 sm:col-span-4">テーマ名</div>
             <div className="col-span-3 sm:col-span-3">カテゴリ</div>
             <div className="col-span-2 sm:col-span-2">状態</div>
+            <div className="hidden sm:block sm:col-span-1">切替</div>
             <div className="col-span-1 sm:col-span-2 text-right">source</div>
           </div>
           <ul className="divide-y divide-slate-100">
             {themes.map((t) => (
               <li key={t.id} className="px-4 py-3">
+                {(() => {
+                  const isUpdating = updatingIds.has(t.id);
+                  return (
                 <div className="grid grid-cols-12 items-center gap-2">
-                  <div className="col-span-6 sm:col-span-5">
+                  <div className="col-span-6 sm:col-span-4">
                     <p className="truncate text-sm font-medium text-slate-900">
                       {t.title}
                     </p>
@@ -156,12 +212,41 @@ export default function ThemesPageClient() {
                       {t.isActive ? "有効" : "無効"}
                     </span>
                   </div>
+                  <div className="col-span-1 sm:col-span-1">
+                    <button
+                      type="button"
+                      className={
+                        isUpdating
+                          ? "h-6 w-10 rounded-full bg-slate-200 opacity-60"
+                          : t.isActive
+                            ? "h-6 w-10 rounded-full bg-emerald-500 transition-colors hover:bg-emerald-600"
+                            : "h-6 w-10 rounded-full bg-slate-200 transition-colors hover:bg-slate-300"
+                      }
+                      aria-label={
+                        t.isActive ? "テーマを無効化" : "テーマを有効化"
+                      }
+                      disabled={isUpdating}
+                      onClick={() => void updateThemeActive(t, !t.isActive)}
+                    >
+                      <span
+                        className={
+                          isUpdating
+                            ? "block h-5 w-5 translate-x-1 rounded-full bg-white shadow"
+                            : t.isActive
+                              ? "block h-5 w-5 translate-x-4 rounded-full bg-white shadow transition-transform"
+                              : "block h-5 w-5 translate-x-1 rounded-full bg-white shadow transition-transform"
+                        }
+                      />
+                    </button>
+                  </div>
                   <div className="col-span-1 sm:col-span-2 text-right">
                     <span className="text-xs text-slate-600">
                       {formatSource(t.source)}
                     </span>
                   </div>
                 </div>
+                  );
+                })()}
               </li>
             ))}
           </ul>
