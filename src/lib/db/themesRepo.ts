@@ -4,8 +4,8 @@ import { builtinThemes } from '@/lib/data/builtinThemes';
 
 const THEME_STORE = 'themes';
 
-const USER_THEME_TITLE_MAX = 200;
-const USER_THEME_CATEGORY_MAX = 100;
+const THEME_TITLE_MAX = 200;
+const THEME_CATEGORY_MAX = 100;
 
 type ThemeRecordWithIndex = ThemeRecord & { isActiveIndex: number };
 
@@ -87,14 +87,14 @@ export async function createUserTheme(
   if (title.length === 0) {
     throw new Error('テーマ名を入力してください');
   }
-  if (title.length > USER_THEME_TITLE_MAX) {
+  if (title.length > THEME_TITLE_MAX) {
     throw new Error(
-      `テーマ名は${String(USER_THEME_TITLE_MAX)}文字以内にしてください`,
+      `テーマ名は${String(THEME_TITLE_MAX)}文字以内にしてください`,
     );
   }
-  if (categoryRaw.length > USER_THEME_CATEGORY_MAX) {
+  if (categoryRaw.length > THEME_CATEGORY_MAX) {
     throw new Error(
-      `カテゴリは${String(USER_THEME_CATEGORY_MAX)}文字以内にしてください`,
+      `カテゴリは${String(THEME_CATEGORY_MAX)}文字以内にしてください`,
     );
   }
 
@@ -138,26 +138,15 @@ export async function updateTheme(
   if (title.length === 0) {
     throw new Error('テーマ名を入力してください');
   }
-  if (title.length > USER_THEME_TITLE_MAX) {
+  if (title.length > THEME_TITLE_MAX) {
     throw new Error(
-      `テーマ名は${String(USER_THEME_TITLE_MAX)}文字以内にしてください`,
+      `テーマ名は${String(THEME_TITLE_MAX)}文字以内にしてください`,
     );
   }
-  if (categoryRaw.length > USER_THEME_CATEGORY_MAX) {
+  if (categoryRaw.length > THEME_CATEGORY_MAX) {
     throw new Error(
-      `カテゴリは${String(USER_THEME_CATEGORY_MAX)}文字以内にしてください`,
+      `カテゴリは${String(THEME_CATEGORY_MAX)}文字以内にしてください`,
     );
-  }
-
-  const all = await getAllThemes();
-  const normalizedTitle = title.toLowerCase();
-  if (
-    all.some(
-      (t) =>
-        t.id !== id && t.title.trim().toLowerCase() === normalizedTitle,
-    )
-  ) {
-    throw new Error('同じ名前のテーマが既に存在します');
   }
 
   const db = await getDB();
@@ -170,6 +159,17 @@ export async function updateTheme(
   }
 
   const prev = stripIndex(existing);
+  const all = await getAllThemes();
+  const normalizedTitle = title.toLowerCase();
+  if (
+    all.some(
+      (t) =>
+        t.id !== id && t.title.trim().toLowerCase() === normalizedTitle,
+    )
+  ) {
+    await tx.done;
+    throw new Error('同じ名前のテーマが既に存在します');
+  }
   const now = new Date().toISOString();
   const updated: ThemeRecord = {
     ...prev,
@@ -243,11 +243,7 @@ async function hasAnyBuiltinTheme(): Promise<boolean> {
  * - 既存のIDがある場合は上書きせずスキップする（不足分だけ追加）。
  */
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
-  const seeded = await hasAnyBuiltinTheme();
-  if (seeded) {
-    return;
-  }
-
+  void hasAnyBuiltinTheme; // keep helper for future diagnostics
   const now = new Date().toISOString();
   const themes: ThemeRecord[] = builtinThemes.map((t, index) => ({
     id: `theme-${String(index + 1).padStart(4, '0')}`,

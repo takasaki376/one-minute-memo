@@ -435,13 +435,15 @@ export default function SessionPage() {
   return (
     <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
       {themeShortage && (
-        <output
+        <div
           className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
           data-testid="theme-shortage-warning"
+          aria-live="polite"
+          aria-atomic="true"
         >
           有効なテーマが不足しているため、{themeShortage.actual}件で開始します（設定:
           {themeShortage.requested}件）。
-        </output>
+        </div>
       )}
       {!hideChromeForHandwritingFocus && (
         <ThemeHeader

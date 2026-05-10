@@ -46,7 +46,7 @@ export default function ThemesPageClient() {
   const [editSaving, setEditSaving] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const canLoad = isReady && !seedError;
 
@@ -70,7 +70,7 @@ export default function ThemesPageClient() {
     const q = searchQuery.trim().toLowerCase();
     const category = categoryFilter;
     return themes.filter((t) => {
-      if (category !== "all" && t.category !== category) return false;
+      if (category !== null && t.category !== category) return false;
       if (q.length === 0) return true;
       const title = t.title.trim().toLowerCase();
       return title.includes(q);
@@ -321,7 +321,7 @@ export default function ThemesPageClient() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold">テーマ管理</h1>
           <p className="mt-1 text-sm text-slate-600">
-            テーマの一覧を確認し、編集・有効/無効・追加ができます（検索は後続）。
+            テーマの一覧を確認し、検索・編集・有効/無効・追加ができます。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -411,11 +411,13 @@ export default function ThemesPageClient() {
                 </label>
                 <select
                   id="themes-category"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  value={categoryFilter ?? ""}
+                  onChange={(e) =>
+                    setCategoryFilter(e.target.value.length > 0 ? e.target.value : null)
+                  }
                   className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 >
-                  <option value="all">すべて</option>
+                  <option value="">すべて</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -424,7 +426,7 @@ export default function ThemesPageClient() {
                 </select>
               </div>
             </div>
-            {(searchQuery.trim().length > 0 || categoryFilter !== "all") && (
+            {(searchQuery.trim().length > 0 || categoryFilter !== null) && (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-slate-500">
                   {filteredThemes.length} 件ヒット
@@ -435,7 +437,7 @@ export default function ThemesPageClient() {
                   size="sm"
                   onClick={() => {
                     setSearchQuery("");
-                    setCategoryFilter("all");
+                    setCategoryFilter(null);
                   }}
                 >
                   フィルタをクリア
