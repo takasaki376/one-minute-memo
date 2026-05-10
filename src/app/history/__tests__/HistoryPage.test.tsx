@@ -1,46 +1,106 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import HistoryPage from "../page";
+import * as memosRepo from "@/lib/db/memosRepo";
 import * as sessionsRepo from "@/lib/db/sessionsRepo";
+import * as themesRepo from "@/lib/db/themesRepo";
+import { isoToLocalDateKey } from "@/lib/utils/dateFormatters";
+import type { MemoRecord } from "@/types/memo";
 import type { SessionRecord } from "@/types/session";
+import type { ThemeRecord } from "@/types/theme";
 
-// window.location.reload のモック
 const mockReload = vi.fn();
 
-const mockSessions: SessionRecord[] = [
+const themeA: ThemeRecord = {
+  id: "theme-a",
+  title: "今気になっていることは？",
+  category: "test",
+  isActive: true,
+  source: "builtin",
+  createdAt: "2025-01-01T00:00:00.000Z",
+  updatedAt: "2025-01-01T00:00:00.000Z",
+};
+
+const themeB: ThemeRecord = {
+  id: "theme-b",
+  title: "別のテーマ",
+  category: "test",
+  isActive: true,
+  source: "builtin",
+  createdAt: "2025-01-01T00:00:00.000Z",
+  updatedAt: "2025-01-01T00:00:00.000Z",
+};
+
+const tinyPng =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+const mockMemos: MemoRecord[] = [
+  {
+    id: "memo-new",
+    sessionId: "session-2",
+    themeId: "theme-b",
+    order: 1,
+    textContent: "新しいメモの本文",
+    handwritingType: "dataUrl",
+    handwritingDataUrl: tinyPng,
+    createdAt: "2025-01-11T10:00:00.000Z",
+    updatedAt: "2025-01-11T10:00:00.000Z",
+  },
+  {
+    id: "memo-old",
+    sessionId: "session-1",
+    themeId: "theme-a",
+    order: 1,
+    textContent: "古いメモの本文",
+    handwritingType: "none",
+    createdAt: "2025-01-10T09:00:00.000Z",
+    updatedAt: "2025-01-10T09:00:00.000Z",
+  },
+];
+
+const mockAllSessions: SessionRecord[] = [
+  {
+    id: "session-2",
+    startedAt: "2025-01-11T10:00:00.000Z",
+    endedAt: "2025-01-11T10:20:00.000Z",
+    themeIds: ["theme-b", "theme-b2"],
+    memoCount: 1,
+  },
   {
     id: "session-1",
     startedAt: "2025-01-10T09:00:00.000Z",
     endedAt: "2025-01-10T09:10:00.000Z",
-    themeIds: ["theme-1", "theme-2"],
-    memoCount: 2,
-  },
-  {
-    id: "session-2",
-    startedAt: "2025-01-11T10:00:00.000Z",
-    endedAt: null, // 未完了
-    themeIds: ["theme-3"],
+    themeIds: ["theme-a", "theme-a2"],
     memoCount: 1,
   },
-  {
-    id: "session-3",
-    startedAt: "2025-01-09T08:00:00.000Z",
-    endedAt: "2025-01-09T08:15:00.000Z",
-    themeIds: Array.from({ length: 5 }, (_, i) => `theme-${i + 1}`),
-    memoCount: 5,
-  },
 ];
+
+vi.mock("@/lib/db/memosRepo", () => {
+  const getAllMemos = vi.fn();
+  return { getAllMemos };
+});
 
 vi.mock("@/lib/db/sessionsRepo", () => {
   const getAllSessions = vi.fn();
   return { getAllSessions };
 });
 
+vi.mock("@/lib/db/themesRepo", () => {
+  const getThemesByIds = vi.fn();
+  return { getThemesByIds };
+});
+
+function mockLoadedHistory() {
+  (memosRepo.getAllMemos as Mock).mockResolvedValue(mockMemos);
+  (sessionsRepo.getAllSessions as Mock).mockResolvedValue(mockAllSessions);
+  (themesRepo.getThemesByIds as Mock).mockResolvedValue([themeA, themeB]);
+}
+
 describe("HistoryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // window.location.reload のモックを設定
     Object.defineProperty(window, "location", {
       value: {
         reload: mockReload,
@@ -51,8 +111,11 @@ describe("HistoryPage", () => {
   });
 
   it("displays loading state initially", async () => {
+    (memosRepo.getAllMemos as Mock).mockImplementation(
+      () => new Promise(() => {}),
+    );
     (sessionsRepo.getAllSessions as Mock).mockImplementation(
-      () => new Promise(() => {}) // 永遠に解決しないPromise
+      () => new Promise(() => {}),
     );
 
     await act(async () => {
@@ -61,14 +124,12 @@ describe("HistoryPage", () => {
 
     expect(screen.getByText("履歴を読み込んでいます…")).toBeInTheDocument();
     expect(
-      screen.getByText("これまでのセッションの記録を取得しています。")
+      screen.getByText("これまでのメモの記録を取得しています。"),
     ).toBeInTheDocument();
   });
 
   it("displays error state when loading fails", async () => {
-    (sessionsRepo.getAllSessions as Mock).mockRejectedValue(
-      new Error("Failed to load")
-    );
+    (memosRepo.getAllMemos as Mock).mockRejectedValue(new Error("Failed"));
 
     await act(async () => {
       render(<HistoryPage />);
@@ -79,14 +140,16 @@ describe("HistoryPage", () => {
     });
 
     expect(
-      screen.getByText("履歴の読み込み中にエラーが発生しました。")
+      screen.getByText("履歴の読み込み中にエラーが発生しました。"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "トップへ戻る" })).toBeInTheDocument();
   });
 
-  it("displays empty state when no sessions exist", async () => {
+  it("displays empty state when no memos exist", async () => {
+    (memosRepo.getAllMemos as Mock).mockResolvedValue([]);
     (sessionsRepo.getAllSessions as Mock).mockResolvedValue([]);
+    (themesRepo.getThemesByIds as Mock).mockResolvedValue([]);
 
     await act(async () => {
       render(<HistoryPage />);
@@ -96,19 +159,14 @@ describe("HistoryPage", () => {
       expect(screen.getByText("履歴一覧")).toBeInTheDocument();
     });
 
+    expect(screen.getByText("まだメモがありません")).toBeInTheDocument();
     expect(
-      screen.getByText("まだセッション履歴がありません")
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("最初のセッションを開始してみましょう")
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "セッションを開始" })
+      screen.getByRole("link", { name: "セッションを開始" }),
     ).toBeInTheDocument();
   });
 
-  it("displays session list when sessions exist", async () => {
-    (sessionsRepo.getAllSessions as Mock).mockResolvedValue(mockSessions);
+  it("displays session cards with memos, order badges, and no detail links", async () => {
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -118,40 +176,43 @@ describe("HistoryPage", () => {
       expect(screen.getByText("履歴一覧")).toBeInTheDocument();
     });
 
-    // セッションカードが表示されることを確認
-    expect(screen.getAllByText(/テーマ.*件・メモ.*件/).length).toBeGreaterThan(
-      0
+    expect(screen.getAllByText("1/2")).toHaveLength(2);
+    expect(screen.getByText(/テーマ: 別のテーマ/)).toBeInTheDocument();
+    expect(screen.getByText(/テーマ: 今気になっていることは？/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/入力内容: 新しいメモの本文/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/入力内容: 古いメモの本文/),
+    ).toBeInTheDocument();
+    const images = screen.getAllByRole("img");
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    expect(images[0]).toHaveAttribute("src", tinyPng);
+
+    expect(screen.queryByRole("link", { name: "詳細を見る" })).toBeNull();
+  });
+
+  it("sorts sessions newest-first (endedAt / startedAt)", async () => {
+    mockLoadedHistory();
+
+    await act(async () => {
+      render(<HistoryPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("履歴一覧")).toBeInTheDocument();
+    });
+
+    const main = screen.getByRole("main");
+    const html = main.textContent ?? "";
+    expect(html.indexOf("新しいメモの本文")).toBeLessThan(
+      html.indexOf("古いメモの本文"),
     );
-    expect(screen.getAllByText("詳細を見る").length).toBe(mockSessions.length);
   });
 
-  it("sorts sessions by endedAt first, then startedAt in descending order", async () => {
-    // endedAtがあるセッションとないセッションを混在させてソートをテスト
-    const sessionsForSort: SessionRecord[] = [
-      {
-        id: "session-old",
-        startedAt: "2025-01-09T08:00:00.000Z",
-        endedAt: "2025-01-09T08:15:00.000Z", // 最も古いendedAt
-        themeIds: ["theme-1"],
-        memoCount: 1,
-      },
-      {
-        id: "session-new",
-        startedAt: "2025-01-11T10:00:00.000Z",
-        endedAt: "2025-01-11T10:15:00.000Z", // 最も新しいendedAt
-        themeIds: ["theme-2"],
-        memoCount: 2,
-      },
-      {
-        id: "session-incomplete",
-        startedAt: "2025-01-12T11:00:00.000Z", // 最も新しいstartedAtだがendedAtなし
-        endedAt: null,
-        themeIds: ["theme-3"],
-        memoCount: 1,
-      },
-    ];
-
-    (sessionsRepo.getAllSessions as Mock).mockResolvedValue(sessionsForSort);
+  it("filters by theme", async () => {
+    const user = userEvent.setup();
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -161,19 +222,104 @@ describe("HistoryPage", () => {
       expect(screen.getByText("履歴一覧")).toBeInTheDocument();
     });
 
-    // ソート順を確認（endedAt ?? startedAt で降順）
-    // 1. session-incomplete (endedAt: null, startedAt: 2025-01-12T11:00:00) - 最新
-    // 2. session-new (endedAt: 2025-01-11T10:15:00)
-    // 3. session-old (endedAt: 2025-01-09T08:15:00) - 最も古い
-    const detailLinks = screen.getAllByRole("link", { name: "詳細を見る" });
-    expect(detailLinks.length).toBe(3);
-    expect(detailLinks[0]).toHaveAttribute("href", "/history/session-incomplete");
-    expect(detailLinks[1]).toHaveAttribute("href", "/history/session-new");
-    expect(detailLinks[2]).toHaveAttribute("href", "/history/session-old");
+    await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("1 件のメモを表示（全 2 件）"),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/テーマ: 今気になっていることは？/)).toBeInTheDocument();
+    expect(screen.queryByText(/テーマ: 別のテーマ/)).not.toBeInTheDocument();
+  });
+
+  it("filters by date and combines with theme filter", async () => {
+    const user = userEvent.setup();
+    mockLoadedHistory();
+
+    await act(async () => {
+      render(<HistoryPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("履歴一覧")).toBeInTheDocument();
+    });
+
+    const dayKey = isoToLocalDateKey(mockMemos[1].createdAt);
+    await user.click(screen.getByTestId(`history-cal-${dayKey}`));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("1 件のメモを表示（全 2 件）"),
+      ).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
+
+    expect(
+      screen.getByText("1 件のメモを表示（全 2 件）"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/入力内容: 古いメモの本文/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no-results message when filters match nothing", async () => {
+    const user = userEvent.setup();
+    mockLoadedHistory();
+
+    await act(async () => {
+      render(<HistoryPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("履歴一覧")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
+    const onlyThemeBDay = isoToLocalDateKey(mockMemos[0].createdAt);
+    await user.click(screen.getByTestId(`history-cal-${onlyThemeBDay}`));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("条件に一致するメモがありません"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "詳細を見る" })).not.toBeInTheDocument();
+  });
+
+  it("clears filters when clicking 条件をクリア", async () => {
+    const user = userEvent.setup();
+    mockLoadedHistory();
+
+    await act(async () => {
+      render(<HistoryPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("履歴一覧")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("テーマ"), "theme-a");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "条件をクリア" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "条件をクリア" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("2 件のメモを表示（全 2 件）"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText(/入力内容: 新しいメモの本文/)).toBeInTheDocument();
+    expect(screen.getByText(/入力内容: 古いメモの本文/)).toBeInTheDocument();
   });
 
   it("renders navigation links correctly", async () => {
-    (sessionsRepo.getAllSessions as Mock).mockResolvedValue(mockSessions);
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
@@ -183,28 +329,26 @@ describe("HistoryPage", () => {
       expect(screen.getByText("履歴一覧")).toBeInTheDocument();
     });
 
-    // 詳細ページへのリンク
-    const detailLinks = screen.getAllByRole("link", { name: "詳細を見る" });
-    expect(detailLinks[0]).toHaveAttribute("href", "/history/session-2");
-    expect(detailLinks[1]).toHaveAttribute("href", "/history/session-1");
-    expect(detailLinks[2]).toHaveAttribute("href", "/history/session-3");
-
-    // 新しいセッションを開始するボタン
     const newSessionButton = screen.getByRole("link", {
       name: "新しいセッションを開始",
     });
     expect(newSessionButton).toHaveAttribute("href", "/session");
   });
 
-  it("calls getAllSessions on mount", async () => {
-    (sessionsRepo.getAllSessions as Mock).mockResolvedValue([]);
+  it("calls getAllMemos, getAllSessions, and getThemesByIds on mount", async () => {
+    mockLoadedHistory();
 
     await act(async () => {
       render(<HistoryPage />);
     });
 
     await waitFor(() => {
-      expect(sessionsRepo.getAllSessions).toHaveBeenCalledTimes(1);
+      expect(memosRepo.getAllMemos).toHaveBeenCalledTimes(1);
     });
+    expect(sessionsRepo.getAllSessions).toHaveBeenCalledTimes(1);
+    expect(themesRepo.getThemesByIds).toHaveBeenCalledWith(
+      expect.arrayContaining(["theme-a", "theme-b"]),
+    );
+    expect(themesRepo.getThemesByIds.mock.calls[0][0]).toHaveLength(2);
   });
 });
