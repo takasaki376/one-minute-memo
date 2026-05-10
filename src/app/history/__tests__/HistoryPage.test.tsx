@@ -349,6 +349,10 @@ describe("HistoryPage", () => {
     expect(themesRepo.getThemesByIds).toHaveBeenCalledWith(
       expect.arrayContaining(["theme-a", "theme-b"]),
     );
-    expect(themesRepo.getThemesByIds.mock.calls[0][0]).toHaveLength(2);
+    // mocked function is a spy, but keep typing safe
+    expect(
+      (themesRepo.getThemesByIds as unknown as import("vitest").Mock).mock
+        .calls[0][0],
+    ).toHaveLength(2);
   });
 });
