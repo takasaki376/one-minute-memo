@@ -37,6 +37,10 @@ export default function SessionPage() {
   const [stage, setStage] = useState<SessionStage>("loading");
   const [themes, setThemes] = useState<SessionTheme[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0); // 0〜N-1
+  const [themeShortage, setThemeShortage] = useState<{
+    requested: number;
+    actual: number;
+  } | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [memoCount, setMemoCount] = useState(0);
   // セッション開始時の設定値（このセッションで固定）
@@ -178,6 +182,15 @@ export default function SessionPage() {
         if (selected.length === 0) {
           setStage("error");
           return;
+        }
+
+        if (selected.length < settingsThemeCount) {
+          setThemeShortage({
+            requested: settingsThemeCount,
+            actual: selected.length,
+          });
+        } else {
+          setThemeShortage(null);
         }
 
         setThemes(selected);
@@ -421,6 +434,16 @@ export default function SessionPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
+      {themeShortage && (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          data-testid="theme-shortage-warning"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {`有効なテーマが不足しているため、${themeShortage.actual}件で開始します（設定:${themeShortage.requested}件）。`}
+        </div>
+      )}
       {!hideChromeForHandwritingFocus && (
         <ThemeHeader
           currentIndex={currentNumber}
