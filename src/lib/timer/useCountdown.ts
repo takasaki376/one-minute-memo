@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+function clampSeconds(seconds: number): number {
+  return Math.max(0, seconds);
+}
+
 export interface UseCountdownOptions {
-  /** 初期秒数（例: 60） */
+  /**
+   * 初期秒数（例: 60）
+   * マウント時の state 初期化にのみ使用する。再レンダーで変えても `secondsLeft` は追従しない。
+   * 実行中に秒数を変える場合は `reset()` を使う。
+   */
   initialSeconds: number;
-  /** 自動でカウントダウンを開始するかどうか（true で自動開始） */
+  /**
+   * 自動でカウントダウンを開始するか（デフォルト: true）
+   * マウント時の `isRunning` 初期化にのみ使用する。
+   */
   autoStart?: boolean;
   /** カウントダウンが終了したときに呼び出されるコールバック関数 */
   onFinish?: () => void;
@@ -32,33 +43,28 @@ export interface UseCountdownResult {
 export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   const { initialSeconds, autoStart = true, onFinish } = options;
 
-  // 初期秒数の参照を保持（reset で使用）
-  const initialSecondsRef = useRef(initialSeconds);
+  const initialSecondsRef = useRef(clampSeconds(initialSeconds));
 
-  // onFinish の ref に値を設定
   const onFinishRef = useRef<(() => void) | undefined>(onFinish);
   useEffect(() => {
     onFinishRef.current = onFinish;
   }, [onFinish]);
 
-  const safeInitialSeconds = Math.max(0, initialSeconds);
-  const [secondsLeft, setSecondsLeft] = useState<number>(safeInitialSeconds);
-  const [isRunning, setIsRunning] = useState<boolean>(autoStart);
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    clampSeconds(initialSeconds),
+  );
+  const [isRunning, setIsRunning] = useState(() => autoStart);
 
-  // secondsLeft の ref に値を設定（start で使用）
   const secondsLeftRef = useRef(secondsLeft);
   useEffect(() => {
     secondsLeftRef.current = secondsLeft;
   }, [secondsLeft]);
 
-  // initialSeconds の変更時の処理（reset で使用）
   useEffect(() => {
-    initialSecondsRef.current = Math.max(0, initialSeconds);
+    initialSecondsRef.current = clampSeconds(initialSeconds);
   }, [initialSeconds]);
 
-  // interval ID を保持する ref
   const intervalIdRef = useRef<number | null>(null);
-  // onFinish の呼び出し状態を管理（Strict Mode 対策）
   const onFinishCalledRef = useRef(false);
 
   useEffect(() => {
@@ -111,12 +117,10 @@ export function useCountdown(options: UseCountdownOptions): UseCountdownResult {
   }, []);
 
   const reset = useCallback((newInitialSeconds?: number) => {
-    const next = Math.max(
-      0,
-      newInitialSeconds ?? initialSecondsRef.current ?? 0
+    const next = clampSeconds(
+      newInitialSeconds ?? initialSecondsRef.current ?? 0,
     );
     initialSecondsRef.current = next;
-    // Keep the ref in sync so a start() immediately after reset() can proceed.
     secondsLeftRef.current = next;
     setSecondsLeft(next);
     setIsRunning(false);
