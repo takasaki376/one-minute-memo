@@ -79,15 +79,20 @@ export default function ThemesPageClient() {
     });
   }, [themes, searchQuery, categoryFilter]);
 
+  const themeIdsKey = useMemo(
+    () => themes.map((t) => t.id).sort().join(","),
+    [themes],
+  );
+
   useEffect(() => {
-    if (themes.length === 0) {
+    if (themeIdsKey.length === 0) {
       setMemoCounts({});
       return;
     }
-    getMemoCountsByThemeIds(themes.map((t) => t.id))
+    getMemoCountsByThemeIds(themeIdsKey.split(","))
       .then((counts) => setMemoCounts(counts))
       .catch(() => setMemoCounts({}));
-  }, [themes]);
+  }, [themeIdsKey]);
 
   const updateThemeActive = async (theme: ThemeRecord, nextActive: boolean) => {
     setUpdateError(null);
@@ -520,6 +525,8 @@ export default function ThemesPageClient() {
                   <div className="col-span-1 sm:col-span-1">
                     <button
                       type="button"
+                      role="switch"
+                      aria-checked={t.isActive}
                       className={
                         isUpdating
                           ? "h-6 w-10 rounded-full bg-slate-200 opacity-60"

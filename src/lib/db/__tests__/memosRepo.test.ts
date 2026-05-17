@@ -42,6 +42,21 @@ vi.mock("../openDB", () => {
     async delete(key: string) {
       store.delete(key);
     },
+    async openCursor() {
+      const values = Array.from(store.values());
+      if (values.length === 0) return null;
+
+      const makeCursor = (i: number) => ({
+        value: values[i],
+        async continue() {
+          const next = i + 1;
+          if (next >= values.length) return null;
+          return makeCursor(next);
+        },
+      });
+
+      return makeCursor(0);
+    },
     index(indexName: string) {
       return createIndex(indexName);
     },
@@ -86,6 +101,7 @@ import {
   getAllMemos,
   getMemosBySession,
   getMemosByTheme,
+  getMemoCountsByThemeIds,
   deleteMemosBySession,
 } from "../memosRepo";
 
@@ -276,6 +292,37 @@ describe("memosRepo", () => {
       const memos = await getMemosBySession("no-memo-session");
       expect(Array.isArray(memos)).toBe(true);
       expect(memos).toHaveLength(0);
+    });
+  });
+
+  describe("getMemoCountsByThemeIds", () => {
+    it("returns memo counts per theme id", async () => {
+      await saveMemo({
+        sessionId: "s1",
+        themeId: "theme-a",
+        order: 1,
+        textContent: "a1",
+        handwritingType: "none",
+      });
+      await saveMemo({
+        sessionId: "s1",
+        themeId: "theme-a",
+        order: 2,
+        textContent: "a2",
+        handwritingType: "none",
+      });
+      await saveMemo({
+        sessionId: "s2",
+        themeId: "theme-b",
+        order: 1,
+        textContent: "b1",
+        handwritingType: "none",
+      });
+
+      const counts = await getMemoCountsByThemeIds(["theme-a", "theme-b", "theme-missing"]);
+      expect(counts["theme-a"]).toBe(2);
+      expect(counts["theme-b"]).toBe(1);
+      expect(counts["theme-missing"]).toBeUndefined();
     });
   });
 

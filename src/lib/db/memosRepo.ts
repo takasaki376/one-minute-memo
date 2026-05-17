@@ -91,23 +91,27 @@ export async function getMemosByTheme(
 
 /**
  * テーマごとのメモ件数をまとめて取得する（`/themes` 一覧用）
+ * memos ストアを1回走査して themeId ごとに集計する（index.count の大量発行を避ける）
  */
 export async function getMemoCountsByThemeIds(
   themeIds: string[],
 ): Promise<Record<string, number>> {
-  const uniqueIds = Array.from(new Set(themeIds)).filter((id) => id.length > 0);
-  if (uniqueIds.length === 0) return {};
+  const targetIds = new Set(themeIds.filter((id) => id.length > 0));
+  if (targetIds.size === 0) return {};
 
+  const counts: Record<string, number> = {};
   const db = await getDB();
   const tx = db.transaction(MEMO_STORE, "readonly");
-  const index = tx.store.index("by_themeId");
-
-  const pairs = await Promise.all(
-    uniqueIds.map(async (id) => [id, await index.count(id)] as const),
-  );
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    const themeId = cursor.value.themeId;
+    if (typeof themeId === "string" && targetIds.has(themeId)) {
+      counts[themeId] = (counts[themeId] ?? 0) + 1;
+    }
+    cursor = await cursor.continue();
+  }
   await tx.done;
-
-  return Object.fromEntries(pairs);
+  return counts;
 }
 
 export async function deleteMemosBySession(sessionId: string): Promise<void> {

@@ -441,8 +441,7 @@ export default function SessionPage() {
           aria-live="polite"
           aria-atomic="true"
         >
-          有効なテーマが不足しているため、{themeShortage.actual}件で開始します（設定:
-          {themeShortage.requested}件）。
+          {`有効なテーマが不足しているため、${themeShortage.actual}件で開始します（設定:${themeShortage.requested}件）。`}
         </div>
       )}
       {!hideChromeForHandwritingFocus && (

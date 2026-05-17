@@ -185,7 +185,7 @@ describe("/themes page", () => {
 
     // initial state for theme-0002 is inactive
     expect(screen.getAllByText("無効").length).toBeGreaterThan(0);
-    const toggle = screen.getByRole("button", { name: "テーマを有効化" });
+    const toggle = screen.getByRole("switch", { name: "テーマを有効化" });
     await user.click(toggle);
 
     await waitFor(() => {

@@ -159,7 +159,7 @@ export async function updateTheme(
   }
 
   const prev = stripIndex(existing);
-  const all = await getAllThemes();
+  const all = await store.getAll();
   const normalizedTitle = title.toLowerCase();
   if (
     all.some(
@@ -217,33 +217,11 @@ export async function toggleThemeActive(
   await tx.done;
 }
 
-async function hasAnyBuiltinTheme(): Promise<boolean> {
-  const db = await getDB();
-  const tx = db.transaction(THEME_STORE, 'readonly');
-  let cursor = await tx.store.openCursor();
-  while (cursor) {
-    const record = stripIndex(cursor.value);
-    if (record.source === 'builtin') {
-      await tx.done;
-      return true;
-    }
-    cursor = await cursor.continue();
-  }
-  await tx.done;
-  return false;
-}
-
 /**
- * 初期テーマをDBに投入する（初回起動時のみ）
- * 既に builtin テーマが投入済みの場合は何もしない
- *
- * NOTE:
- * - ユーザーテーマだけが先に存在するケースでも builtinThemes は投入したいので、
- *   「themes 件数」ではなく「builtin の有無」で判定する。
- * - 既存のIDがある場合は上書きせずスキップする（不足分だけ追加）。
+ * 初期テーマをDBに投入する
+ * builtinThemes のうち、まだDBに存在しないIDのみ追加する（不足分だけ追加、既存は上書きしない）
  */
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
-  void hasAnyBuiltinTheme; // keep helper for future diagnostics
   const now = new Date().toISOString();
   const themes: ThemeRecord[] = builtinThemes.map((t, index) => ({
     id: `theme-${String(index + 1).padStart(4, '0')}`,
