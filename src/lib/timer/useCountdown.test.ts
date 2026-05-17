@@ -82,6 +82,31 @@ describe("useCountdown", () => {
     expect(result.current.isRunning).toBe(false);
   });
 
+  it("clamps negative initialSeconds to zero", () => {
+    const { result } = renderHook(() =>
+      useCountdown({ initialSeconds: -5, autoStart: false }),
+    );
+
+    expect(result.current.secondsLeft).toBe(0);
+    expect(result.current.isRunning).toBe(false);
+  });
+
+  it("does not sync initialSeconds or autoStart after mount", () => {
+    const { result, rerender } = renderHook(
+      ({ initialSeconds, autoStart }: { initialSeconds: number; autoStart: boolean }) =>
+        useCountdown({ initialSeconds, autoStart }),
+      { initialProps: { initialSeconds: 10, autoStart: false } },
+    );
+
+    expect(result.current.secondsLeft).toBe(10);
+    expect(result.current.isRunning).toBe(false);
+
+    rerender({ initialSeconds: 5, autoStart: true });
+
+    expect(result.current.secondsLeft).toBe(10);
+    expect(result.current.isRunning).toBe(false);
+  });
+
   it("resets to new initial seconds and re-enables onFinish", () => {
     const onFinish = vi.fn();
     const { result } = renderHook(() =>
