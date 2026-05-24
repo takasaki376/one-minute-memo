@@ -129,8 +129,15 @@ export default function SessionPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    let wasTabletUp = window.innerWidth >= 768;
+
     const updateViewportFlag = () => {
-      setIsTabletUp(window.innerWidth >= 768);
+      const tablet = window.innerWidth >= 768;
+      if (wasTabletUp && !tablet) {
+        exitHandwritingFocus();
+      }
+      wasTabletUp = tablet;
+      setIsTabletUp(tablet);
     };
 
     updateViewportFlag();
@@ -138,7 +145,7 @@ export default function SessionPage() {
     return () => {
       window.removeEventListener("resize", updateViewportFlag);
     };
-  }, []);
+  }, [exitHandwritingFocus]);
 
   useEffect(() => {
     if (!isFocusTextOpen || !isHandwritingFocusActive) {

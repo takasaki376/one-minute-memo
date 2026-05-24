@@ -666,6 +666,41 @@ describe("/session page", () => {
       expect(screen.getByTestId("split-layout")).toBeVisible();
       expect(screen.queryByTestId("focus-mode-button")).not.toBeInTheDocument();
     });
+
+    it("stays in split after viewport shrinks and expands again", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("focus-mode-button"));
+      });
+
+      expect(screen.getByTestId("focus-handwriting-modal")).toBeVisible();
+
+      await act(async () => {
+        setViewportWidth(700);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
+      });
+
+      await act(async () => {
+        setViewportWidth(1024);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("focus-mode-button")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("focus-handwriting-modal")).not.toBeInTheDocument();
+      expect(screen.getByTestId("split-layout")).toBeVisible();
+    });
   });
 
   describe("settings integration", () => {
