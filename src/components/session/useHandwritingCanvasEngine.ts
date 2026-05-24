@@ -42,7 +42,6 @@ export function useHandwritingCanvasEngine({
   const activePointerIdRef = useRef<number | null>(null);
   const activeStrokeStartTimeRef = useRef(0);
   const logicalSizeRef = useRef({ width: 0, height: 0 });
-  const dprRef = useRef(1);
   const latestValueRef = useRef<string | null | undefined>(value);
   const latestCanvasDataUrlRef = useRef<string | null>(value ?? null);
   const mountedRef = useRef(true);
@@ -204,7 +203,6 @@ export function useHandwritingCanvasEngine({
       const displayHeight = Math.max(1, wrapper.clientHeight);
       const dpr =
         typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-      dprRef.current = dpr;
 
       const prevLogical = logicalSizeRef.current;
 
