@@ -91,9 +91,9 @@ test.describe("セッション実行フロー", () => {
 
       if (i < total - 1) {
         const nextIndex = i + 2;
-        await expect(
-          themeProgressLocator(page, nextIndex, total),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
+          timeout: 5000,
+        });
       }
     }
 

@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { clearIndexedDB } from "./helpers/indexeddb";
-import { getThemeTotal, getVisibleSessionTextarea } from "./helpers/session";
+import {
+  getThemeTotal,
+  getVisibleSessionTextarea,
+  themeProgressLocator,
+} from "./helpers/session";
 
 test.describe("履歴確認フロー", () => {
   test.beforeEach(async ({ page }) => {
@@ -26,11 +30,9 @@ test.describe("履歴確認フロー", () => {
       await nextButton.click();
       if (i < total - 1) {
         const nextIndex = i + 2;
-        await expect(
-          page
-            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
-            .first(),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
+          timeout: 5000,
+        });
       }
     }
     await expect(page).toHaveURL(/\/session\/complete/);
@@ -60,11 +62,9 @@ test.describe("履歴確認フロー", () => {
       await nextButton.click();
       if (i < total - 1) {
         const nextIndex = i + 2;
-        await expect(
-          page
-            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
-            .first(),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
+          timeout: 5000,
+        });
       }
     }
     await expect(page).toHaveURL(/\/session\/complete/);
@@ -94,11 +94,9 @@ test.describe("履歴確認フロー", () => {
       await nextButton.click();
       if (i < total - 1) {
         const nextIndex = i + 2;
-        await expect(
-          page
-            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
-            .first(),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
+          timeout: 5000,
+        });
       }
     }
     await expect(page).toHaveURL(/\/session\/complete/);
