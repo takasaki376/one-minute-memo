@@ -5,6 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { HistoryFilterCalendar } from "@/components/history/HistoryFilterCalendar";
 import { SessionCard } from "@/components/history/SessionCard";
+import {
+  isLoadStagePending,
+  PageError,
+  PageLoading,
+  type LoadStage,
+} from "@/components/ui/PageStatus";
 import { getAllMemos } from "@/lib/db/memosRepo";
 import { getAllSessions } from "@/lib/db/sessionsRepo";
 import { getThemesByIds } from "@/lib/db/themesRepo";
@@ -12,8 +18,6 @@ import { isoToLocalDateKey } from "@/lib/utils/dateFormatters";
 import type { MemoRecord } from "@/types/memo";
 import type { SessionRecord } from "@/types/session";
 import type { ThemeRecord } from "@/types/theme";
-
-type LoadStage = "idle" | "loading" | "loaded" | "error";
 
 function themeFallbackTitle(order: number): string {
   return `テーマ ${order}`;
@@ -162,46 +166,30 @@ export default function HistoryPage() {
     [themeMap],
   );
 
-  // ローディング中
-  if (stage === "idle" || stage === "loading") {
+  if (isLoadStagePending(stage)) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-          履歴を読み込んでいます…
-        </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          これまでのメモの記録を取得しています。
-        </p>
-      </main>
+      <PageLoading
+        title="履歴を読み込んでいます…"
+        description="これまでのメモの記録を取得しています。"
+      />
     );
   }
 
-  // エラー時
   if (stage === "error") {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-          履歴を読み込めませんでした
-        </h1>
-        {error && (
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            {error}
-          </p>
-        )}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button
-            variant="primary"
-            onClick={() => {
-              window.location.reload();
-            }}
-          >
-            再読み込み
-          </Button>
-          <Button href="/" variant="secondary">
-            トップへ戻る
-          </Button>
-        </div>
-      </main>
+      <PageError title="履歴を読み込めませんでした" message={error}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            window.location.reload();
+          }}
+        >
+          再読み込み
+        </Button>
+        <Button href="/" variant="secondary">
+          トップへ戻る
+        </Button>
+      </PageError>
     );
   }
 
