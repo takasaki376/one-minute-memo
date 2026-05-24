@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -8,21 +15,14 @@ import { Button } from "@/components/ui/Button";
 import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
 import { TextEditor } from "@/components/session/TextEditor";
 import { ThemeHeader } from "@/components/session/ThemeHeader";
+import { type SessionTheme, useSessionFlow } from "@/hooks/useSessionFlow";
 import { useCountdown } from "@/lib/timer/useCountdown";
-import { createSession, completeSession } from "@/lib/db/sessionsRepo";
-import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
 import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
 import { getSettings } from "@/lib/db/settingsRepo";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import { useThemeSeedState } from "@/components/providers/ThemeSeedProvider";
 
 type SessionStage = "loading" | "running" | "finished" | "error";
-
-interface SessionTheme {
-  id: string;
-  title: string;
-  category?: string;
-}
 
 // デフォルト値（設定取得失敗時のフォールバック）
 const DEFAULT_THEME_COUNT = DEFAULT_SETTINGS.theme_count;
@@ -44,8 +44,6 @@ export default function SessionPage() {
     requested: number;
     actual: number;
   } | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [memoCount, setMemoCount] = useState(0);
   // セッション開始時の設定値（このセッションで固定）
   // themeCountは現時点では未使用だが、将来的に「セッション結果画面／分析機能」で
   // 1セッションあたりのテーマ数を表示・保存する際に利用する予定のため state として保持しておく
@@ -53,11 +51,6 @@ export default function SessionPage() {
   const [secondsPerTheme, setSecondsPerTheme] = useState(
     DEFAULT_TIME_LIMIT_SECONDS,
   );
-  // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isSavingMemo, setIsSavingMemo] = useState(false);
-  // PJ1-99: レースコンディション対策: useRefで同期的なロックを実装
-  const savingRef = useRef(false);
 
   // --- 現在テーマの入力状態 ---
   const [text, setText] = useState("");
@@ -73,21 +66,57 @@ export default function SessionPage() {
   );
   const [isFocusTextOpen, setIsFocusTextOpen] = useState(false);
   const [isTabletUp, setIsTabletUp] = useState(false);
-  const [portalReady, setPortalReady] = useState(false);
-
-  // タイマー（secondsPerThemeは初期化時に設定される）
-  const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
-    initialSeconds: secondsPerTheme,
-    autoStart: false, // テーマ準備が終わってから start する
-    onFinish: () => {
-      void handleThemeFinishedAuto();
-    },
-  });
+  const portalReady = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const currentTheme = useMemo(
     () => themes[currentIndex] ?? null,
     [themes, currentIndex],
   );
+
+  const themeFinishedAutoRef = useRef<() => Promise<void>>(async () => {});
+
+  const { secondsLeft, isRunning, start, reset, pause } = useCountdown({
+    initialSeconds: secondsPerTheme,
+    autoStart: false, // テーマ準備が終わってから start する
+    onFinish: () => {
+      void themeFinishedAutoRef.current();
+    },
+  });
+
+  const onAdvanceToNextTheme = useCallback((nextIndex: number) => {
+    setCurrentIndex(nextIndex);
+    setText("");
+    setHandwritingDataUrl(null);
+  }, []);
+
+  const onSessionCompleted = useCallback(
+    (completedSessionId: string) => {
+      setStage("finished");
+      router.push(`/session/complete?sessionId=${completedSessionId}`);
+    },
+    [router],
+  );
+
+  const { handleThemeFinished, handleThemeFinishedAuto } = useSessionFlow({
+    themes,
+    currentIndex,
+    currentTheme,
+    text,
+    handwritingDataUrl,
+    secondsPerTheme,
+    resetTimer: reset,
+    startTimer: start,
+    onAdvanceToNextTheme,
+    onSessionCompleted,
+  });
+
+  useEffect(() => {
+    themeFinishedAutoRef.current = handleThemeFinishedAuto;
+  }, [handleThemeFinishedAuto]);
 
   const handleSwitchToHandwritingTab = () => {
     setActiveInputTab("handwriting");
@@ -98,9 +127,13 @@ export default function SessionPage() {
     }
   };
 
-  useEffect(() => {
-    setPortalReady(true);
+  const exitHandwritingFocus = useCallback(() => {
+    setViewMode("split");
+    setIsFocusTextOpen(false);
   }, []);
+
+  const effectiveViewMode = isTabletUp ? viewMode : "split";
+  const isHandwritingFocusActive = effectiveViewMode === "handwritingFocus";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -142,7 +175,7 @@ export default function SessionPage() {
     return () => {
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [isFocusTextOpen, isTabletUp, viewMode]);
+  }, [isFocusTextOpen, isHandwritingFocusActive]);
 
   // セッション開始時の初期化
   useEffect(() => {
@@ -224,184 +257,6 @@ export default function SessionPage() {
     void init();
   }, [isThemeSeedReady, themeSeedError, reset, start]);
 
-  // PJ1-99: 現在テーマのメモをIndexedDBに保存する
-  // タスク仕様に合わせて、id/createdAt/updatedAtの指定を削除（saveMemo側で自動生成）
-  // themeIdは引数として受け取ることで、非同期処理中にcurrentThemeが変わる可能性に対応
-  const saveCurrentMemo = async (
-    index: number,
-    themeId: string,
-  ): Promise<void> => {
-    // セッションがまだ作成されていない場合は、最初のメモ保存時に作成する
-    // これにより、メモ0件のセッションが作成されることを防ぐ
-    let currentSessionId = sessionId;
-    if (!currentSessionId) {
-      if (themes.length === 0) {
-        console.error(
-          "[PJ1-99] テーマが設定されていないためセッションを作成できません",
-        );
-        return;
-      }
-      const session = await createSession(themes.map((t) => t.id));
-      currentSessionId = session.id;
-      setSessionId(session.id);
-      // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
-      if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] 最初のメモ保存時にセッションを作成しました:", {
-          id: session.id,
-          themeIds: session.themeIds,
-          startedAt: session.startedAt,
-          memoCount: session.memoCount,
-        });
-      }
-    }
-
-    try {
-      const savedMemo = await saveMemo({
-        sessionId: currentSessionId,
-        themeId,
-        order: index + 1, // 引数として受け取ったindexを使用
-        textContent: text,
-        handwritingType: handwritingDataUrl ? "dataUrl" : "none",
-        handwritingDataUrl: handwritingDataUrl ?? undefined,
-      });
-
-      // デバッグ用: 開発環境でのみ保存されたメモをコンソールに出力
-      if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] メモを保存しました:", {
-          id: savedMemo.id,
-          sessionId: savedMemo.sessionId,
-          themeId: savedMemo.themeId,
-          order: savedMemo.order,
-          textLength: savedMemo.textContent.length,
-          hasHandwriting: savedMemo.handwritingType !== "none",
-          currentIndex: index,
-          createdAt: savedMemo.createdAt,
-          updatedAt: savedMemo.updatedAt,
-          totalThemes: themes.length,
-          isLastTheme: index === themes.length - 1,
-        });
-      }
-
-      setMemoCount((prev) => prev + 1);
-    } catch (e) {
-      console.error("Failed to save memo", e);
-      // エラーが発生してもセッションは続行する
-    }
-  };
-
-  // PJ1-99: タイマー終了で自動的に次へ進むとき
-  const handleThemeFinishedAuto = async () => {
-    await handleThemeFinished({ triggeredByUser: false });
-  };
-
-  // PJ1-99: 「次へ」ボタン or タイマー終了時の共通処理
-  // タスク仕様に合わせて、メモ保存→次テーマ/完了の流れを実装
-  // 重複実行を防ぐため、useRefを使った同期的なロックを実装
-  const handleThemeFinished = async (options?: {
-    triggeredByUser?: boolean;
-  }) => {
-    // PJ1-99: レースコンディション対策: useRefで同期的にロックをチェック
-    if (savingRef.current) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] handleThemeFinishedをスキップ（既に保存中）:", {
-          currentIndex,
-          sessionId,
-        });
-      }
-      return;
-    }
-
-    if (!currentTheme) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] handleThemeFinishedをスキップ（テーマなし）:", {
-          currentIndex,
-          sessionId,
-        });
-      }
-      return;
-    }
-
-    // PJ1-99: 同期的にロックを取得（レースコンディション対策）
-    savingRef.current = true;
-    setIsSavingMemo(true);
-
-    try {
-      // 現在のindexとthemeIdをローカル変数に保持（非同期処理中に変わる可能性があるため）
-      const currentIndexToSave = currentIndex;
-      const themeIdToSave = currentTheme.id;
-      // PJ1-99: 最後のテーマかどうかを現在のindexで判定
-      const isLastThemeToSave =
-        themes.length > 0 && currentIndexToSave === themes.length - 1;
-
-      // デバッグ用: 開発環境でのみテーマ終了処理の開始をログ出力
-      if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] handleThemeFinished開始:", {
-          currentIndex: currentIndexToSave,
-          themeId: themeIdToSave,
-          sessionId,
-          isLastTheme: isLastThemeToSave,
-          totalThemes: themes.length,
-          triggeredByUser: options?.triggeredByUser,
-        });
-      }
-
-      // 現在のメモをIndexedDBに保存（indexとthemeIdを引数として渡す）
-      await saveCurrentMemo(currentIndexToSave, themeIdToSave);
-
-      if (isLastThemeToSave) {
-        // PJ1-99: 最後のテーマなので、セッションを完了
-        // DBから実際のメモ数を取得して使用（保存に失敗した場合にも対応）
-        await handleSessionComplete();
-        return;
-      }
-
-      // 次のテーマへ
-      const nextIndex = currentIndexToSave + 1;
-      setCurrentIndex(nextIndex);
-      setText("");
-      setHandwritingDataUrl(null);
-
-      // タイマーをリセットして開始（設定値を使用）
-      reset(secondsPerTheme);
-      start();
-    } finally {
-      // PJ1-99: 処理完了時にロックをリセット（エラーが発生しても確実にリセット）
-      savingRef.current = false;
-      setIsSavingMemo(false);
-    }
-  };
-
-  // PJ1-99: セッション完了時の処理
-  // IndexedDBのsessionsストアを完了状態に更新（endedAt, memoCountを更新）
-  // DBから実際のメモ数を取得して使用することで、保存に失敗した場合にも対応
-  const handleSessionComplete = async () => {
-    if (!sessionId) return;
-
-    try {
-      // PJ1-99: DBから実際のメモ数を取得（保存に失敗した場合にも対応）
-      const actualMemos = await getMemosBySession(sessionId);
-      const actualMemoCount = actualMemos.length;
-
-      await completeSession(sessionId, actualMemoCount);
-      // デバッグ用: 開発環境でのみ完了したセッションをコンソールに出力
-      if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] セッションを完了しました:", {
-          sessionId,
-          actualMemoCount,
-          stateMemoCount: memoCount,
-        });
-      }
-    } catch (e) {
-      console.error("Failed to complete session", e);
-      // エラーが発生しても完了画面へ遷移する
-    }
-
-    setStage("finished");
-
-    // 完了画面へ遷移（sessionIdをクエリパラメータで渡す）
-    router.push(`/session/complete?sessionId=${sessionId}`);
-  };
-
   // デバッグ & ガード
   if (stage === "loading") {
     return (
@@ -435,10 +290,9 @@ export default function SessionPage() {
   const isInputDisabled = stage !== "running" || secondsLeft === 0;
   // タブレット + 集中モード時は split 欄ごとアンマウント（hidden のまま TextEditor 等が
   // 残ると ResizeObserver が無駄に走り、ポータル側と二重インスタンスになるのを避ける）
-  const mountSplitInputSection = !isTabletUp || viewMode === "split";
+  const mountSplitInputSection = effectiveViewMode === "split";
 
-  const hideChromeForHandwritingFocus =
-    isTabletUp && viewMode === "handwritingFocus";
+  const hideChromeForHandwritingFocus = isHandwritingFocusActive;
 
   return (
     <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
@@ -470,7 +324,7 @@ export default function SessionPage() {
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              {viewMode === "split" && (
+              {effectiveViewMode === "split" && (
                 <div
                   className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
                   role="tablist"
@@ -509,7 +363,7 @@ export default function SessionPage() {
                 </div>
               )}
 
-              {isTabletUp && viewMode === "split" && (
+              {isTabletUp && effectiveViewMode === "split" && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -523,7 +377,7 @@ export default function SessionPage() {
               )}
             </div>
 
-            {viewMode === "split" && (
+            {effectiveViewMode === "split" && (
               <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap">
                 <p className="text-xs text-slate-400">
                   {isRunning ? "入力中…" : "一時停止中"}
@@ -601,8 +455,7 @@ export default function SessionPage() {
       )}
 
       {portalReady &&
-        isTabletUp &&
-        viewMode === "handwritingFocus" &&
+        isHandwritingFocusActive &&
         createPortal(
           <div className="fixed inset-0 z-50 box-border h-[100dvh] w-[100vw] max-w-none">
             <dialog
@@ -615,7 +468,7 @@ export default function SessionPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setViewMode("split")}
+                  onClick={() => exitHandwritingFocus()}
                   aria-label="手書き集中を終了して戻る"
                   data-testid="split-mode-button"
                 >
@@ -684,8 +537,7 @@ export default function SessionPage() {
         )}
 
       {portalReady &&
-        isTabletUp &&
-        viewMode === "handwritingFocus" &&
+        isHandwritingFocusActive &&
         isFocusTextOpen &&
         createPortal(
           <div className="fixed inset-0 z-[60] box-border flex h-[100dvh] w-[100vw] items-center justify-center p-4">
