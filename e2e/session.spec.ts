@@ -63,7 +63,6 @@ test.describe("セッション実行フロー", () => {
 
   test("「次へ」ボタンで次のテーマに進める", async ({ page }) => {
     await page.goto("/session");
-    const total = await getThemeTotal(page);
 
     // 最初のテーマ（1/N, N は設定で可変）を確認
     await expect(themeProgressLocator(page, 1, total)).toBeVisible();
@@ -91,9 +90,9 @@ test.describe("セッション実行フロー", () => {
 
       if (i < total - 1) {
         const nextIndex = i + 2;
-        await expect(
-          themeProgressLocator(page, nextIndex, total),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
+          timeout: 5000,
+        });
       }
     }
 
