@@ -662,10 +662,10 @@ export function useHandwritingCanvasEngine({
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointercancel", handlePointerCancel);
-      canvas.removeEventListener("touchstart", preventTouchDefault);
-      canvas.removeEventListener("touchmove", preventTouchDefault);
-      canvas.removeEventListener("touchend", preventTouchDefault);
-      canvas.removeEventListener("touchcancel", preventTouchDefault);
+      canvas.removeEventListener("touchstart", preventTouchDefault, touchOptions);
+      canvas.removeEventListener("touchmove", preventTouchDefault, touchOptions);
+      canvas.removeEventListener("touchend", preventTouchDefault, touchOptions);
+      canvas.removeEventListener("touchcancel", preventTouchDefault, touchOptions);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerCancel);
     };
