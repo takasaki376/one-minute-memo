@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { clearIndexedDB } from "./helpers/indexeddb";
-import { getThemeTotal, getVisibleSessionTextarea } from "./helpers/session";
+import {
+  getThemeTotal,
+  getVisibleSessionTextarea,
+  themeProgressLocator,
+} from "./helpers/session";
 
 test.describe("セッション実行フロー", () => {
   test.beforeEach(async ({ page }) => {
@@ -62,9 +66,7 @@ test.describe("セッション実行フロー", () => {
     const total = await getThemeTotal(page);
 
     // 最初のテーマ（1/N, N は設定で可変）を確認
-    await expect(
-      page.getByText(new RegExp(`^1\\s*\\/\\s*${total}$`)),
-    ).toBeVisible();
+    await expect(themeProgressLocator(page, 1, total)).toBeVisible();
 
     // 次へボタンをクリック
     const nextButton = page.getByRole("button", {
@@ -73,9 +75,7 @@ test.describe("セッション実行フロー", () => {
     await nextButton.click();
 
     // 次のテーマ（2/N）に進んだことを確認
-    await expect(
-      page.getByText(new RegExp(`^2\\s*\\/\\s*${total}$`)),
-    ).toBeVisible();
+    await expect(themeProgressLocator(page, 2, total)).toBeVisible();
   });
 
   test("10テーマ完了後、完了画面に遷移する", async ({ page }) => {
@@ -92,9 +92,7 @@ test.describe("セッション実行フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(
-          page
-            .locator(`text=/${nextIndex}\\s*\\/\\s*${total}/ >> visible=true`)
-            .first(),
+          themeProgressLocator(page, nextIndex, total),
         ).toBeVisible({ timeout: 5000 });
       }
     }
