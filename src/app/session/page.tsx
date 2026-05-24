@@ -14,6 +14,7 @@ import { saveMemo, getMemosBySession } from "@/lib/db/memosRepo";
 import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
 import { getSettings } from "@/lib/db/settingsRepo";
 import { DEFAULT_SETTINGS } from "@/types/settings";
+import { useThemeSeedState } from "@/components/providers/ThemeSeedProvider";
 
 type SessionStage = "loading" | "running" | "finished" | "error";
 
@@ -32,6 +33,8 @@ const DEFAULT_TIME_LIMIT_SECONDS = Number.parseInt(
 
 export default function SessionPage() {
   const router = useRouter();
+  const { isReady: isThemeSeedReady, error: themeSeedError } =
+    useThemeSeedState();
 
   // --- セッション全体の状態 ---
   const [stage, setStage] = useState<SessionStage>("loading");
@@ -65,7 +68,9 @@ export default function SessionPage() {
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
     "handwriting",
   );
-  const [viewMode, setViewMode] = useState<"split" | "handwritingFocus">("split");
+  const [viewMode, setViewMode] = useState<"split" | "handwritingFocus">(
+    "split",
+  );
   const [isFocusTextOpen, setIsFocusTextOpen] = useState(false);
   const [isTabletUp, setIsTabletUp] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
@@ -124,11 +129,7 @@ export default function SessionPage() {
   }, [viewMode]);
 
   useEffect(() => {
-    if (
-      !isFocusTextOpen ||
-      !isTabletUp ||
-      viewMode !== "handwritingFocus"
-    ) {
+    if (!isFocusTextOpen || !isTabletUp || viewMode !== "handwritingFocus") {
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
@@ -145,6 +146,13 @@ export default function SessionPage() {
 
   // セッション開始時の初期化
   useEffect(() => {
+    if (!isThemeSeedReady) {
+      if (themeSeedError) {
+        setStage("error");
+      }
+      return;
+    }
+
     const init = async () => {
       try {
         setStage("loading");
@@ -214,7 +222,7 @@ export default function SessionPage() {
     };
 
     void init();
-  }, [reset, start]);
+  }, [isThemeSeedReady, themeSeedError, reset, start]);
 
   // PJ1-99: 現在テーマのメモをIndexedDBに保存する
   // タスク仕様に合わせて、id/createdAt/updatedAtの指定を削除（saveMemo側で自動生成）
@@ -672,7 +680,7 @@ export default function SessionPage() {
               </div>
             </dialog>
           </div>,
-          document.body
+          document.body,
         )}
 
       {portalReady &&
@@ -718,7 +726,7 @@ export default function SessionPage() {
               />
             </dialog>
           </div>,
-          document.body
+          document.body,
         )}
     </main>
   );
