@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { formatSessionDateTime, isoToLocalDateKey } from "../dateFormatters";
+import { formatDurationMinutes, formatSessionDateTime, isoToLocalDateKey } from "../dateFormatters";
 
 describe("formatSessionDateTime", () => {
   it("formats a valid date correctly", () => {
@@ -73,6 +73,18 @@ describe("formatSessionDateTime", () => {
     expect(result).toMatch(/2025/);
     // 時刻が含まれることを確認
     expect(result).toMatch(/\d{1,2}:\d{2}/);
+  });
+});
+
+describe("formatDurationMinutes", () => {
+  it("returns rounded minutes between started and ended", () => {
+    const started = new Date("2025-01-01T10:00:00");
+    const ended = new Date("2025-01-01T10:05:30");
+    expect(formatDurationMinutes(started, ended)).toBe(6);
+  });
+
+  it("returns null when ended is missing", () => {
+    expect(formatDurationMinutes(new Date(), null)).toBeNull();
   });
 });
 

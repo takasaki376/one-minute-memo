@@ -28,3 +28,16 @@ export function isoToLocalDateKey(iso: string): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/**
+ * 開始〜終了の所要時間（分）を算出する。算出できない場合は null。
+ */
+export function formatDurationMinutes(
+  started: Date | null,
+  ended: Date | null,
+): number | null {
+  if (!started || !ended) return null;
+  const diffMs = ended.getTime() - started.getTime();
+  if (diffMs <= 0) return null;
+  return Math.round(diffMs / 1000 / 60);
+}
