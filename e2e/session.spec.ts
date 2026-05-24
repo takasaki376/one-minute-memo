@@ -59,12 +59,12 @@ test.describe("セッション実行フロー", () => {
 
   test("「次へ」ボタンで次のテーマに進める", async ({ page }) => {
     await page.goto("/session");
+    const total = await getThemeTotal(page);
 
-    // 最初のテーマ（1/10 など）を確認
-    const themeIndicator = page
-      .locator("text=/1.*\\/|テーマ.*1/ >> visible=true")
-      .first();
-    await expect(themeIndicator).toBeVisible();
+    // 最初のテーマ（1/N, N は設定で可変）を確認
+    await expect(
+      page.getByText(new RegExp(`^1\\s*\\/\\s*${total}$`)),
+    ).toBeVisible();
 
     // 次へボタンをクリック
     const nextButton = page.getByRole("button", {
@@ -72,9 +72,9 @@ test.describe("セッション実行フロー", () => {
     });
     await nextButton.click();
 
-    // 次のテーマ（2/10 など）に進んだことを確認
+    // 次のテーマ（2/N）に進んだことを確認
     await expect(
-      page.locator("text=/2.*\\/|テーマ.*2/ >> visible=true").first(),
+      page.getByText(new RegExp(`^2\\s*\\/\\s*${total}$`)),
     ).toBeVisible();
   });
 
