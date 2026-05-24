@@ -681,19 +681,7 @@ export function useHandwritingCanvasEngine({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(
-      0,
-      0,
-      logicalSizeRef.current.width,
-      logicalSizeRef.current.height,
-    );
-    applyCanvasStyle(ctx);
+    clearCanvas(ctx);
 
     clearActiveStrokePath();
     clearCommittedSvgStrokes();
