@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsClient } from "@/hooks/useIsClient";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -57,11 +58,7 @@ export default function SessionPage() {
   const [viewMode, setViewMode] = useState<"split" | "handwritingFocus">("split");
   const [isFocusTextOpen, setIsFocusTextOpen] = useState(false);
   const [isTabletUp, setIsTabletUp] = useState(false);
-  const portalReady = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
+  const portalReady = useIsClient();
 
   const currentTheme = useMemo(
     () => themes[currentIndex] ?? null,
