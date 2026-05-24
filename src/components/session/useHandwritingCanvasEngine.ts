@@ -642,7 +642,10 @@ export function useHandwritingCanvasEngine({
         event.preventDefault();
       }
     };
-    const touchOptions: AddEventListenerOptions = { passive: false };
+    const touchOptions: AddEventListenerOptions = {
+      passive: false,
+      capture: false,
+    };
 
     canvas.addEventListener("pointerdown", handlePointerDown);
     canvas.addEventListener("pointermove", handlePointerMove);
