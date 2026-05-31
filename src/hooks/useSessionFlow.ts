@@ -65,7 +65,7 @@ export function useSessionFlow(
       if (!currentSessionId) {
         if (themes.length === 0) {
           console.error(
-            "[PJ1-99] テーマが設定されていないためセッションを作成できません",
+            "テーマが設定されていないためセッションを作成できません",
           );
           return null;
         }
@@ -75,7 +75,7 @@ export function useSessionFlow(
           sessionIdRef.current = session.id;
           setSessionId(session.id);
           if (process.env.NODE_ENV === "development") {
-            console.log("[PJ1-99] 最初のメモ保存時にセッションを作成しました:", {
+            console.log("最初のメモ保存時にセッションを作成しました:", {
               id: session.id,
               themeIds: session.themeIds,
               startedAt: session.startedAt,
@@ -99,7 +99,7 @@ export function useSessionFlow(
         });
 
         if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] メモを保存しました:", {
+          console.log("メモを保存しました:", {
             id: savedMemo.id,
             sessionId: savedMemo.sessionId,
             themeId: savedMemo.themeId,
@@ -131,7 +131,7 @@ export function useSessionFlow(
         const actualMemoCount = actualMemos.length;
         await completeSession(completedSessionId, actualMemoCount);
         if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] セッションを完了しました:", {
+          console.log("セッションを完了しました:", {
             sessionId: completedSessionId,
             actualMemoCount,
           });
@@ -149,7 +149,7 @@ export function useSessionFlow(
     async (finishOptions?: { triggeredByUser?: boolean }) => {
       if (savingRef.current) {
         if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] handleThemeFinishedをスキップ（既に保存中）:", {
+          console.log("handleThemeFinished をスキップ（既に保存中）:", {
             currentIndex,
             sessionId: sessionIdRef.current,
           });
@@ -159,7 +159,7 @@ export function useSessionFlow(
 
       if (!currentTheme) {
         if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] handleThemeFinishedをスキップ（テーマなし）:", {
+          console.log("handleThemeFinished をスキップ（テーマなし）:", {
             currentIndex,
             sessionId: sessionIdRef.current,
           });
@@ -176,7 +176,7 @@ export function useSessionFlow(
           themes.length > 0 && currentIndexToSave === themes.length - 1;
 
         if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] handleThemeFinished開始:", {
+          console.log("handleThemeFinished 開始:", {
             currentIndex: currentIndexToSave,
             themeId: themeIdToSave,
             sessionId: sessionIdRef.current,
