@@ -1,22 +1,23 @@
 import { test, expect } from "@playwright/test";
-import { clearIndexedDB } from "./helpers/indexeddb";
+import { resetE2eAppState } from "./helpers/reset";
 import {
   getThemeTotal,
   getVisibleSessionTextarea,
+  SESSION_UI_TIMEOUT,
   themeProgressLocator,
 } from "./helpers/session";
 
 test.describe("履歴確認フロー", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await clearIndexedDB(page);
-    await page.reload();
+    await resetE2eAppState(page);
   });
 
   test("履歴がない状態で空メッセージが表示される", async ({ page }) => {
     await page.goto("/history");
 
-    await expect(page.getByText("まだメモがありません")).toBeVisible();
+    await expect(page.getByText("まだメモがありません")).toBeVisible({
+      timeout: SESSION_UI_TIMEOUT,
+    });
   });
 
   test("セッション完了後、履歴一覧に表示される", async ({ page }) => {
@@ -31,11 +32,13 @@ test.describe("履歴確認フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
-          timeout: 5000,
+          timeout: SESSION_UI_TIMEOUT,
         });
       }
     }
-    await expect(page).toHaveURL(/\/session\/complete/);
+    await expect(page).toHaveURL(/\/session\/complete/, {
+      timeout: SESSION_UI_TIMEOUT,
+    });
 
     // 履歴一覧に遷移
     await page.getByRole("link", { name: /履歴一覧/ }).click();
@@ -46,7 +49,7 @@ test.describe("履歴確認フロー", () => {
     // セッションカードが表示される
     await expect(
       page.getByText(/テーマ \d+ 件・メモ \d+ 件/),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
   });
 
   test("履歴詳細画面でメモ一覧が表示される", async ({ page }) => {
@@ -63,11 +66,13 @@ test.describe("履歴確認フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
-          timeout: 5000,
+          timeout: SESSION_UI_TIMEOUT,
         });
       }
     }
-    await expect(page).toHaveURL(/\/session\/complete/);
+    await expect(page).toHaveURL(/\/session\/complete/, {
+      timeout: SESSION_UI_TIMEOUT,
+    });
 
     // 完了画面から直接、当該セッションの詳細へ遷移
     const detailLink = page.getByRole("link", {
@@ -75,12 +80,14 @@ test.describe("履歴確認フロー", () => {
     });
     await expect(detailLink).toHaveAttribute("href", /\/history\/.+/);
     await Promise.all([
-      page.waitForURL(/\/history\/.+/, { timeout: 15000 }),
+      page.waitForURL(/\/history\/.+/, { timeout: SESSION_UI_TIMEOUT }),
       detailLink.click(),
     ]);
 
     // メモ一覧が表示される（見出しで一意に特定）
-    await expect(page.getByRole("heading", { name: "メモ一覧" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "メモ一覧" })).toBeVisible({
+      timeout: SESSION_UI_TIMEOUT,
+    });
   });
 
   test("履歴詳細から履歴一覧に戻れる", async ({ page }) => {
@@ -95,11 +102,13 @@ test.describe("履歴確認フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
-          timeout: 5000,
+          timeout: SESSION_UI_TIMEOUT,
         });
       }
     }
-    await expect(page).toHaveURL(/\/session\/complete/);
+    await expect(page).toHaveURL(/\/session\/complete/, {
+      timeout: SESSION_UI_TIMEOUT,
+    });
 
     // 完了画面から詳細へ（履歴一覧には「詳細を見る」リンクはない）
     const detailLink = page.getByRole("link", {
@@ -107,7 +116,7 @@ test.describe("履歴確認フロー", () => {
     });
     await expect(detailLink).toHaveAttribute("href", /\/history\/.+/);
     await Promise.all([
-      page.waitForURL(/\/history\/.+/, { timeout: 15000 }),
+      page.waitForURL(/\/history\/.+/, { timeout: SESSION_UI_TIMEOUT }),
       detailLink.click(),
     ]);
 
