@@ -30,6 +30,7 @@ const mockGetAllThemes = vi.fn();
 const mockToggleThemeActive = vi.fn();
 const mockCreateUserTheme = vi.fn();
 const mockUpdateTheme = vi.fn();
+const mockImportUserThemesFromCsvRows = vi.fn();
 const mockGetMemoCountsByThemeIds = vi.fn();
 
 vi.mock("@/components/providers/ThemeSeedProvider", () => {
@@ -48,6 +49,8 @@ vi.mock("@/lib/db/themesRepo", () => {
     toggleThemeActive: (...args: unknown[]) => mockToggleThemeActive(...args),
     createUserTheme: (...args: unknown[]) => mockCreateUserTheme(...args),
     updateTheme: (...args: unknown[]) => mockUpdateTheme(...args),
+    importUserThemesFromCsvRows: (...args: unknown[]) =>
+      mockImportUserThemesFromCsvRows(...args),
   };
 });
 
@@ -66,6 +69,11 @@ describe("/themes page", () => {
     mockGetMemoCountsByThemeIds.mockResolvedValue({
       "theme-0001": 3,
       "theme-0002": 1,
+    });
+    mockImportUserThemesFromCsvRows.mockResolvedValue({
+      successCount: 0,
+      failureCount: 0,
+      results: [],
     });
     mockCreateUserTheme.mockImplementation(
       async (input: { title: string; category: string; isActive: boolean }) => ({
@@ -145,13 +153,45 @@ describe("/themes page", () => {
     expect(addDialog).toBeInTheDocument();
 
     await user.type(within(addDialog).getByLabelText(/テーマ名/), "  新テーマ  ");
-    await user.type(within(addDialog).getByLabelText(/カテゴリ/), "custom");
+    await user.type(within(addDialog).getByLabelText("新規カテゴリ"), "custom");
     await user.click(within(addDialog).getByRole("button", { name: "追加" }));
 
     await waitFor(() => {
       expect(screen.getByText("新テーマ")).toBeInTheDocument();
     });
     expect(mockCreateUserTheme).toHaveBeenCalled();
+  });
+
+  it("can select existing category from dropdown when adding theme", async () => {
+    const user = userEvent.setup();
+    render(<ThemesPage />);
+    await waitFor(() => {
+      expect(screen.getByText("仕事の振り返り")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("themes-add-open"));
+    const addDialog = screen.getByRole("dialog", { name: "テーマを追加" });
+    await user.type(within(addDialog).getByLabelText(/テーマ名/), "既存カテゴリテスト");
+    await user.selectOptions(
+      within(addDialog).getByLabelText("カテゴリ（既存から選択）"),
+      "work",
+    );
+    await user.click(within(addDialog).getByRole("button", { name: "追加" }));
+
+    await waitFor(() => {
+      expect(mockCreateUserTheme).toHaveBeenCalledWith(
+        expect.objectContaining({ category: "work" }),
+      );
+    });
+  });
+
+  it("shows CSV import panel and sample download button", async () => {
+    render(<ThemesPage />);
+    await waitFor(() => {
+      expect(screen.getByText("CSV一括登録")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("themes-csv-sample-download")).toBeInTheDocument();
+    expect(screen.getByTestId("themes-csv-import-open")).toBeInTheDocument();
   });
 
   it("can edit a theme from list", async () => {
