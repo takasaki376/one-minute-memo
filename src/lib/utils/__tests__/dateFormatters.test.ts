@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { formatDurationMinutes, formatSessionDateTime, isoToLocalDateKey } from "../dateFormatters";
+import { calculateDurationMinutes, formatSessionDateTime, isoToLocalDateKey } from "../dateFormatters";
 
 describe("formatSessionDateTime", () => {
   it("formats a valid date correctly", () => {
@@ -76,15 +76,30 @@ describe("formatSessionDateTime", () => {
   });
 });
 
-describe("formatDurationMinutes", () => {
+describe("calculateDurationMinutes", () => {
   it("returns rounded minutes between started and ended", () => {
     const started = new Date("2025-01-01T10:00:00");
     const ended = new Date("2025-01-01T10:05:30");
-    expect(formatDurationMinutes(started, ended)).toBe(6);
+    expect(calculateDurationMinutes(started, ended)).toBe(6);
+  });
+
+  it("returns null when started is missing", () => {
+    expect(calculateDurationMinutes(null, new Date())).toBeNull();
   });
 
   it("returns null when ended is missing", () => {
-    expect(formatDurationMinutes(new Date(), null)).toBeNull();
+    expect(calculateDurationMinutes(new Date(), null)).toBeNull();
+  });
+
+  it("returns null when ended is before started", () => {
+    const started = new Date("2025-01-01T10:05:00");
+    const ended = new Date("2025-01-01T10:00:00");
+    expect(calculateDurationMinutes(started, ended)).toBeNull();
+  });
+
+  it("returns null when ended equals started", () => {
+    const at = new Date("2025-01-01T10:00:00");
+    expect(calculateDurationMinutes(at, at)).toBeNull();
   });
 });
 

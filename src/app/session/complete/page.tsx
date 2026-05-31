@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { PageError, PageLoading } from "@/components/ui/PageStatus";
 import { getSessionById } from "@/lib/db/sessionsRepo";
 import {
-  formatDurationMinutes,
+  calculateDurationMinutes,
   formatSessionDateTime,
 } from "@/lib/utils/dateFormatters";
 import type { SessionRecord } from "@/types/session";
@@ -88,7 +88,7 @@ function SessionCompleteContent() {
   const isSameDay =
     started && ended && started.toDateString() === ended.toDateString();
 
-  const durationMinutes = formatDurationMinutes(started, ended);
+  const durationMinutes = calculateDurationMinutes(started, ended);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
