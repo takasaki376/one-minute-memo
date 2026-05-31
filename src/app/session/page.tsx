@@ -147,19 +147,7 @@ export default function SessionPage() {
   }, [exitHandwritingFocus]);
 
   useEffect(() => {
-    if (!isTabletUp && viewMode !== "split") {
-      setViewMode("split");
-    }
-  }, [isTabletUp, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "handwritingFocus") {
-      setIsFocusTextOpen(false);
-    }
-  }, [viewMode]);
-
-  useEffect(() => {
-    if (!isFocusTextOpen || !isTabletUp || viewMode !== "handwritingFocus") {
+    if (!isFocusTextOpen || !isHandwritingFocusActive) {
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
@@ -177,9 +165,6 @@ export default function SessionPage() {
   // セッション開始時の初期化
   useEffect(() => {
     if (!isThemeSeedReady) {
-      if (themeSeedError) {
-        setStage("error");
-      }
       return;
     }
 
@@ -252,10 +237,26 @@ export default function SessionPage() {
     };
 
     void init();
-  }, [isThemeSeedReady, themeSeedError, reset, start]);
+  }, [isThemeSeedReady, reset, start]);
 
   // デバッグ & ガード
-  if (stage === "loading") {
+  if (themeSeedError) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <h1 className="text-xl font-semibold">セッションを開始できません</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          テーマの読み込み中にエラーが発生しました。
+        </p>
+        <div className="mt-6">
+          <Button href="/" variant="secondary">
+            トップへ戻る
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  if (stage === "loading" || !isThemeSeedReady) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="text-xl font-semibold">セッションを準備中...</h1>
@@ -365,7 +366,10 @@ export default function SessionPage() {
                   size="sm"
                   variant="ghost"
                   className="hidden md:inline-flex"
-                  onClick={() => setViewMode("handwritingFocus")}
+                  onClick={() => {
+                    setViewMode("handwritingFocus");
+                    setIsFocusTextOpen(false);
+                  }}
                   aria-label="手書き集中モードに切り替え"
                   data-testid="focus-mode-button"
                 >

@@ -69,17 +69,22 @@ export function useSessionFlow(
           );
           return null;
         }
-        const session = await createSession(themes.map((t) => t.id));
-        currentSessionId = session.id;
-        sessionIdRef.current = session.id;
-        setSessionId(session.id);
-        if (process.env.NODE_ENV === "development") {
-          console.log("[PJ1-99] 最初のメモ保存時にセッションを作成しました:", {
-            id: session.id,
-            themeIds: session.themeIds,
-            startedAt: session.startedAt,
-            memoCount: session.memoCount,
-          });
+        try {
+          const session = await createSession(themes.map((t) => t.id));
+          currentSessionId = session.id;
+          sessionIdRef.current = session.id;
+          setSessionId(session.id);
+          if (process.env.NODE_ENV === "development") {
+            console.log("[PJ1-99] 最初のメモ保存時にセッションを作成しました:", {
+              id: session.id,
+              themeIds: session.themeIds,
+              startedAt: session.startedAt,
+              memoCount: session.memoCount,
+            });
+          }
+        } catch (e) {
+          console.error("Failed to create session", e);
+          return null;
         }
       }
 
@@ -186,10 +191,12 @@ export function useSessionFlow(
           themeIdToSave,
         );
 
+        if (!activeSessionId) {
+          return;
+        }
+
         if (isLastThemeToSave) {
-          if (activeSessionId) {
-            await completeSessionFlow(activeSessionId);
-          }
+          await completeSessionFlow(activeSessionId);
           return;
         }
 
