@@ -1,11 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { clearIndexedDB } from "./helpers/indexeddb";
+import { resetE2eAppState } from "./helpers/reset";
+import { SESSION_UI_TIMEOUT } from "./helpers/session";
 
 test.describe("設定変更フロー", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await clearIndexedDB(page);
-    await page.reload();
+    await resetE2eAppState(page);
   });
 
   test("設定画面にアクセスできる", async ({ page }) => {
@@ -48,8 +47,12 @@ test.describe("設定変更フロー", () => {
     const progressIndicator = page.locator(
       "text=/1\\s*\\/\\s*5/ >> visible=true"
     );
-    await expect(progressIndicator).toHaveCount(1, { timeout: 5000 });
-    await expect(progressIndicator).toBeVisible({ timeout: 5000 });
+    await expect(progressIndicator).toHaveCount(1, {
+      timeout: SESSION_UI_TIMEOUT,
+    });
+    await expect(progressIndicator).toBeVisible({
+      timeout: SESSION_UI_TIMEOUT,
+    });
   });
 
   test("トップ画面から設定画面に遷移できる", async ({ page }) => {

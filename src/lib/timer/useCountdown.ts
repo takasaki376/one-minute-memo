@@ -7,8 +7,9 @@ function clampSeconds(seconds: number): number {
 export interface UseCountdownOptions {
   /**
    * 初期秒数（例: 60）
-   * マウント時の state 初期化にのみ使用する。再レンダーで変えても `secondsLeft` は追従しない。
-   * 実行中に秒数を変える場合は `reset()` を使う。
+   * `secondsLeft` の初期値としてのみ使用する。再レンダーで変えても `secondsLeft` は追従しない。
+   * ただし props の変更は `initialSecondsRef` に反映され、`reset()` を引数なしで呼んだときの
+   * デフォルト秒数には使われる。実行中に残り秒数を変える場合は `reset(newSeconds)` を使う。
    */
   initialSeconds: number;
   /**

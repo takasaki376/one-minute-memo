@@ -1,17 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { clearIndexedDB } from "./helpers/indexeddb";
+import { resetE2eAppState } from "./helpers/reset";
 import {
   getThemeTotal,
   getVisibleSessionTextarea,
+  SESSION_UI_TIMEOUT,
   themeProgressLocator,
 } from "./helpers/session";
 
 test.describe("セッション実行フロー", () => {
   test.beforeEach(async ({ page }) => {
-    // IndexedDB をクリアしてクリーンな状態から開始
-    await page.goto("/");
-    await clearIndexedDB(page);
-    await page.reload();
+    await resetE2eAppState(page);
   });
 
   test("トップ画面が表示される", async ({ page }) => {
@@ -38,7 +36,7 @@ test.describe("セッション実行フロー", () => {
     // テーマ表示があることを確認（1/N のインジケータ、N は設定で可変）
     await expect(
       page.locator("text=/1\\s*\\/\\s*\\d+/ >> visible=true").first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
   });
 
   test("セッション画面でタイマーが表示される", async ({ page }) => {
@@ -47,7 +45,7 @@ test.describe("セッション実行フロー", () => {
     // タイマー表示を確認（モバイル/デスクトップ共通で数字表示を持つ要素）
     await expect(
       page.locator(".tabular-nums >> visible=true").first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
   });
 
   test("セッション画面でテキスト入力ができる", async ({ page }) => {
@@ -66,7 +64,9 @@ test.describe("セッション実行フロー", () => {
     const total = await getThemeTotal(page);
 
     // 最初のテーマ（1/N, N は設定で可変）を確認
-    await expect(themeProgressLocator(page, 1, total)).toBeVisible();
+    await expect(themeProgressLocator(page, 1, total)).toBeVisible({
+      timeout: SESSION_UI_TIMEOUT,
+    });
 
     // 次へボタンをクリック
     const nextButton = page.getByRole("button", {
@@ -75,7 +75,9 @@ test.describe("セッション実行フロー", () => {
     await nextButton.click();
 
     // 次のテーマ（2/N）に進んだことを確認
-    await expect(themeProgressLocator(page, 2, total)).toBeVisible();
+    await expect(themeProgressLocator(page, 2, total)).toBeVisible({
+      timeout: SESSION_UI_TIMEOUT,
+    });
   });
 
   test("10テーマ完了後、完了画面に遷移する", async ({ page }) => {
@@ -92,17 +94,19 @@ test.describe("セッション実行フロー", () => {
       if (i < total - 1) {
         const nextIndex = i + 2;
         await expect(themeProgressLocator(page, nextIndex, total)).toBeVisible({
-          timeout: 5000,
+          timeout: SESSION_UI_TIMEOUT,
         });
       }
     }
 
     // 完了画面に遷移
-    await expect(page).toHaveURL(/\/session\/complete/);
+    await expect(page).toHaveURL(/\/session\/complete/, {
+      timeout: SESSION_UI_TIMEOUT,
+    });
 
     // 完了メッセージを確認（見出しとして表示されている）
     await expect(
       page.getByRole("heading", { name: /完了|おつかれさま/ }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
   });
 });

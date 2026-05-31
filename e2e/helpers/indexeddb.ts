@@ -1,5 +1,22 @@
 import type { Page } from "@playwright/test";
 
+export const E2E_DB_NAME = "one-minute-memo-db";
+
+/** E2E ごとにリセットするストア（themes は残して再シードを避ける） */
+export const E2E_TEST_DATA_STORES = ["memos", "sessions", "settings"] as const;
+
+/**
+ * セッション・履歴・設定のテストデータのみクリアする。
+ * themes ストアは残すため、500件の内蔵テーマ再投入を毎回避けられる。
+ */
+export async function clearTestDataStores(page: Page): Promise<void> {
+  await Promise.all(
+    E2E_TEST_DATA_STORES.map((storeName) =>
+      clearStore(page, E2E_DB_NAME, storeName),
+    ),
+  );
+}
+
 /**
  * IndexedDB をクリアするヘルパー
  * テスト実行前にクリーンな状態にするために使用

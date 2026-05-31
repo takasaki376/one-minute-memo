@@ -1,6 +1,9 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
+/** セッション画面の UI 待機タイムアウト（Windows 等の遅い環境向け） */
+export const SESSION_UI_TIMEOUT = 15000;
+
 /**
  * テーマ進捗（例: 1 / 10）のロケータ。
  * ThemeHeader は md ブレークポイント用に同一テキストを2つDOMへ出すため、
@@ -22,7 +25,7 @@ export function themeProgressLocator(
  */
 export async function getThemeTotal(page: Page): Promise<number> {
   const indicator = page.locator("text=/1\\s*\\/\\s*\\d+/ >> visible=true").first();
-  await indicator.waitFor({ state: "visible", timeout: 10000 });
+  await indicator.waitFor({ state: "visible", timeout: SESSION_UI_TIMEOUT });
   const text = await indicator.textContent();
   const match = text?.replace(/\s/g, "").match(/1\/(\d+)/);
   return Number.parseInt(match?.[1] ?? "10", 10);
@@ -31,7 +34,7 @@ export async function getThemeTotal(page: Page): Promise<number> {
 export async function getVisibleSessionTextarea(page: Page) {
   // セッションUIの操作領域が出るまで待つ（初期ロード中の取りこぼしを防ぐ）
   await expect(page.locator('[data-testid="session-controls"]')).toBeVisible({
-    timeout: 15000,
+    timeout: SESSION_UI_TIMEOUT,
   });
 
   const textTab = page.getByRole("tab", { name: "テキスト入力" });
@@ -59,6 +62,6 @@ export async function getVisibleSessionTextarea(page: Page) {
   const focusTextarea = page
     .locator('[data-testid="focus-text-modal"] textarea')
     .first();
-  await expect(focusTextarea).toBeVisible({ timeout: 10000 });
+  await expect(focusTextarea).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
   return focusTextarea;
 }
