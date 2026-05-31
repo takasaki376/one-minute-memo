@@ -3,8 +3,7 @@ import type { MemoRecord } from '@/types/memo';
 
 const MEMO_STORE = 'memos';
 
-// PJ1-99: タスク仕様に合わせてID生成関数を追加
-// 呼び出し側でidを指定しなくても自動生成されるようにする
+// 呼び出し側で id を指定しなくても自動生成される
 function generateId() {
   // globalThis.cryptoを使用することで、TypeScript環境での型エラーを回避
   if (typeof globalThis !== 'undefined' && 'crypto' in globalThis && 'randomUUID' in globalThis.crypto) {
@@ -16,12 +15,7 @@ function generateId() {
 
 /**
  * メモを保存（同じ id があれば上書き）
- * 呼び出し側で id を決めてもいいし、任せてもOKなようにしている。
- *
- * PJ1-99: タスク仕様に合わせて以下の変更を実施
- * - id, createdAt, updatedAtをオプショナル/自動生成に変更
- * - 呼び出し側でidを指定しなくても自動生成されるように改善
- * - 戻り値をMemoRecordに変更（保存したレコードを返す）
+ * id / createdAt / updatedAt は省略可（未指定時は自動生成）
  */
 export async function saveMemo(
   memo: Omit<MemoRecord, 'id' | 'createdAt' | 'updatedAt'> & {
@@ -31,7 +25,7 @@ export async function saveMemo(
   const db = await getDB();
   const now = new Date().toISOString();
 
-  // PJ1-99: 既存レコードがある場合はcreatedAtを保持、新規の場合は現在時刻を設定
+  // 既存レコードがある場合は createdAt を保持
   let existingRecord: MemoRecord | undefined;
   if (memo.id) {
     const tx = db.transaction(MEMO_STORE, "readonly");
@@ -39,9 +33,6 @@ export async function saveMemo(
     await tx.done;
   }
 
-  // PJ1-99: idが指定されていない場合は自動生成
-  // 既存レコードがある場合はcreatedAtを保持、新規の場合は現在時刻を設定
-  // メモ: 型定義でmemoからcreatedAt/updatedAtを除外しているため、ここでid/createdAt/updatedAtを明示的に設定している
   const record: MemoRecord = {
     ...memo,
     id: memo.id ?? generateId(),

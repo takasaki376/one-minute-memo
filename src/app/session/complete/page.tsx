@@ -148,7 +148,7 @@ function SessionCompleteContent() {
         </dl>
       </div>
 
-      {/* アクションボタン（PJ1-104: このセッションの詳細を見るを primary に） */}
+      {/* アクションボタン */}
       <section className="mt-8 flex flex-wrap gap-3">
         <Button href={`/history/${session.id}`} variant="primary">
           このセッションの詳細を見る
