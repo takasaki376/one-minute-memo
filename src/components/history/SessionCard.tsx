@@ -86,7 +86,7 @@ function SessionMemoEntry({
 }
 
 /**
- * セッション履歴用カード（PJ1-107）
+ * セッション履歴用カード
  * - detailHref があるときだけ詳細リンクを表示
  * - memos + resolveThemeTitle で一覧にメモ内容を埋め込める
  */
