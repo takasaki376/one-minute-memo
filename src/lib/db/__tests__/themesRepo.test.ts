@@ -79,6 +79,7 @@ import {
   getAllThemes,
   createUserTheme,
   updateTheme,
+  importUserThemesFromCsvRows,
 } from "../themesRepo";
 
 describe("themesRepo initBuiltinThemesIfNeeded", () => {
@@ -242,6 +243,38 @@ describe("themesRepo updateTheme", () => {
         isActive: true,
       }),
     ).rejects.toThrow(/見つかりません/);
+  });
+});
+
+describe("themesRepo importUserThemesFromCsvRows", () => {
+  beforeEach(async () => {
+    const mod = await importOpenDBTestModule();
+    mod.__reset();
+  });
+
+  it("imports valid rows and reports duplicate failures individually", async () => {
+    await createUserTheme({
+      title: "既存テーマ",
+      category: "仕事",
+      isActive: true,
+    });
+
+    const summary = await importUserThemesFromCsvRows([
+      { lineNumber: 2, title: "新規A", category: "仕事" },
+      { lineNumber: 3, title: "既存テーマ", category: "仕事" },
+      { lineNumber: 4, title: "新規B", category: "新カテゴリ" },
+    ]);
+
+    expect(summary.successCount).toBe(2);
+    expect(summary.failureCount).toBe(1);
+    expect(summary.results[1]).toMatchObject({
+      lineNumber: 3,
+      ok: false,
+    });
+
+    const all = await getAllThemes();
+    expect(all).toHaveLength(3);
+    expect(all.some((t) => t.category === "新カテゴリ")).toBe(true);
   });
 });
 
