@@ -49,7 +49,7 @@ function ThemeSeedInitializer() {
           error: err instanceof Error ? err : new Error("failed to seed"),
         });
       });
-  }, []);
+  }, [setState]);
 
   return null;
 }
