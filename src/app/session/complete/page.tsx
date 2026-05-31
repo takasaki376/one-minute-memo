@@ -4,8 +4,12 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
+import { PageError, PageLoading } from "@/components/ui/PageStatus";
 import { getSessionById } from "@/lib/db/sessionsRepo";
-import { formatSessionDateTime } from "@/lib/utils/dateFormatters";
+import {
+  calculateDurationMinutes,
+  formatSessionDateTime,
+} from "@/lib/utils/dateFormatters";
 import type { SessionRecord } from "@/types/session";
 
 type PageStage = "loading" | "success" | "error";
@@ -47,48 +51,31 @@ function SessionCompleteContent() {
     void loadSession();
   }, [searchParams]);
 
-  // ローディング状態
   if (stage === "loading") {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-          セッション情報を読み込んでいます…
-        </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          お待ちください。
-        </p>
-      </main>
+      <PageLoading
+        title="セッション情報を読み込んでいます…"
+        description="お待ちください。"
+      />
     );
   }
 
-  // エラー状態
   if (stage === "error" || !session) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-          セッション情報を取得できませんでした
-        </h1>
-        {error && (
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            {error}
-          </p>
-        )}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button href="/session" variant="primary">
-            新しくセッションを始める
-          </Button>
-          <Button href="/history" variant="secondary">
-            履歴一覧を見る
-          </Button>
-          <Button href="/" variant="ghost">
-            トップへ戻る
-          </Button>
-        </div>
-      </main>
+      <PageError title="セッション情報を取得できませんでした" message={error}>
+        <Button href="/session" variant="primary">
+          新しくセッションを始める
+        </Button>
+        <Button href="/history" variant="secondary">
+          履歴一覧を見る
+        </Button>
+        <Button href="/" variant="ghost">
+          トップへ戻る
+        </Button>
+      </PageError>
     );
   }
 
-  // 成功状態：セッション情報を表示
   const memoCount = session.memoCount;
   const themeCount = session.themeIds.length;
   const started = session.startedAt ? new Date(session.startedAt) : null;
@@ -101,14 +88,7 @@ function SessionCompleteContent() {
   const isSameDay =
     started && ended && started.toDateString() === ended.toDateString();
 
-  // 所要時間（分）の計算（endedAt がある場合のみ）
-  let durationMinutes: number | null = null;
-  if (started && ended) {
-    const diffMs = ended.getTime() - started.getTime();
-    if (diffMs > 0) {
-      durationMinutes = Math.round(diffMs / 1000 / 60);
-    }
-  }
+  const durationMinutes = calculateDurationMinutes(started, ended);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -188,14 +168,10 @@ export default function SessionCompletePage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto max-w-3xl px-4 py-8">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-            セッション情報を読み込んでいます…
-          </h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            お待ちください。
-          </p>
-        </main>
+        <PageLoading
+          title="セッション情報を読み込んでいます…"
+          description="お待ちください。"
+        />
       }
     >
       <SessionCompleteContent />
