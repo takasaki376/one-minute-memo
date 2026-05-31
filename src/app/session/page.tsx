@@ -53,10 +53,6 @@ export default function SessionPage() {
   const [secondsPerTheme, setSecondsPerTheme] = useState(
     DEFAULT_TIME_LIMIT_SECONDS,
   );
-  // PJ1-99: 重複実行を防ぐためのフラグ（UI更新用、将来的にローディング表示などに使用可能）
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isSavingMemo, setIsSavingMemo] = useState(false);
-  // PJ1-99: レースコンディション対策: useRefで同期的なロックを実装
   const savingRef = useRef(false);
 
   // --- 現在テーマの入力状態 ---
@@ -224,9 +220,8 @@ export default function SessionPage() {
     void init();
   }, [isThemeSeedReady, themeSeedError, reset, start]);
 
-  // PJ1-99: 現在テーマのメモをIndexedDBに保存する
-  // タスク仕様に合わせて、id/createdAt/updatedAtの指定を削除（saveMemo側で自動生成）
-  // themeIdは引数として受け取ることで、非同期処理中にcurrentThemeが変わる可能性に対応
+  // 現在テーマのメモを IndexedDB に保存（id/createdAt/updatedAt は saveMemo 側で自動生成）
+  // themeId は引数で受け取り、非同期中に currentTheme が変わるケースに対応
   const saveCurrentMemo = async (
     index: number,
     themeId: string,
@@ -237,7 +232,7 @@ export default function SessionPage() {
     if (!currentSessionId) {
       if (themes.length === 0) {
         console.error(
-          "[PJ1-99] テーマが設定されていないためセッションを作成できません",
+          "テーマが設定されていないためセッションを作成できません",
         );
         return;
       }
@@ -246,7 +241,7 @@ export default function SessionPage() {
       setSessionId(session.id);
       // デバッグ用: 開発環境でのみセッション情報をコンソールに出力
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] 最初のメモ保存時にセッションを作成しました:", {
+        console.log("最初のメモ保存時にセッションを作成しました:", {
           id: session.id,
           themeIds: session.themeIds,
           startedAt: session.startedAt,
@@ -267,7 +262,7 @@ export default function SessionPage() {
 
       // デバッグ用: 開発環境でのみ保存されたメモをコンソールに出力
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] メモを保存しました:", {
+        console.log("メモを保存しました:", {
           id: savedMemo.id,
           sessionId: savedMemo.sessionId,
           themeId: savedMemo.themeId,
@@ -289,21 +284,17 @@ export default function SessionPage() {
     }
   };
 
-  // PJ1-99: タイマー終了で自動的に次へ進むとき
   const handleThemeFinishedAuto = async () => {
     await handleThemeFinished({ triggeredByUser: false });
   };
 
-  // PJ1-99: 「次へ」ボタン or タイマー終了時の共通処理
-  // タスク仕様に合わせて、メモ保存→次テーマ/完了の流れを実装
-  // 重複実行を防ぐため、useRefを使った同期的なロックを実装
+  /** 「次へ」ボタン or タイマー終了時: メモ保存 → 次テーマ or セッション完了 */
   const handleThemeFinished = async (options?: {
     triggeredByUser?: boolean;
   }) => {
-    // PJ1-99: レースコンディション対策: useRefで同期的にロックをチェック
     if (savingRef.current) {
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] handleThemeFinishedをスキップ（既に保存中）:", {
+        console.log("handleThemeFinished をスキップ（既に保存中）:", {
           currentIndex,
           sessionId,
         });
@@ -313,7 +304,7 @@ export default function SessionPage() {
 
     if (!currentTheme) {
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] handleThemeFinishedをスキップ（テーマなし）:", {
+        console.log("handleThemeFinished をスキップ（テーマなし）:", {
           currentIndex,
           sessionId,
         });
@@ -321,21 +312,17 @@ export default function SessionPage() {
       return;
     }
 
-    // PJ1-99: 同期的にロックを取得（レースコンディション対策）
     savingRef.current = true;
-    setIsSavingMemo(true);
 
     try {
       // 現在のindexとthemeIdをローカル変数に保持（非同期処理中に変わる可能性があるため）
       const currentIndexToSave = currentIndex;
       const themeIdToSave = currentTheme.id;
-      // PJ1-99: 最後のテーマかどうかを現在のindexで判定
       const isLastThemeToSave =
         themes.length > 0 && currentIndexToSave === themes.length - 1;
 
-      // デバッグ用: 開発環境でのみテーマ終了処理の開始をログ出力
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] handleThemeFinished開始:", {
+        console.log("handleThemeFinished 開始:", {
           currentIndex: currentIndexToSave,
           themeId: themeIdToSave,
           sessionId,
@@ -349,8 +336,6 @@ export default function SessionPage() {
       await saveCurrentMemo(currentIndexToSave, themeIdToSave);
 
       if (isLastThemeToSave) {
-        // PJ1-99: 最後のテーマなので、セッションを完了
-        // DBから実際のメモ数を取得して使用（保存に失敗した場合にも対応）
         await handleSessionComplete();
         return;
       }
@@ -365,27 +350,22 @@ export default function SessionPage() {
       reset(secondsPerTheme);
       start();
     } finally {
-      // PJ1-99: 処理完了時にロックをリセット（エラーが発生しても確実にリセット）
       savingRef.current = false;
-      setIsSavingMemo(false);
     }
   };
 
-  // PJ1-99: セッション完了時の処理
-  // IndexedDBのsessionsストアを完了状態に更新（endedAt, memoCountを更新）
-  // DBから実際のメモ数を取得して使用することで、保存に失敗した場合にも対応
+  /** セッション完了: endedAt / memoCount を DB の実件数で更新して完了画面へ */
   const handleSessionComplete = async () => {
     if (!sessionId) return;
 
     try {
-      // PJ1-99: DBから実際のメモ数を取得（保存に失敗した場合にも対応）
       const actualMemos = await getMemosBySession(sessionId);
       const actualMemoCount = actualMemos.length;
 
       await completeSession(sessionId, actualMemoCount);
       // デバッグ用: 開発環境でのみ完了したセッションをコンソールに出力
       if (process.env.NODE_ENV === "development") {
-        console.log("[PJ1-99] セッションを完了しました:", {
+        console.log("セッションを完了しました:", {
           sessionId,
           actualMemoCount,
           stateMemoCount: memoCount,
