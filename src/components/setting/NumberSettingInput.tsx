@@ -15,6 +15,15 @@ export interface NumberSettingInputProps {
   errorLogMessage?: string;
 }
 
+/** type="number" 入力を有限の整数として解釈する（1e2→100、1.5→拒否） */
+function parseIntegerInput(raw: string): number | null {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
 /**
  * 数値設定入力（blur 時に min/max でクランプして onUpdate）
  */
@@ -38,8 +47,8 @@ export function NumberSettingInput({
 
   const displayValue = (() => {
     if (inputValue === "") return "";
-    const parsed = Number.parseInt(inputValue, 10);
-    if (Number.isNaN(parsed)) return "";
+    const parsed = parseIntegerInput(inputValue);
+    if (parsed === null) return "";
     return parsed;
   })();
 
@@ -50,8 +59,7 @@ export function NumberSettingInput({
       return;
     }
 
-    const parsed = Number.parseInt(newValue, 10);
-    if (!Number.isNaN(parsed)) {
+    if (parseIntegerInput(newValue) !== null) {
       setInputValue(newValue);
     }
   };
@@ -62,8 +70,8 @@ export function NumberSettingInput({
       finalValue = String(min);
       setInputValue(String(min));
     } else {
-      const parsed = Number.parseInt(inputValue, 10);
-      if (Number.isNaN(parsed)) {
+      const parsed = parseIntegerInput(inputValue);
+      if (parsed === null) {
         finalValue = String(min);
         setInputValue(String(min));
       } else {

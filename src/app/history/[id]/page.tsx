@@ -12,7 +12,7 @@ import { getSessionById } from "@/lib/db/sessionsRepo";
 import { getMemosBySession } from "@/lib/db/memosRepo";
 import { getThemesByIds } from "@/lib/db/themesRepo";
 import {
-  formatDurationMinutes,
+  calculateDurationMinutes,
   formatSessionDateTime,
 } from "@/lib/utils/dateFormatters";
 import type { SessionRecord } from "@/types/session";
@@ -171,7 +171,7 @@ export default function HistoryDetailPage({ params }: PageProps) {
 
   const startedLabel = formatSessionDateTime(started);
   const endedLabel = ended ? formatSessionDateTime(ended) : "進行中";
-  const durationMinutes = formatDurationMinutes(started, ended);
+  const durationMinutes = calculateDurationMinutes(started, ended);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">

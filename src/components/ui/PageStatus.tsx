@@ -14,12 +14,14 @@ export interface PageLoadingProps {
 export function PageLoading({ title, description }: PageLoadingProps) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-        {title}
-      </h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        {description}
-      </p>
+      <div role="status" aria-live="polite" aria-busy="true">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+          {title}
+        </h1>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          {description}
+        </p>
+      </div>
     </main>
   );
 }

@@ -32,7 +32,7 @@ export function isoToLocalDateKey(iso: string): string {
 /**
  * 開始〜終了の所要時間（分）を算出する。算出できない場合は null。
  */
-export function formatDurationMinutes(
+export function calculateDurationMinutes(
   started: Date | null,
   ended: Date | null,
 ): number | null {
