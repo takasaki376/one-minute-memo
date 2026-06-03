@@ -91,7 +91,7 @@ export function ThemeCsvImportPanel({ onImported }: ThemeCsvImportPanelProps) {
         <div>
           <h2 className="text-sm font-semibold text-slate-900">CSV一括登録</h2>
           <p className="mt-1 text-xs text-slate-600">
-            テーマ名・カテゴリ名・メモ（任意）の CSV から user テーマを一括追加します。
+            テーマ名・カテゴリ名の CSV から user テーマを一括追加します（メモ列は任意ですが、現時点ではテーマに保存されません）。
             カテゴリ名は既存と一致すればそのカテゴリに、未登録なら新規カテゴリとして保存されます。
           </p>
         </div>
