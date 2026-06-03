@@ -36,35 +36,6 @@ export function stripUtf8Bom(text: string): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
-/** 1行分の CSV をフィールド配列に分解（ダブルクォート・エスケープ対応） */
-export function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-    if (ch === "," && !inQuotes) {
-      fields.push(current);
-      current = "";
-      continue;
-    }
-    current += ch;
-  }
-
-  fields.push(current);
-  return fields;
-}
-
 /** 改行を含む quoted フィールドに対応した CSV レコード分解 */
 export function splitCsvRecords(text: string): string[][] {
   const records: string[][] = [];
@@ -195,6 +166,8 @@ export function downloadThemeCsvSample(): void {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = THEME_CSV_SAMPLE_FILENAME;
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
