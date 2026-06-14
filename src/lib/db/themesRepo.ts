@@ -75,6 +75,57 @@ export type CreateUserThemeInput = Pick<
   'title' | 'category' | 'isActive'
 >;
 
+export type ThemeCsvImportRowInput = {
+  lineNumber: number;
+  title: string;
+  category: string;
+};
+
+export type ThemeCsvImportRowResult =
+  | { lineNumber: number; ok: true; theme: ThemeRecord }
+  | { lineNumber: number; ok: false; error: string };
+
+export type ThemeCsvImportSummary = {
+  successCount: number;
+  failureCount: number;
+  results: ThemeCsvImportRowResult[];
+};
+
+/**
+ * CSV から解析済みの行を一括登録する。行ごとに成功/失敗を返し、正常行のみ登録する。
+ * カテゴリ名は既存テーマと文字列一致で紐付く（新規名はそのまま新カテゴリとして保存）。
+ */
+export async function importUserThemesFromCsvRows(
+  rows: ThemeCsvImportRowInput[],
+): Promise<ThemeCsvImportSummary> {
+  const results: ThemeCsvImportRowResult[] = [];
+
+  for (const row of rows) {
+    try {
+      const theme = await createUserTheme({
+        title: row.title,
+        category: row.category,
+        isActive: true,
+      });
+      results.push({ lineNumber: row.lineNumber, ok: true, theme });
+    } catch (err) {
+      results.push({
+        lineNumber: row.lineNumber,
+        ok: false,
+        error:
+          err instanceof Error ? err.message : "テーマの登録に失敗しました",
+      });
+    }
+  }
+
+  const successCount = results.filter((r) => r.ok).length;
+  return {
+    successCount,
+    failureCount: results.length - successCount,
+    results,
+  };
+}
+
 /**
  * ユーザー追加テーマを1件保存する（source は常に user）
  * カテゴリ未入力時は「未分類」として保存する。

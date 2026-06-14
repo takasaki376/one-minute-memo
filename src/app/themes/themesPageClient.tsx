@@ -4,6 +4,11 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useThemeSeedState } from "@/components/providers/ThemeSeedProvider";
+import {
+  CategoryInput,
+  resolveCategoryValue,
+} from "@/components/themes/CategoryInput";
+import { ThemeCsvImportPanel } from "@/components/themes/ThemeCsvImportPanel";
 import { Button } from "@/components/ui/Button";
 import {
   createUserTheme,
@@ -34,7 +39,8 @@ export default function ThemesPageClient() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addTitle, setAddTitle] = useState("");
-  const [addCategory, setAddCategory] = useState("");
+  const [addCategorySelect, setAddCategorySelect] = useState("");
+  const [addCategoryCustom, setAddCategoryCustom] = useState("");
   const [addIsActive, setAddIsActive] = useState(true);
   const [addFormError, setAddFormError] = useState<string | null>(null);
   const [addSaving, setAddSaving] = useState(false);
@@ -140,7 +146,8 @@ export default function ThemesPageClient() {
 
   const resetAddForm = useCallback(() => {
     setAddTitle("");
-    setAddCategory("");
+    setAddCategorySelect("");
+    setAddCategoryCustom("");
     setAddIsActive(true);
     setAddFormError(null);
   }, []);
@@ -195,7 +202,7 @@ export default function ThemesPageClient() {
     e.preventDefault();
     setAddFormError(null);
     const t = addTitle.trim();
-    const c = addCategory.trim();
+    const c = resolveCategoryValue(addCategorySelect, addCategoryCustom).trim();
     if (t.length === 0) {
       setAddFormError("テーマ名を入力してください");
       return;
@@ -216,7 +223,7 @@ export default function ThemesPageClient() {
     try {
       const created = await createUserTheme({
         title: addTitle,
-        category: addCategory,
+        category: c,
         isActive: addIsActive,
       });
       setState((prev) => {
@@ -363,6 +370,20 @@ export default function ThemesPageClient() {
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {updateError}
         </div>
+      )}
+
+      {state.status === "success" && (
+        <ThemeCsvImportPanel
+          onImported={(imported) => {
+            setState((prev) => {
+              if (prev.status !== "success") return prev;
+              return {
+                status: "success",
+                themes: [...prev.themes, ...imported],
+              };
+            });
+          }}
+        />
       )}
 
       {state.status === "loading" || state.status === "idle" ? (
@@ -629,25 +650,16 @@ export default function ThemesPageClient() {
                 </p>
               </div>
               <div>
-                <label
-                  htmlFor="add-theme-category"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                >
-                  カテゴリ
-                </label>
-                <input
-                  id="add-theme-category"
-                  type="text"
-                  value={addCategory}
-                  onChange={(ev) => setAddCategory(ev.target.value)}
+                <CategoryInput
+                  idPrefix="add-theme"
+                  categories={categories}
+                  selectedCategory={addCategorySelect}
+                  onSelectedCategoryChange={setAddCategorySelect}
+                  customCategory={addCategoryCustom}
+                  onCustomCategoryChange={setAddCategoryCustom}
                   maxLength={ADD_CATEGORY_MAX}
-                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                  autoComplete="off"
-                  placeholder="未入力のときは「未分類」になります"
+                  disabled={addSaving}
                 />
-                <p className="mt-1 text-xs text-slate-500">
-                  {`${addCategory.length}/${String(ADD_CATEGORY_MAX)} 文字`}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input
