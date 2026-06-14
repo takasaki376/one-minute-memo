@@ -276,5 +276,28 @@ describe("themesRepo importUserThemesFromCsvRows", () => {
     expect(all).toHaveLength(3);
     expect(all.some((t) => t.category === "新カテゴリ")).toBe(true);
   });
-});
 
+  it("reports duplicates within imported rows without writing partial duplicates", async () => {
+    const summary = await importUserThemesFromCsvRows([
+      { lineNumber: 2, title: "新規A", category: "仕事" },
+      { lineNumber: 3, title: "  新規A  ", category: "別カテゴリ" },
+      { lineNumber: 4, title: "新規B", category: "新カテゴリ" },
+    ]);
+
+    expect(summary.successCount).toBe(2);
+    expect(summary.failureCount).toBe(1);
+    expect(summary.results).toMatchObject([
+      { lineNumber: 2, ok: true },
+      {
+        lineNumber: 3,
+        ok: false,
+        error: "同じ名前のテーマが既に存在します",
+      },
+      { lineNumber: 4, ok: true },
+    ]);
+
+    const all = await getAllThemes();
+    expect(all).toHaveLength(2);
+    expect(all.map((theme) => theme.title)).toEqual(["新規A", "新規B"]);
+  });
+});

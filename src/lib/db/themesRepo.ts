@@ -1,8 +1,8 @@
-import { getDB } from './openDB';
-import type { ThemeRecord } from '@/types/theme';
-import { builtinThemes } from '@/lib/data/builtinThemes';
+import { getDB } from "./openDB";
+import type { ThemeRecord } from "@/types/theme";
+import { builtinThemes } from "@/lib/data/builtinThemes";
 
-const THEME_STORE = 'themes';
+const THEME_STORE = "themes";
 
 const THEME_TITLE_MAX = 200;
 const THEME_CATEGORY_MAX = 100;
@@ -11,9 +11,9 @@ type ThemeRecordWithIndex = ThemeRecord & { isActiveIndex: number };
 
 function generateUserThemeId(): string {
   if (
-    typeof globalThis !== 'undefined' &&
-    'crypto' in globalThis &&
-    'randomUUID' in globalThis.crypto
+    typeof globalThis !== "undefined" &&
+    "crypto" in globalThis &&
+    "randomUUID" in globalThis.crypto
   ) {
     return `user-theme-${globalThis.crypto.randomUUID()}`;
   }
@@ -41,7 +41,7 @@ export async function getAllThemes(): Promise<ThemeRecord[]> {
 
 export async function getActiveThemes(): Promise<ThemeRecord[]> {
   const db = await getDB();
-  const active = await db.getAllFromIndex(THEME_STORE, 'by_isActive', 1);
+  const active = await db.getAllFromIndex(THEME_STORE, "by_isActive", 1);
   return active.map(stripIndex);
 }
 
@@ -50,17 +50,19 @@ export async function getActiveThemes(): Promise<ThemeRecord[]> {
  * @param themeIds 取得したいテーマIDの配列
  * @returns 該当するテーマレコードの配列（IDの順序は保証されない）
  */
-export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]> {
+export async function getThemesByIds(
+  themeIds: string[],
+): Promise<ThemeRecord[]> {
   if (themeIds.length === 0) {
     return [];
   }
   // 重複したIDを除去してパフォーマンスを向上
   const uniqueIds = Array.from(new Set(themeIds));
   const db = await getDB();
-  const tx = db.transaction(THEME_STORE, 'readonly');
+  const tx = db.transaction(THEME_STORE, "readonly");
   const store = tx.store;
   // 全てのget操作を並列実行してパフォーマンスを向上
-  const themePromises = uniqueIds.map(id => store.get(id));
+  const themePromises = uniqueIds.map((id) => store.get(id));
   const themeResults = await Promise.all(themePromises);
   // 存在するテーマのみを抽出
   const themes = themeResults
@@ -72,7 +74,7 @@ export async function getThemesByIds(themeIds: string[]): Promise<ThemeRecord[]>
 
 export type CreateUserThemeInput = Pick<
   ThemeRecord,
-  'title' | 'category' | 'isActive'
+  "title" | "category" | "isActive"
 >;
 
 export type ThemeCsvImportRowInput = {
@@ -91,6 +93,55 @@ export type ThemeCsvImportSummary = {
   results: ThemeCsvImportRowResult[];
 };
 
+type PreparedUserTheme = {
+  record: ThemeRecord;
+  normalizedTitle: string;
+};
+
+function normalizeThemeTitle(title: string): string {
+  return title.trim().toLowerCase();
+}
+
+function prepareUserTheme(
+  input: CreateUserThemeInput,
+  existingTitles: ReadonlySet<string>,
+): PreparedUserTheme {
+  const title = input.title.trim();
+  const categoryRaw = input.category.trim();
+  if (title.length === 0) {
+    throw new Error("テーマ名を入力してください");
+  }
+  if (title.length > THEME_TITLE_MAX) {
+    throw new Error(
+      `テーマ名は${String(THEME_TITLE_MAX)}文字以内にしてください`,
+    );
+  }
+  if (categoryRaw.length > THEME_CATEGORY_MAX) {
+    throw new Error(
+      `カテゴリは${String(THEME_CATEGORY_MAX)}文字以内にしてください`,
+    );
+  }
+
+  const normalizedTitle = normalizeThemeTitle(title);
+  if (existingTitles.has(normalizedTitle)) {
+    throw new Error("同じ名前のテーマが既に存在します");
+  }
+
+  const now = new Date().toISOString();
+  return {
+    normalizedTitle,
+    record: {
+      id: generateUserThemeId(),
+      title,
+      category: categoryRaw.length > 0 ? categoryRaw : "未分類",
+      isActive: input.isActive,
+      source: "user",
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+}
+
 /**
  * CSV から解析済みの行を一括登録する。行ごとに成功/失敗を返し、正常行のみ登録する。
  * カテゴリ名は既存テーマと文字列一致で紐付く（新規名はそのまま新カテゴリとして保存）。
@@ -99,15 +150,28 @@ export async function importUserThemesFromCsvRows(
   rows: ThemeCsvImportRowInput[],
 ): Promise<ThemeCsvImportSummary> {
   const results: ThemeCsvImportRowResult[] = [];
+  const existingTitles = new Set(
+    (await getAllThemes()).map((theme) => normalizeThemeTitle(theme.title)),
+  );
+  const importedThemes: ThemeRecord[] = [];
 
   for (const row of rows) {
     try {
-      const theme = await createUserTheme({
-        title: row.title,
-        category: row.category,
-        isActive: true,
+      const prepared = prepareUserTheme(
+        {
+          title: row.title,
+          category: row.category,
+          isActive: true,
+        },
+        existingTitles,
+      );
+      importedThemes.push(prepared.record);
+      existingTitles.add(prepared.normalizedTitle);
+      results.push({
+        lineNumber: row.lineNumber,
+        ok: true,
+        theme: prepared.record,
       });
-      results.push({ lineNumber: row.lineNumber, ok: true, theme });
     } catch (err) {
       results.push({
         lineNumber: row.lineNumber,
@@ -116,6 +180,10 @@ export async function importUserThemesFromCsvRows(
           err instanceof Error ? err.message : "テーマの登録に失敗しました",
       });
     }
+  }
+
+  if (importedThemes.length > 0) {
+    await upsertThemes(importedThemes);
   }
 
   const successCount = results.filter((r) => r.ok).length;
@@ -133,40 +201,10 @@ export async function importUserThemesFromCsvRows(
 export async function createUserTheme(
   input: CreateUserThemeInput,
 ): Promise<ThemeRecord> {
-  const title = input.title.trim();
-  const categoryRaw = input.category.trim();
-  if (title.length === 0) {
-    throw new Error('テーマ名を入力してください');
-  }
-  if (title.length > THEME_TITLE_MAX) {
-    throw new Error(
-      `テーマ名は${String(THEME_TITLE_MAX)}文字以内にしてください`,
-    );
-  }
-  if (categoryRaw.length > THEME_CATEGORY_MAX) {
-    throw new Error(
-      `カテゴリは${String(THEME_CATEGORY_MAX)}文字以内にしてください`,
-    );
-  }
-
-  const all = await getAllThemes();
-  const normalizedTitle = title.toLowerCase();
-  if (
-    all.some((t) => t.title.trim().toLowerCase() === normalizedTitle)
-  ) {
-    throw new Error('同じ名前のテーマが既に存在します');
-  }
-
-  const now = new Date().toISOString();
-  const record: ThemeRecord = {
-    id: generateUserThemeId(),
-    title,
-    category: categoryRaw.length > 0 ? categoryRaw : '未分類',
-    isActive: input.isActive,
-    source: 'user',
-    createdAt: now,
-    updatedAt: now,
-  };
+  const existingTitles = new Set(
+    (await getAllThemes()).map((theme) => normalizeThemeTitle(theme.title)),
+  );
+  const { record } = prepareUserTheme(input, existingTitles);
 
   await upsertThemes([record]);
   return record;
@@ -174,7 +212,7 @@ export async function createUserTheme(
 
 export type UpdateThemeInput = Pick<
   ThemeRecord,
-  'title' | 'category' | 'isActive'
+  "title" | "category" | "isActive"
 >;
 
 /**
@@ -187,7 +225,7 @@ export async function updateTheme(
   const title = input.title.trim();
   const categoryRaw = input.category.trim();
   if (title.length === 0) {
-    throw new Error('テーマ名を入力してください');
+    throw new Error("テーマ名を入力してください");
   }
   if (title.length > THEME_TITLE_MAX) {
     throw new Error(
@@ -201,31 +239,30 @@ export async function updateTheme(
   }
 
   const db = await getDB();
-  const tx = db.transaction(THEME_STORE, 'readwrite');
+  const tx = db.transaction(THEME_STORE, "readwrite");
   const store = tx.store;
   const existing = await store.get(id);
   if (!existing) {
     await tx.done;
-    throw new Error('テーマが見つかりません');
+    throw new Error("テーマが見つかりません");
   }
 
   const prev = stripIndex(existing);
   const all = await store.getAll();
-  const normalizedTitle = title.toLowerCase();
+  const normalizedTitle = normalizeThemeTitle(title);
   if (
     all.some(
-      (t) =>
-        t.id !== id && t.title.trim().toLowerCase() === normalizedTitle,
+      (t) => t.id !== id && normalizeThemeTitle(t.title) === normalizedTitle,
     )
   ) {
     await tx.done;
-    throw new Error('同じ名前のテーマが既に存在します');
+    throw new Error("同じ名前のテーマが既に存在します");
   }
   const now = new Date().toISOString();
   const updated: ThemeRecord = {
     ...prev,
     title,
-    category: categoryRaw.length > 0 ? categoryRaw : '未分類',
+    category: categoryRaw.length > 0 ? categoryRaw : "未分類",
     isActive: input.isActive,
     updatedAt: now,
   };
@@ -237,7 +274,7 @@ export async function updateTheme(
 
 export async function upsertThemes(themes: ThemeRecord[]): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(THEME_STORE, 'readwrite');
+  const tx = db.transaction(THEME_STORE, "readwrite");
   for (const theme of themes) {
     await tx.store.put(withIndex(theme));
   }
@@ -249,11 +286,11 @@ export async function toggleThemeActive(
   isActive: boolean,
 ): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(THEME_STORE, 'readwrite');
+  const tx = db.transaction(THEME_STORE, "readwrite");
   const store = tx.store;
   const existing = await store.get(id);
   if (!existing) {
-    console.warn('theme not found:', id);
+    console.warn("theme not found:", id);
     await tx.done;
     return;
   }
@@ -275,7 +312,7 @@ export async function toggleThemeActive(
 export async function initBuiltinThemesIfNeeded(): Promise<void> {
   const now = new Date().toISOString();
   const themes: ThemeRecord[] = builtinThemes.map((t, index) => ({
-    id: `theme-${String(index + 1).padStart(4, '0')}`,
+    id: `theme-${String(index + 1).padStart(4, "0")}`,
     title: t.title,
     category: t.category,
     isActive: t.isActive,
