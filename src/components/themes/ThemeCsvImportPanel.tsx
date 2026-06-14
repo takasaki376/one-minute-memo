@@ -51,7 +51,12 @@ export function ThemeCsvImportPanel({ onImported }: ThemeCsvImportPanelProps) {
       );
 
       const importedThemes = importResult.results
-        .filter((result) => result.ok)
+        .filter(
+          (
+            result,
+          ): result is { lineNumber: number; ok: true; theme: ThemeRecord } =>
+            result.ok,
+        )
         .map((result) => result.theme);
 
       if (importedThemes.length > 0) {
@@ -64,7 +69,12 @@ export function ThemeCsvImportPanel({ onImported }: ThemeCsvImportPanelProps) {
           importResult.failureCount + parsed.rowErrors.length,
         parseErrors: parsed.rowErrors,
         rowErrors: importResult.results
-          .filter((result) => !result.ok)
+          .filter(
+            (
+              result,
+            ): result is { lineNumber: number; ok: false; error: string } =>
+              !result.ok,
+          )
           .map((result) => ({
             lineNumber: result.lineNumber,
             message: result.error,
