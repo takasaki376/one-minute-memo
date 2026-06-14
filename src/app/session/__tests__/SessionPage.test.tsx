@@ -105,6 +105,13 @@ vi.mock("@/lib/db/settingsRepo", () => {
   };
 });
 
+vi.mock("@/components/providers/ThemeSeedProvider", async () => {
+  const { themeSeedReadyState } = await import("@/test/mocks/themeSeedProvider");
+  return {
+    useThemeSeedState: () => themeSeedReadyState,
+  };
+});
+
 vi.mock("@/components/session/HandwritingCanvas", () => {
   const HandwritingCanvas = ({
     onChange,
