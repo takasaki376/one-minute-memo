@@ -77,6 +77,9 @@ vi.mock("../openDB", () => {
 import {
   initBuiltinThemesIfNeeded,
   getAllThemes,
+  getActiveThemes,
+  getThemesByIds,
+  toggleThemeActive,
   createUserTheme,
   updateTheme,
   importUserThemesFromCsvRows,
@@ -299,5 +302,64 @@ describe("themesRepo importUserThemesFromCsvRows", () => {
     const all = await getAllThemes();
     expect(all).toHaveLength(2);
     expect(all.map((theme) => theme.title)).toEqual(["新規A", "新規B"]);
+  });
+});
+
+describe("themesRepo read and toggle", () => {
+  beforeEach(async () => {
+    const mod = await importOpenDBTestModule();
+    mod.__reset();
+  });
+
+  it("getActiveThemes returns only active themes", async () => {
+    await createUserTheme({
+      title: "Active Theme",
+      category: "work",
+      isActive: true,
+    });
+    await createUserTheme({
+      title: "Inactive Theme",
+      category: "life",
+      isActive: false,
+    });
+
+    const active = await getActiveThemes();
+
+    expect(active).toHaveLength(1);
+    expect(active[0]?.title).toBe("Active Theme");
+  });
+
+  it("getThemesByIds returns matching themes and ignores missing ids", async () => {
+    const created = await createUserTheme({
+      title: "Find Me",
+      category: "work",
+      isActive: true,
+    });
+
+    const themes = await getThemesByIds([created.id, "missing-id", created.id]);
+
+    expect(themes).toHaveLength(1);
+    expect(themes[0]?.id).toBe(created.id);
+  });
+
+  it("getThemesByIds returns empty array for empty input", async () => {
+    expect(await getThemesByIds([])).toEqual([]);
+  });
+
+  it("toggleThemeActive updates isActive flag", async () => {
+    const created = await createUserTheme({
+      title: "Toggle Me",
+      category: "work",
+      isActive: true,
+    });
+
+    await toggleThemeActive(created.id, false);
+
+    const all = await getAllThemes();
+    const updated = all.find((t) => t.id === created.id);
+    expect(updated?.isActive).toBe(false);
+
+    const active = await getActiveThemes();
+    expect(active.some((t) => t.id === created.id)).toBe(false);
   });
 });
