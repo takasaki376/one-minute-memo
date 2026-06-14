@@ -33,13 +33,10 @@ const mockUpdateTheme = vi.fn();
 const mockImportUserThemesFromCsvRows = vi.fn();
 const mockGetMemoCountsByThemeIds = vi.fn();
 
-vi.mock("@/components/providers/ThemeSeedProvider", () => {
+vi.mock("@/components/providers/ThemeSeedProvider", async () => {
+  const { themeSeedReadyState } = await import("@/test/mocks/themeSeedProvider");
   return {
-    useThemeSeedState: () => ({
-      isReady: true,
-      isSeeding: false,
-      error: undefined,
-    }),
+    useThemeSeedState: () => themeSeedReadyState,
   };
 });
 
