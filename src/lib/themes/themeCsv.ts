@@ -93,7 +93,15 @@ export function parseThemeCsv(rawText: string): ParseThemeCsvResult {
     return { ok: false, fileError: "CSVファイルが空です" };
   }
 
-  const records = splitCsvRecords(text);
+  let records: string[][];
+  try {
+    records = splitCsvRecords(text);
+  } catch (err) {
+    return {
+      ok: false,
+      fileError: err instanceof Error ? err.message : "CSVの解析に失敗しました",
+    };
+  }
   if (records.length === 0) {
     return { ok: false, fileError: "CSVにデータがありません" };
   }
