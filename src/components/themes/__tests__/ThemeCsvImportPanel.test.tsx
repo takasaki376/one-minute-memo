@@ -92,12 +92,16 @@ describe("ThemeCsvImportPanel", () => {
     expect(mockImportUserThemesFromCsvRows).not.toHaveBeenCalled();
   });
 
-  it("shows failure summary with row errors from import", async () => {
+  it("shows failure summary with parse and import row errors", async () => {
     mockImportUserThemesFromCsvRows.mockResolvedValue({
       successCount: 1,
       failureCount: 1,
       results: [
-        { lineNumber: 2, ok: true, theme: importedTheme },
+        {
+          lineNumber: 2,
+          ok: true,
+          theme: { ...importedTheme, title: "新規A" },
+        },
         {
           lineNumber: 3,
           ok: false,
@@ -108,7 +112,8 @@ describe("ThemeCsvImportPanel", () => {
 
     const csv = `テーマ名,カテゴリ名,メモ
 新規A,仕事,
-,プライベート,
+重複B,プライベート,
+,その他,
 `;
 
     render(<ThemeCsvImportPanel onImported={vi.fn()} />);
@@ -117,7 +122,18 @@ describe("ThemeCsvImportPanel", () => {
     await waitFor(() => {
       expect(screen.getByText(/登録成功: 1 件/)).toBeInTheDocument();
       expect(screen.getByText(/失敗: 2 件/)).toBeInTheDocument();
-      expect(screen.getByText(/3行目: 同じ名前のテーマが既に存在します/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/3行目: 同じ名前のテーマが既に存在します/),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/4行目: テーマ名が空です/)).toBeInTheDocument();
     });
+    expect(mockImportUserThemesFromCsvRows).toHaveBeenCalledWith([
+      expect.objectContaining({ lineNumber: 2, title: "新規A", category: "仕事" }),
+      expect.objectContaining({
+        lineNumber: 3,
+        title: "重複B",
+        category: "プライベート",
+      }),
+    ]);
   });
 });
