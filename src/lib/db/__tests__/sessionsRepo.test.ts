@@ -88,7 +88,7 @@ vi.mock("../openDB", () => {
 });
 
 // モック定義の後で sessionsRepo をインポート
-import { getAllSessions, createSession } from "../sessionsRepo";
+import { getAllSessions, createSession, getSessionById } from "../sessionsRepo";
 
 describe("sessionsRepo", () => {
   beforeEach(async () => {
@@ -193,6 +193,38 @@ describe("sessionsRepo", () => {
       expect(ids).toContain(session1.id);
       expect(ids).toContain(session2.id);
       expect(ids).toContain(session3.id);
+    });
+  });
+
+  describe("getSessionById", () => {
+    it("returns undefined when session does not exist", async () => {
+      const result = await getSessionById("non-existent");
+      expect(result).toBeUndefined();
+    });
+
+    it("returns session by id with endedAt converted to null when incomplete", async () => {
+      const session = await createSession(["theme-1"]);
+
+      const result = await getSessionById(session.id);
+
+      expect(result).toEqual({
+        id: session.id,
+        startedAt: session.startedAt,
+        endedAt: null,
+        themeIds: session.themeIds,
+        memoCount: session.memoCount,
+      });
+    });
+
+    it("returns completed session with endedAt set", async () => {
+      const session = await createSession(["theme-1"]);
+      const { completeSession } = await import("../sessionsRepo");
+      await completeSession(session.id, 3);
+
+      const result = await getSessionById(session.id);
+
+      expect(result?.endedAt).not.toBeNull();
+      expect(result?.memoCount).toBe(3);
     });
   });
 });
