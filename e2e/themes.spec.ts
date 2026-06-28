@@ -28,12 +28,16 @@ test.describe("テーマ管理フロー", () => {
   test("テーマを追加できる", async ({ page }) => {
     await page.goto("/themes");
 
+    await expect(page.getByRole("heading", { name: "テーマ管理" })).toBeVisible({
+      timeout: SESSION_UI_TIMEOUT,
+    });
+
     await page.getByTestId("themes-add-open").click();
     const dialog = page.getByRole("dialog", { name: "テーマを追加" });
     await expect(dialog).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
 
-    await dialog.getByLabelText(/テーマ名/).fill("E2E追加テーマ");
-    await dialog.getByLabelText("新規カテゴリ").fill("e2e-smoke");
+    await dialog.getByLabel(/テーマ名/).fill("E2E追加テーマ");
+    await dialog.getByLabel("新規カテゴリ").fill("e2e-smoke");
     await dialog.getByRole("button", { name: "追加" }).click();
 
     await expect(page.getByText("E2E追加テーマ")).toBeVisible({
