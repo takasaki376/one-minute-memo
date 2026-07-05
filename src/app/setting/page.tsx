@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { InputTargetCount } from "@/components/setting/InputTargetCount";
 import { InputTargetTime } from "@/components/setting/InputTargetTime";
+import { AuthSection } from "@/components/auth/AuthSection";
 
 /**
  * 設定画面
@@ -157,6 +158,8 @@ export default function SettingPage() {
               />
             </div>
           </section>
+
+          <AuthSection />
         </div>
 
         {/* 右カラム: 情報表示 */}

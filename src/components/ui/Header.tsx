@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { HeaderAuthControl } from '@/components/auth/HeaderAuthControl';
 
 export function Header() {
   return (
@@ -9,7 +10,7 @@ export function Header() {
             one-minute-memo
           </Link>
         </div>
-        <nav className="flex gap-4 text-sm">
+        <nav className="flex items-center gap-4 text-sm">
           <Link
             href="/"
             className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
@@ -40,6 +41,7 @@ export function Header() {
           >
             設定
           </Link>
+          <HeaderAuthControl />
         </nav>
       </div>
     </header>
