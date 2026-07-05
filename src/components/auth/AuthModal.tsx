@@ -45,6 +45,7 @@ export function AuthModal({
     setPassword("");
     setError(null);
     setSuccessMessage(null);
+    setIsSubmitting(false);
     onClose();
   };
 
