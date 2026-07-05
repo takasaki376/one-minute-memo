@@ -96,3 +96,21 @@ export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
     .map(s => fromDB(s as SessionRecordDB))
     .filter((s): s is SessionRecord => s !== undefined);
 }
+
+/**
+ * ローカルに存在しない場合のみセッションを追加する（同期ダウンロード用）
+ */
+export async function addSessionIfAbsent(
+  session: SessionRecord,
+): Promise<boolean> {
+  const db = await getDB();
+  const tx = db.transaction(SESSION_STORE, 'readwrite');
+  const existing = await tx.store.get(session.id);
+  if (existing) {
+    await tx.done;
+    return false;
+  }
+  await tx.store.put(toDB(session));
+  await tx.done;
+  return true;
+}

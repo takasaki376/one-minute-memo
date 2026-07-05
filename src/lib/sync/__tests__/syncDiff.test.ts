@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  collectLocalThemeSettings,
+  hasRemoteSyncDifference,
+  pickUserThemes,
+  shouldDownloadUserTheme,
+  shouldUploadUserTheme,
+} from "@/lib/sync/syncDiff";
+import type { ThemeRecord } from "@/types/theme";
+
+function makeTheme(overrides: Partial<ThemeRecord> = {}): ThemeRecord {
+  return {
+    id: "user-theme-1",
+    title: "Test",
+    category: "未分類",
+    isActive: true,
+    source: "user",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("syncDiff", () => {
+  it("pickUserThemes returns only user themes", () => {
+    const themes = [
+      makeTheme({ id: "user-theme-1", source: "user" }),
+      makeTheme({ id: "theme-0001", source: "builtin" }),
+    ];
+    expect(pickUserThemes(themes)).toHaveLength(1);
+    expect(pickUserThemes(themes)[0]?.id).toBe("user-theme-1");
+  });
+
+  it("collectLocalThemeSettings includes builtin overrides only", () => {
+    const themes = [
+      makeTheme({ id: "theme-0001", source: "builtin", isActive: false }),
+      makeTheme({ id: "theme-0002", source: "builtin", isActive: true }),
+    ];
+    const settings = collectLocalThemeSettings(themes);
+    expect(settings).toHaveLength(1);
+    expect(settings[0]?.id).toBe("theme-0001");
+    expect(settings[0]?.isActive).toBe(false);
+  });
+
+  it("shouldUploadUserTheme uploads when remote is missing or older", () => {
+    const local = makeTheme({ updatedAt: "2026-01-02T00:00:00.000Z" });
+    const remote = makeTheme({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    expect(shouldUploadUserTheme(local, undefined)).toBe(true);
+    expect(shouldUploadUserTheme(local, remote)).toBe(true);
+    expect(shouldUploadUserTheme(remote, local)).toBe(false);
+  });
+
+  it("shouldDownloadUserTheme downloads when local is missing or older", () => {
+    const local = makeTheme({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const remote = makeTheme({ updatedAt: "2026-01-02T00:00:00.000Z" });
+    expect(shouldDownloadUserTheme(undefined, remote)).toBe(true);
+    expect(shouldDownloadUserTheme(local, remote)).toBe(true);
+    expect(shouldDownloadUserTheme(remote, local)).toBe(false);
+  });
+
+  it("hasRemoteSyncDifference detects newer cloud sync time", () => {
+    expect(
+      hasRemoteSyncDifference(
+        "2026-01-01T00:00:00.000Z",
+        "2026-01-02T00:00:00.000Z",
+      ),
+    ).toBe(true);
+    expect(
+      hasRemoteSyncDifference(
+        "2026-01-02T00:00:00.000Z",
+        "2026-01-01T00:00:00.000Z",
+      ),
+    ).toBe(false);
+    expect(hasRemoteSyncDifference(null, "2026-01-01T00:00:00.000Z")).toBe(
+      false,
+    );
+  });
+});

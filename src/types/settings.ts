@@ -6,6 +6,7 @@ export interface SettingsRecord {
   theme_count: number; // 1セッションあたりのテーマ件数（1〜100）
   time_limit: string; // 1テーマあたりの制限時間（秒、文字列形式）
   updatedAt: string; // ISO文字列
+  lastSyncedAt?: string | null; // 前回同期時刻（ISO文字列）
 }
 
 /**
