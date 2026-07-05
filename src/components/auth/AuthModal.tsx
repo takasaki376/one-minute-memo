@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/Button";
 import {
@@ -33,21 +33,33 @@ export function AuthModal({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!open) {
-    return null;
-  }
-
-  const title = mode === "login" ? "ログイン" : "サインアップ";
-  const submitLabel = mode === "login" ? "ログイン" : "アカウント作成";
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setEmail("");
     setPassword("");
     setError(null);
     setSuccessMessage(null);
     setIsSubmitting(false);
     onClose();
-  };
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, handleClose]);
+
+  if (!open) {
+    return null;
+  }
+
+  const title = mode === "login" ? "ログイン" : "サインアップ";
+  const submitLabel = mode === "login" ? "ログイン" : "アカウント作成";
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,7 +87,7 @@ export function AuthModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop mirrors existing modals */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop mirrors existing modals; Escape closes via document listener */}
       <div
         role="presentation"
         aria-hidden="true"
