@@ -21,6 +21,17 @@ vi.mock("@/hooks/useSettings", () => {
   };
 });
 
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: null,
+    isLoading: false,
+    isConfigured: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
 describe("SettingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
