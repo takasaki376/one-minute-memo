@@ -6,6 +6,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { InputTargetCount } from "@/components/setting/InputTargetCount";
 import { InputTargetTime } from "@/components/setting/InputTargetTime";
 import { AuthSection } from "@/components/auth/AuthSection";
+import { SyncSection } from "@/components/sync/SyncSection";
 
 /**
  * 設定画面
@@ -160,6 +161,7 @@ export default function SettingPage() {
           </section>
 
           <AuthSection />
+          <SyncSection />
         </div>
 
         {/* 右カラム: 情報表示 */}

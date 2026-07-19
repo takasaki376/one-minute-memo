@@ -114,3 +114,13 @@ export async function deleteMemosBySession(sessionId: string): Promise<void> {
   }
   await tx.done;
 }
+
+/**
+ * タイムスタンプを保持したままメモを追加または更新する（同期ダウンロード用）
+ */
+export async function upsertMemo(memo: MemoRecord): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(MEMO_STORE, 'readwrite');
+  await tx.store.put(memo);
+  await tx.done;
+}

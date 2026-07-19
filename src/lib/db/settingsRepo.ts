@@ -49,6 +49,10 @@ export async function updateSettings(
     id: SETTINGS_ID,
     theme_count: patch.theme_count ?? existing?.theme_count ?? DEFAULT_SETTINGS.theme_count,
     time_limit: patch.time_limit ?? existing?.time_limit ?? DEFAULT_SETTINGS.time_limit,
+    lastSyncedAt:
+      patch.lastSyncedAt !== undefined
+        ? patch.lastSyncedAt
+        : existing?.lastSyncedAt,
     updatedAt: now,
   };
 
@@ -61,16 +65,18 @@ export async function updateSettings(
  * 設定を初期値に戻す
  */
 export async function resetSettings(): Promise<SettingsRecord> {
+  const db = await getDB();
+  const tx = db.transaction(SETTINGS_STORE, 'readwrite');
+  const store = tx.store;
+  const existing = await store.get(SETTINGS_ID);
   const now = new Date().toISOString();
   const defaultRecord: SettingsRecord = {
     id: SETTINGS_ID,
     ...DEFAULT_SETTINGS,
+    lastSyncedAt: existing?.lastSyncedAt,
     updatedAt: now,
   };
 
-  const db = await getDB();
-  const tx = db.transaction(SETTINGS_STORE, 'readwrite');
-  const store = tx.store;
   await store.put(defaultRecord);
   await tx.done;
   return defaultRecord;

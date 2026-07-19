@@ -42,7 +42,7 @@ export function AuthSection() {
         アカウント
       </h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        ログインすると、今後追加予定のクラウドバックアップ機能が利用できるようになります。
+        ログインすると、クラウドへのデータ同期が利用できます。
       </p>
 
       {!isConfigured && (
@@ -73,9 +73,6 @@ export function AuthSection() {
               </dd>
             </div>
           </dl>
-          <p className="text-xs text-slate-500">
-            クラウドバックアップは別チケットで追加予定です。
-          </p>
           {actionError && (
             <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
               {actionError}

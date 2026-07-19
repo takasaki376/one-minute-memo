@@ -96,3 +96,13 @@ export async function getAllSessionsSorted(): Promise<SessionRecord[]> {
     .map(s => fromDB(s as SessionRecordDB))
     .filter((s): s is SessionRecord => s !== undefined);
 }
+
+/**
+ * セッションを追加または更新する（同期ダウンロード用）
+ */
+export async function upsertSession(session: SessionRecord): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(SESSION_STORE, 'readwrite');
+  await tx.store.put(toDB(session));
+  await tx.done;
+}

@@ -64,6 +64,8 @@ vi.mock("../openDB", () => {
 
   const db = {
     transaction(_storeName: string, _mode?: "readonly" | "readwrite") {
+      void _storeName;
+      void _mode;
       return {
         store: createStore(),
         done: Promise.resolve(),
@@ -103,6 +105,7 @@ import {
   getMemosByTheme,
   getMemoCountsByThemeIds,
   deleteMemosBySession,
+  upsertMemo,
 } from "../memosRepo";
 
 describe("memosRepo", () => {
@@ -183,6 +186,28 @@ describe("memosRepo", () => {
       expect(new Date(second.updatedAt).getTime()).toBeGreaterThan(
         new Date(first.updatedAt).getTime(),
       );
+    });
+  });
+
+  describe("upsertMemo", () => {
+    it("タイムスタンプを保持したまま既存メモを更新できる", async () => {
+      const original = await saveMemo({
+        id: "memo-1",
+        sessionId: "s1",
+        themeId: "t1",
+        order: 1,
+        textContent: "更新前",
+        handwritingType: "none",
+      });
+      const remoteMemo = {
+        ...original,
+        textContent: "更新後",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      };
+
+      await upsertMemo(remoteMemo);
+
+      expect(await getMemosBySession("s1")).toEqual([remoteMemo]);
     });
   });
 
