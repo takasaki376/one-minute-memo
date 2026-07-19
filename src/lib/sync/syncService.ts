@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 
 import { addMemoIfAbsent, getAllMemos } from "@/lib/db/memosRepo";
-import { addSessionIfAbsent, getAllSessions } from "@/lib/db/sessionsRepo";
+import { getAllSessions, upsertSession } from "@/lib/db/sessionsRepo";
 import { getAllThemes, toggleThemeActive, upsertThemes } from "@/lib/db/themesRepo";
 import { getFirestoreDb } from "@/lib/firebase/firestore";
 import type { MemoRecord } from "@/types/memo";
@@ -72,7 +72,7 @@ async function fetchCollectionMap<T extends { id: string }>(
   const map = new Map<string, T>();
   for (const item of snap.docs) {
     const data = item.data() as T;
-    map.set(data.id, data);
+    map.set(item.id, { ...data, id: item.id });
   }
   return map;
 }
@@ -274,10 +274,8 @@ export async function syncUserData(uid: string): Promise<SyncResult> {
       }
 
       try {
-        const added = await addSessionIfAbsent(remoteSession);
-        if (added) {
-          result.downloadedSessions += 1;
-        }
+        await upsertSession(remoteSession);
+        result.downloadedSessions += 1;
       } catch {
         result.downloadFailures += 1;
       }

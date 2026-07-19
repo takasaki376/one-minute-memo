@@ -91,6 +91,7 @@ export function shouldDownloadMemo(
   local: MemoRecord | undefined,
   remote: MemoRecord,
 ): boolean {
+  void remote;
   return !local;
 }
 
@@ -98,14 +99,22 @@ export function shouldUploadSession(
   local: SessionRecord,
   remote: SessionRecord | undefined,
 ): boolean {
-  return !remote;
+  if (!remote) {
+    return true;
+  }
+
+  return local.endedAt !== null && remote.endedAt === null;
 }
 
 export function shouldDownloadSession(
   local: SessionRecord | undefined,
   remote: SessionRecord,
 ): boolean {
-  return !local;
+  if (!local) {
+    return true;
+  }
+
+  return remote.endedAt !== null && local.endedAt === null;
 }
 
 export function hasRemoteSyncDifference(

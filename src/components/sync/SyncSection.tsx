@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,18 +51,6 @@ export function SyncSection() {
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const refreshSyncTimes = useCallback(async () => {
-    const local = await fetchLocalLastSyncedAt();
-    setLocalLastSyncedAt(local);
-
-    if (user) {
-      const cloud = await fetchCloudLastSyncedAt(user.uid);
-      setCloudLastSyncedAt(cloud);
-    } else {
-      setCloudLastSyncedAt(null);
-    }
-  }, [user]);
-
   useEffect(() => {
     if (!isConfigured || isLoading) {
       return;
@@ -72,7 +60,14 @@ export function SyncSection() {
     const load = async () => {
       setIsRefreshing(true);
       try {
-        await refreshSyncTimes();
+        const [local, cloud] = await Promise.all([
+          fetchLocalLastSyncedAt(),
+          user ? fetchCloudLastSyncedAt(user.uid) : Promise.resolve(null),
+        ]);
+        if (!cancelled) {
+          setLocalLastSyncedAt(local);
+          setCloudLastSyncedAt(cloud);
+        }
       } finally {
         if (!cancelled) {
           setIsRefreshing(false);
@@ -84,7 +79,7 @@ export function SyncSection() {
     return () => {
       cancelled = true;
     };
-  }, [isConfigured, isLoading, refreshSyncTimes]);
+  }, [isConfigured, isLoading, user]);
 
   const showOtherDeviceHint = hasRemoteSyncDifference(
     localLastSyncedAt,

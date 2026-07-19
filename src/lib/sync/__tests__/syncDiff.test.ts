@@ -4,9 +4,12 @@ import {
   collectLocalThemeSettings,
   hasRemoteSyncDifference,
   pickUserThemes,
+  shouldDownloadSession,
   shouldDownloadUserTheme,
+  shouldUploadSession,
   shouldUploadUserTheme,
 } from "@/lib/sync/syncDiff";
+import type { SessionRecord } from "@/types/session";
 import type { ThemeRecord } from "@/types/theme";
 
 function makeTheme(overrides: Partial<ThemeRecord> = {}): ThemeRecord {
@@ -18,6 +21,17 @@ function makeTheme(overrides: Partial<ThemeRecord> = {}): ThemeRecord {
     source: "user",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
+  return {
+    id: "session-1",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    endedAt: null,
+    themeIds: ["theme-1"],
+    memoCount: 0,
     ...overrides,
   };
 }
@@ -57,6 +71,32 @@ describe("syncDiff", () => {
     expect(shouldDownloadUserTheme(undefined, remote)).toBe(true);
     expect(shouldDownloadUserTheme(local, remote)).toBe(true);
     expect(shouldDownloadUserTheme(remote, local)).toBe(false);
+  });
+
+  it("shouldUploadSession uploads missing or newly completed sessions", () => {
+    const incomplete = makeSession();
+    const complete = makeSession({
+      endedAt: "2026-01-01T00:01:00.000Z",
+      memoCount: 1,
+    });
+
+    expect(shouldUploadSession(incomplete, undefined)).toBe(true);
+    expect(shouldUploadSession(complete, incomplete)).toBe(true);
+    expect(shouldUploadSession(incomplete, complete)).toBe(false);
+    expect(shouldUploadSession(complete, complete)).toBe(false);
+  });
+
+  it("shouldDownloadSession downloads missing or newly completed sessions", () => {
+    const incomplete = makeSession();
+    const complete = makeSession({
+      endedAt: "2026-01-01T00:01:00.000Z",
+      memoCount: 1,
+    });
+
+    expect(shouldDownloadSession(undefined, incomplete)).toBe(true);
+    expect(shouldDownloadSession(incomplete, complete)).toBe(true);
+    expect(shouldDownloadSession(complete, incomplete)).toBe(false);
+    expect(shouldDownloadSession(complete, complete)).toBe(false);
   });
 
   it("hasRemoteSyncDifference detects newer cloud sync time", () => {

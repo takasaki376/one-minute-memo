@@ -88,7 +88,12 @@ vi.mock("../openDB", () => {
 });
 
 // モック定義の後で sessionsRepo をインポート
-import { getAllSessions, createSession, getSessionById } from "../sessionsRepo";
+import {
+  createSession,
+  getAllSessions,
+  getSessionById,
+  upsertSession,
+} from "../sessionsRepo";
 
 describe("sessionsRepo", () => {
   beforeEach(async () => {
@@ -225,6 +230,21 @@ describe("sessionsRepo", () => {
 
       expect(result?.endedAt).not.toBeNull();
       expect(result?.memoCount).toBe(3);
+    });
+  });
+
+  describe("upsertSession", () => {
+    it("updates an existing session with completed data", async () => {
+      const session = await createSession(["theme-1"]);
+      const completedSession = {
+        ...session,
+        endedAt: "2026-01-01T00:01:00.000Z",
+        memoCount: 1,
+      };
+
+      await upsertSession(completedSession);
+
+      expect(await getSessionById(session.id)).toEqual(completedSession);
     });
   });
 });
