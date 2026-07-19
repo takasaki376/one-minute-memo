@@ -4,11 +4,14 @@ import {
   collectLocalThemeSettings,
   hasRemoteSyncDifference,
   pickUserThemes,
+  shouldDownloadMemo,
   shouldDownloadSession,
   shouldDownloadUserTheme,
+  shouldUploadMemo,
   shouldUploadSession,
   shouldUploadUserTheme,
 } from "@/lib/sync/syncDiff";
+import type { MemoRecord } from "@/types/memo";
 import type { SessionRecord } from "@/types/session";
 import type { ThemeRecord } from "@/types/theme";
 
@@ -32,6 +35,20 @@ function makeSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
     endedAt: null,
     themeIds: ["theme-1"],
     memoCount: 0,
+    ...overrides,
+  };
+}
+
+function makeMemo(overrides: Partial<MemoRecord> = {}): MemoRecord {
+  return {
+    id: "memo-1",
+    sessionId: "session-1",
+    themeId: "theme-1",
+    order: 1,
+    textContent: "Test",
+    handwritingType: "none",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -73,6 +90,26 @@ describe("syncDiff", () => {
     expect(shouldDownloadUserTheme(remote, local)).toBe(false);
   });
 
+  it("shouldUploadMemo uploads when remote is missing or older", () => {
+    const older = makeMemo({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const newer = makeMemo({ updatedAt: "2026-01-02T00:00:00.000Z" });
+
+    expect(shouldUploadMemo(older, undefined)).toBe(true);
+    expect(shouldUploadMemo(newer, older)).toBe(true);
+    expect(shouldUploadMemo(older, newer)).toBe(false);
+    expect(shouldUploadMemo(newer, newer)).toBe(false);
+  });
+
+  it("shouldDownloadMemo downloads when local is missing or older", () => {
+    const older = makeMemo({ updatedAt: "2026-01-01T00:00:00.000Z" });
+    const newer = makeMemo({ updatedAt: "2026-01-02T00:00:00.000Z" });
+
+    expect(shouldDownloadMemo(undefined, older)).toBe(true);
+    expect(shouldDownloadMemo(older, newer)).toBe(true);
+    expect(shouldDownloadMemo(newer, older)).toBe(false);
+    expect(shouldDownloadMemo(newer, newer)).toBe(false);
+  });
+
   it("shouldUploadSession uploads missing or newly completed sessions", () => {
     const incomplete = makeSession();
     const complete = makeSession({
@@ -112,8 +149,9 @@ describe("syncDiff", () => {
         "2026-01-01T00:00:00.000Z",
       ),
     ).toBe(false);
-    expect(hasRemoteSyncDifference(null, "2026-01-01T00:00:00.000Z")).toBe(
-      false,
-    );
+    expect(
+      hasRemoteSyncDifference(null, "2026-01-01T00:00:00.000Z"),
+    ).toBe(true);
+    expect(hasRemoteSyncDifference(null, null)).toBe(false);
   });
 });

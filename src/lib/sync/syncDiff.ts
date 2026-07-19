@@ -84,15 +84,22 @@ export function shouldUploadMemo(
   local: MemoRecord,
   remote: MemoRecord | undefined,
 ): boolean {
-  return !remote;
+  if (!remote) {
+    return true;
+  }
+
+  return local.updatedAt.localeCompare(remote.updatedAt) > 0;
 }
 
 export function shouldDownloadMemo(
   local: MemoRecord | undefined,
   remote: MemoRecord,
 ): boolean {
-  void remote;
-  return !local;
+  if (!local) {
+    return true;
+  }
+
+  return remote.updatedAt.localeCompare(local.updatedAt) > 0;
 }
 
 export function shouldUploadSession(
@@ -121,8 +128,12 @@ export function hasRemoteSyncDifference(
   localLastSyncedAt: string | null,
   cloudLastSyncedAt: string | null,
 ): boolean {
-  if (!localLastSyncedAt || !cloudLastSyncedAt) {
+  if (!cloudLastSyncedAt) {
     return false;
+  }
+
+  if (!localLastSyncedAt) {
+    return true;
   }
 
   return cloudLastSyncedAt.localeCompare(localLastSyncedAt) > 0;

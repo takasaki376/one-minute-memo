@@ -6,7 +6,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 
-import { addMemoIfAbsent, getAllMemos } from "@/lib/db/memosRepo";
+import { getAllMemos, upsertMemo } from "@/lib/db/memosRepo";
 import { getAllSessions, upsertSession } from "@/lib/db/sessionsRepo";
 import { getAllThemes, toggleThemeActive, upsertThemes } from "@/lib/db/themesRepo";
 import { getFirestoreDb } from "@/lib/firebase/firestore";
@@ -94,7 +94,7 @@ async function writeDocumentsInBatches(
         db,
         userDocPath(uid, collectionName, record.id),
       );
-      batch.set(ref, stripUndefinedFields(record.data), { merge: true });
+      batch.set(ref, stripUndefinedFields(record.data));
     }
 
     try {
@@ -254,10 +254,8 @@ export async function syncUserData(uid: string): Promise<SyncResult> {
       }
 
       try {
-        const added = await addMemoIfAbsent(remoteMemo);
-        if (added) {
-          result.downloadedMemos += 1;
-        }
+        await upsertMemo(remoteMemo);
+        result.downloadedMemos += 1;
       } catch {
         result.downloadFailures += 1;
       }

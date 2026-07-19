@@ -116,17 +116,11 @@ export async function deleteMemosBySession(sessionId: string): Promise<void> {
 }
 
 /**
- * ローカルに存在しない場合のみメモを追加する（同期ダウンロード用）
+ * タイムスタンプを保持したままメモを追加または更新する（同期ダウンロード用）
  */
-export async function addMemoIfAbsent(memo: MemoRecord): Promise<boolean> {
+export async function upsertMemo(memo: MemoRecord): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(MEMO_STORE, 'readwrite');
-  const existing = await tx.store.get(memo.id);
-  if (existing) {
-    await tx.done;
-    return false;
-  }
   await tx.store.put(memo);
   await tx.done;
-  return true;
 }
