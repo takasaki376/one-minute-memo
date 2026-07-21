@@ -1,15 +1,39 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { Header } from "@/components/ui/Header";
 import { ThemeSeedProvider } from "@/components/providers/ThemeSeedProvider";
 
+const APP_NAME = "one-minute-memo";
+const APP_DESCRIPTION = "1分で思考を書き出すメモアプリ";
+
 export const metadata: Metadata = {
+  applicationName: APP_NAME,
   title: {
-    default: "one-minute-memo",
-    template: "%s | one-minute-memo",
+    default: APP_NAME,
+    template: `%s | ${APP_NAME}`,
   },
-  description: "1分で思考を書き出すメモアプリ",
+  description: APP_DESCRIPTION,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: APP_NAME,
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({
@@ -37,6 +61,7 @@ export default function RootLayout({
                 </div>
               </footer>
             </div>
+            <ServiceWorkerRegister />
           </AuthProvider>
         </ThemeSeedProvider>
       </body>
