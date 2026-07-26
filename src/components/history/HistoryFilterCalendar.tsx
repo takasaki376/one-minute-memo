@@ -45,6 +45,8 @@ export function HistoryFilterCalendar({
     const parts = selectedDate.split("-").map(Number);
     const [ys, ms] = parts;
     if (parts.length !== 3 || !ys || !ms) return;
+    // 外部の日付フィルター変更に表示月を追従させるための同期。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setView({ y: ys, m: ms - 1 });
   }, [selectedDate]);
 
@@ -116,7 +118,7 @@ export function HistoryFilterCalendar({
             {w}
           </div>
         ))}
-        {cells.map((cell, i) => {
+        {cells.map((cell) => {
           if (cell.day < 0) {
             return (
               <div
