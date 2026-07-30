@@ -6,8 +6,7 @@ import { DEFAULT_SETTINGS } from "@/types/settings";
 
 // openDB をモック
 vi.mock("../openDB", () => {
-  // biome-ignore lint/suspicious/noExplicitAny: モック用の汎用型
-  type Value = any;
+  type Value = { id: string } & Record<string, unknown>;
 
   // シンプルなインメモリストア（db.add と transaction.store で共有）
   const store = new Map<string, Value>();
@@ -29,6 +28,8 @@ vi.mock("../openDB", () => {
 
   const db = {
     transaction(_storeName: string, _mode?: "readonly" | "readwrite") {
+      void _storeName;
+      void _mode;
       return {
         store: createStore(),
         done: Promise.resolve(),

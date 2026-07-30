@@ -1,11 +1,10 @@
 "use client";
 
-import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { getApps, initializeApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 
 import { getFirebaseConfig } from "./env";
 
-let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: Auth | null = null;
 
 export function getFirebaseAuth(): Auth | null {
