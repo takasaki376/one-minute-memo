@@ -1,0 +1,9 @@
+# 開発ツールのバージョン固定（Volta からの移行先）
+# 導入: brew install mise && mise install
+# 有効化: eval "$(mise activate zsh)"  （シェルに一度だけ）
+
+[tools]
+# 標準のパッケージマネージャ / スクリプト実行環境
+bun = "1.3.14"
+# 互換性保険（Playwright / 一部 CLI の Node 前提向け）。将来 CI でも必要になる可能性あり
+node = "20.20.2"
