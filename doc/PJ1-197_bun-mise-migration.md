@@ -24,6 +24,7 @@
 - Next.js の本番ビルドは既存どおり `--webpack`（Serwist 制約）。
 - 一部環境で Bun の AVX 警告が出ることがある。mise 経由インストールは baseline ビルドを使うため通常は問題ないが、クラッシュする場合は公式の `*-baseline` バイナリを確認する。
 - lint エラー無しを確認済み（既存 warning は残る）。`public/sw.js` は生成物のため ESLint 対象外。
+- **`bun.lock` は `yarn.lock` からの自動移行版を使わないこと。** 移行版は依存の解決先がレジストリの tarball URL 形式になり、`node_modules/.bin` にバイナリがリンクされず、クリーン環境で `next: command not found` になる（Vercel のビルド失敗要因）。`bun.lock` を作り直す場合は `rm -rf node_modules bun.lock && bun install`。
 
 ## 検証コマンド
 

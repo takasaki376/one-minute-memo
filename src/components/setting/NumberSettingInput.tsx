@@ -42,6 +42,8 @@ export function NumberSettingInput({
   const [inputValue, setInputValue] = useState<string>(value);
 
   useEffect(() => {
+    // 親から渡される確定値に入力欄を追従させるための同期。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInputValue(value);
   }, [value]);
 
