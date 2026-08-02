@@ -92,6 +92,7 @@ export default function ThemesPageClient() {
 
   useEffect(() => {
     if (themeIdsKey.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMemoCounts({});
       return;
     }
@@ -294,6 +295,8 @@ export default function ThemesPageClient() {
 
   useEffect(() => {
     if (!canLoad) return;
+    // IndexedDB 取得の開始に合わせてローディング表示へ切り替える。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: "loading" });
     getAllThemes()
       .then((records) => setState({ status: "success", themes: records }))

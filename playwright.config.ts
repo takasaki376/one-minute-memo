@@ -51,7 +51,7 @@ export default defineConfig({
 
   // 開発サーバーの自動起動
   webServer: {
-    command: "yarn dev",
+    command: "bun run dev",
     url: "http://localhost:3000",
     // ローカル開発時のみ既存サーバーを再利用（CIでは常に新規起動）
     reuseExistingServer: !process.env.CI,

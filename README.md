@@ -111,6 +111,17 @@ one-minute-memo/
 
 ## 🛠 開発環境セットアップ
 
+前提ツールは [mise](https://mise.jdx.dev/) で管理します（`mise.toml`）。Volta / Yarn は使いません。
+
+```bash
+# mise 未導入の場合（macOS / Homebrew）
+brew install mise
+eval "$(mise activate zsh)"   # または bash / fish。シェル設定にも追記推奨
+
+cd one-minute-memo
+mise install                  # Bun / Node を mise.toml の版に合わせて入れる
+```
+
 ### 1. リポジトリをクローン
 
 ```bash
@@ -121,13 +132,15 @@ cd one-minute-memo
 ### 2. 依存関係をインストール
 
 ```bash
-yarn install
+bun install
 ```
+
+ロックファイルは `bun.lock` を正とします（`yarn.lock` は使いません）。
 
 ### 3. 開発サーバーを起動
 
 ```bash
-yarn dev
+bun run dev
 ```
 
 アクセス：
@@ -138,8 +151,8 @@ http://localhost:3000
 
 ### 4. テスト
 
-- **単体・コンポーネントテスト（Vitest）**: `yarn test` または `yarn test:watch`
-- **E2E テスト（Playwright）**: 初回のみ `yarn playwright install` でブラウザをインストールしてから、`yarn test:e2e` で実行
+- **単体・コンポーネントテスト（Vitest）**: `bun run test` または `bun run test:watch`
+- **E2E テスト（Playwright）**: 初回のみ `bunx playwright install chromium` でブラウザをインストールしてから、`bun run test:e2e` で実行
 
 ---
 
