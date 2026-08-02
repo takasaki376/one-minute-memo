@@ -27,11 +27,14 @@ test.describe("セッション実行フロー", () => {
   test("トップからセッション画面に遷移できる", async ({ page }) => {
     await page.goto("/");
 
-    // セッション開始ボタンをクリック（トップページのボタンのみを対象）
-    await page.getByRole("link", { name: /セッションを開始/ }).click();
-
-    // セッション画面に遷移
-    await expect(page).toHaveURL(/\/session/);
+    // テーマシード完了まで無効のままなので、有効化を待ってから遷移する
+    // （Windows では初期コンパイルが遅く、クリック直後の toHaveURL が 5s で落ちやすい）
+    const startLink = page.getByRole("link", { name: /セッションを開始/ });
+    await expect(startLink).toBeEnabled({ timeout: SESSION_UI_TIMEOUT });
+    await Promise.all([
+      page.waitForURL(/\/session/, { timeout: SESSION_UI_TIMEOUT }),
+      startLink.click(),
+    ]);
 
     // テーマ表示があることを確認（1/N のインジケータ、N は設定で可変）
     await expect(
