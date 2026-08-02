@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { resetE2eAppState } from "./helpers/reset";
+import { waitForThemeSeedReady } from "./helpers/themeSeed";
 import {
   getThemeTotal,
   getVisibleSessionTextarea,
@@ -29,8 +30,8 @@ test.describe("セッション実行フロー", () => {
 
     // テーマシード完了まで無効のままなので、有効化を待ってから遷移する
     // （Windows では初期コンパイルが遅く、クリック直後の toHaveURL が 5s で落ちやすい）
+    await waitForThemeSeedReady(page);
     const startLink = page.getByRole("link", { name: /セッションを開始/ });
-    await expect(startLink).toBeEnabled({ timeout: SESSION_UI_TIMEOUT });
     await Promise.all([
       page.waitForURL(/\/session/, { timeout: SESSION_UI_TIMEOUT }),
       startLink.click(),
