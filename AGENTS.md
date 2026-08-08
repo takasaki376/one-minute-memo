@@ -73,6 +73,7 @@
 
 - **Conventional Commits** に従う（`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`）
 - PRには目的・背景・動作確認手順を含める
+- **`develop`（および main/master）へのマージは常に同僚が行う。エージェントは `gh pr merge` 等でマージしない**
 
 ---
 

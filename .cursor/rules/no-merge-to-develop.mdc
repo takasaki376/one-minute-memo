@@ -1,0 +1,25 @@
+---
+description: develop へのマージは同僚のみ。エージェントはマージしない
+alwaysApply: true
+---
+
+# develop へのマージ禁止
+
+このプロジェクトでは **`develop`（および main/master）へのマージは常に同僚が行う**。
+
+## 禁止
+
+- `gh pr merge` / GitHub UI 相当のマージ操作
+- `git merge` / `git pull` で develop に取り込み結果を push する操作
+- ユーザーが「マージして」と言っていないのにマージすること
+- 「レビュー待ち」「次はこれ」などの発言をマージ許可と解釈すること
+
+## 許可されること
+
+- PR 作成（`gh pr create`）
+- push（feature ブランチのみ、ユーザー依頼時）
+- レビューコメントへの対応、CI 調査
+
+## 迷ったら
+
+マージせず、PR URL を提示して同僚レビュー／マージ待ちにする。
