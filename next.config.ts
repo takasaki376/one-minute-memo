@@ -14,10 +14,6 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  // TypeScript 7 は legacy Compiler API を持たないため、型チェックは tsc CLI 経由にする
-  experimental: {
-    useTypeScriptCli: true,
-  },
   turbopack: {
     // Ensure Turbopack resolves the correct workspace root (avoid picking parent dir)
     root: __dirname,
