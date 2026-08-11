@@ -8,14 +8,21 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    // src 内のテストのみ実行（e2e/*.spec.ts は Playwright 用なので含めない）
+    // src 内の Vitest 対象のみ（*.bun.test.* は Bun、e2e/*.spec.ts は Playwright）
     include: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
       'src/**/*.spec.ts',
       'src/**/*.spec.tsx',
     ],
-    exclude: ['node_modules', 'e2e', 'e2e/**', '**/e2e/**'],
+    exclude: [
+      'node_modules',
+      'e2e',
+      'e2e/**',
+      '**/e2e/**',
+      '**/*.bun.test.ts',
+      '**/*.bun.test.tsx',
+    ],
   },
   resolve: {
     alias: {

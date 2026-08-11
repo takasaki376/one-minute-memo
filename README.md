@@ -151,8 +151,22 @@ http://localhost:3000
 
 ### 4. テスト
 
-- **単体・コンポーネントテスト（Vitest）**: `bun run test` または `bun run test:watch`
-- **E2E テスト（Playwright）**: 初回のみ `bunx playwright install chromium` でブラウザをインストールしてから、`bun run test:e2e` で実行
+単体・コンポーネントテストは **Bun + Vitest のハイブリッド**です。
+
+| コマンド | 内容 |
+| --- | --- |
+| `bun run test` | Bun 対象 → Vitest 対象を順に実行（推奨） |
+| `bun run test:bun` | `*.bun.test.ts` のみ（Bun ランナー） |
+| `bun run test:vitest` | `*.test.ts` / `*.test.tsx`（Vitest + jsdom） |
+| `bun run test:watch` | Vitest の watch モード |
+| `bun run test:e2e` | Playwright E2E（初回のみ `bunx playwright install chromium`） |
+
+**どちらに書くか**
+
+- **Bun（`*.bun.test.ts`）**: DOM / Testing Library / IndexedDB の重いモックに依存しない純粋ロジック
+- **Vitest（`*.test.ts` / `*.test.tsx`）**: React コンポーネント、`renderHook`、`vi.mock` 前提のリポジトリテストなど
+
+詳細は `doc/PJ1-198_bun-vitest-hybrid.md` を参照。
 
 ---
 

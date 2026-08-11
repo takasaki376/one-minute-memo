@@ -1,0 +1,6 @@
+# Bun runtime / test configuration (PJ1-198)
+# Prefer package scripts (`bun run test:bun`) over bare `bun test`.
+
+[test]
+# Playwright specs and Vitest-only suites must not be picked up accidentally.
+pathIgnorePatterns = ["e2e/**", "**/node_modules/**"]

@@ -20,7 +20,7 @@
 
 - Playwright のブラウザはローカルの `postinstall` で Chromium を入れる（`bunx playwright`）。**Vercel では `VERCEL` 環境変数を見てスキップ**する（本番ビルドにブラウザは不要で、Bun では `playwright: command not found` になるため）。
 - 手動インストール: `bunx playwright install chromium`
-- Vitest テストランナーはこのチケットでは据え置き（`bun run test` → Vitest）。Bun ランナーへの段階移行は PJ1-198。
+- Vitest / Bun ハイブリッドは **PJ1-198**（`bun run test` = Bun 対象 → Vitest 対象）。詳細は `doc/PJ1-198_bun-vitest-hybrid.md`。
 - Next.js の本番ビルドは既存どおり `--webpack`（Serwist 制約）。
 - 一部環境で Bun の AVX 警告が出ることがある。mise 経由インストールは baseline ビルドを使うため通常は問題ないが、クラッシュする場合は公式の `*-baseline` バイナリを確認する。
 - lint エラー無しを確認済み（既存 warning は残る）。`public/sw.js` は生成物のため ESLint 対象外。
@@ -32,7 +32,7 @@
 mise install
 bun install
 bun run lint
-bun run test --run
+bun run test
 bun run test:e2e
 bun run build
 ```
