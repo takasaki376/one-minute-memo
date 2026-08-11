@@ -1,6 +1,6 @@
-# PJ1-196 依存アップデートメモ（v2 / Bun 前提）
+# PJ1-196 依存アップデートメモ（v3 / Bun 前提）
 
-旧 PR #60 は Yarn 時代の `yarn.lock` 差分のまま develop（Bun 移行後）へ rebase できないため close し、`feat/PJ1-196-next-ts-upgrade-v2` でやり直した。
+旧 PR #60 は Yarn 時代の `yarn.lock` 差分のまま develop（Bun 移行後）へ rebase できないため close し、`feat/PJ1-196-next-ts-upgrade-v2`（PR #62）でやり直した。#62 はレビュー前に誤マージされたため PR #63 で revert し、本ブランチ `feat/PJ1-196-next-ts-upgrade-v3` で同じ変更を再提出する。
 
 ## 採用バージョン
 
