@@ -4,30 +4,39 @@
  * Keeps package.json's Bun suite target explicit without relying on
  * ambiguous CLI substring filters (see PJ1-198 review).
  */
-import { Glob } from "bun";
+import { spawnSync } from "node:child_process";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 
-const patterns = ["src/**/*.bun.test.ts", "src/**/*.bun.test.tsx"] as const;
+const ROOT = "src";
+const BUN_TEST_FILE = /\.bun\.test\.tsx?$/;
 
-const files: string[] = [];
-for (const pattern of patterns) {
-  for await (const path of new Glob(pattern).scan()) {
-    files.push(path);
+async function collectBunTestFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectBunTestFiles(fullPath)));
+      continue;
+    }
+    if (entry.isFile() && BUN_TEST_FILE.test(entry.name)) {
+      files.push(fullPath);
+    }
   }
+
+  return files;
 }
 
-files.sort();
+const files = (await collectBunTestFiles(ROOT)).sort();
 
 if (files.length === 0) {
   console.error(
-    `No Bun test files matched: ${patterns.map((p) => JSON.stringify(p)).join(", ")}`,
+    `No Bun test files matched under ${ROOT}/ (expected *.bun.test.ts or *.bun.test.tsx)`,
   );
   process.exit(1);
 }
 
-const proc = Bun.spawn(["bun", "test", ...files], {
-  stdout: "inherit",
-  stderr: "inherit",
-  stdin: "inherit",
-});
-
-process.exit(await proc.exited);
+const result = spawnSync("bun", ["test", ...files], { stdio: "inherit" });
+process.exit(result.status ?? 1);

@@ -27,7 +27,8 @@
 
 - `bunfig.toml`: `e2e/**` などを ignore（意図しない拾い上げ防止）
 - `vitest.config.ts`: `**/*.bun.test.ts(x)` を exclude（二重実行防止）
-- `test:bun` は `scripts/run-bun-tests.ts` で `src/**/*.bun.test.ts` / `src/**/*.bun.test.tsx` を解決し、一致ファイルだけを `bun test` する
+- `test:bun` は `scripts/run-bun-tests.ts` で `src/` 配下の `*.bun.test.ts` / `*.bun.test.tsx` を列挙し、一致ファイルだけを `bun test` する
+- Bun テストの型は `@types/bun`（`bun:test`）で解決する
 
 ## 検証（作業時）
 

@@ -4,7 +4,7 @@ import { stripUndefinedFields } from "@/lib/sync/sanitizeForFirestore";
 
 describe("stripUndefinedFields", () => {
   it("removes undefined fields", () => {
-    const input = {
+    const input: Record<string, unknown> = {
       id: "memo-1",
       textContent: "hello",
       handwritingDataUrl: undefined,
