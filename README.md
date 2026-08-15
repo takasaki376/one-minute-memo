@@ -156,7 +156,7 @@ http://localhost:3000
 | コマンド | 内容 |
 | --- | --- |
 | `bun run test` | Bun 対象 → Vitest 対象を順に実行（推奨） |
-| `bun run test:bun` | `*.bun.test.ts` のみ（Bun ランナー） |
+| `bun run test:bun` | `src/**/*.bun.test.ts(x)` のみ（`scripts/run-bun-tests.ts` → Bun） |
 | `bun run test:vitest` | `*.test.ts` / `*.test.tsx`（Vitest + jsdom） |
 | `bun run test:watch` | Vitest の watch モード |
 | `bun run test:e2e` | Playwright E2E（初回のみ `bunx playwright install chromium`） |

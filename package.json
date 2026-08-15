@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "bun run test:bun && bun run test:vitest",
-    "test:bun": "bun test .bun.test",
+    "test:bun": "bun ./scripts/run-bun-tests.ts",
     "test:vitest": "vitest run",
     "test:watch": "vitest --watch",
     "test:e2e": "playwright test",
