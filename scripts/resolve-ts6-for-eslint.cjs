@@ -6,9 +6,21 @@
 const Module = require("node:module");
 
 const originalLoad = Module._load;
+let resolvingTypescript = false;
+
 Module._load = function patchedLoad(request, parent, isMain) {
   if (request === "typescript") {
-    return originalLoad.call(this, "@typescript/typescript6", parent, isMain);
+    // @typescript/typescript6 のロード中に再度 require('typescript') が
+    // 走ると無限再帰になるため、再入時は差し替えず素通しする。
+    if (resolvingTypescript) {
+      return originalLoad.apply(this, arguments);
+    }
+    resolvingTypescript = true;
+    try {
+      return originalLoad.call(this, "@typescript/typescript6", parent, isMain);
+    } finally {
+      resolvingTypescript = false;
+    }
   }
   return originalLoad.apply(this, arguments);
 };
