@@ -1,19 +1,14 @@
+import "server-only";
+
 import type { DecodedIdToken } from "firebase-admin/auth";
 
 import { getFirebaseAdminAuth } from "@/lib/firebase/admin";
-import type { SessionUser } from "@/types/auth";
 
-import { AUTH_ERROR_CODES } from "./errorContract";
+import { AuthNotConfiguredError } from "./authErrors";
 import { AUTH_SESSION_COOKIE } from "./sessionCookie";
 
-export class AuthNotConfiguredError extends Error {
-  readonly code = AUTH_ERROR_CODES.NOT_CONFIGURED;
-
-  constructor() {
-    super("Firebase Admin is not configured");
-    this.name = "AuthNotConfiguredError";
-  }
-}
+export { AuthNotConfiguredError } from "./authErrors";
+export { decodedIdTokenToSessionUser } from "./sessionUser";
 
 export async function createSessionCookieFromIdToken(
   idToken: string,
@@ -37,14 +32,4 @@ export async function verifyAuthSessionCookie(
   }
 
   return auth.verifySessionCookie(sessionCookie, true);
-}
-
-export function decodedIdTokenToSessionUser(
-  decoded: DecodedIdToken,
-): SessionUser {
-  return {
-    uid: decoded.uid,
-    email: decoded.email ?? null,
-    emailVerified: decoded.email_verified ?? false,
-  };
 }

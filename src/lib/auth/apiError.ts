@@ -8,7 +8,7 @@ import {
   toAuthErrorCode,
   type AuthErrorCode,
 } from "./errorContract";
-import { AuthNotConfiguredError } from "./sessionToken";
+import { AuthNotConfiguredError } from "./authErrors";
 
 function extractFirebaseErrorCode(error: unknown): string | undefined {
   if (error && typeof error === "object" && "code" in error) {
@@ -49,10 +49,6 @@ export function toAuthApiError(error: unknown): ApiFailure {
   if (firebaseCode) {
     const code = toAuthErrorCode(firebaseCode);
     return fail(code, authErrorMessage(code));
-  }
-
-  if (error instanceof Error && error.message.length > 0) {
-    return fail(AUTH_ERROR_CODES.INTERNAL, error.message);
   }
 
   return fail(
