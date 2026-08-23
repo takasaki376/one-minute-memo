@@ -163,11 +163,14 @@
 
 ## Server Actions Policy（Server Action の使い方）
 
+### Firebase 認証・同期は Route Handler（PJ1-199）
+
+認証（signup/signin/signout/session）と Firestore 同期（upload/pull/state/run）は **Server Actions ではなく** `src/app/api/**/route.ts` で実装する。契約は `doc/PJ1-199-01_auth-sync-api-contract.md`。
+
 ### ✅ Server Actions を使うべき処理
 
 1. **将来の Supabase や外部APIへのアクセス**
-   - セッション結果を Supabase に保存する処理
-   - ユーザー認証・認可
+   - セッション結果を Supabase に保存する処理（将来。同期の現行経路は API Route）
    - 外部サービスとの連携
 
 2. **サーバー側でのデータ永続化**
@@ -194,15 +197,12 @@
 
 ### 具体例
 
-#### ✅ OK: Server Action として実装すべき処理
+#### ✅ OK: 認証・同期は Route Handler（Server Action にしない）
 
 ```typescript
-// app/actions/sync.ts
-'use server'
-
-export async function syncSessionToSupabase(sessionId: string) {
-  // Supabase にセッションを同期
-  // 将来実装予定
+// src/app/api/auth/session/route.ts
+export async function GET() {
+  // httpOnly Cookie を検証し { success, data | error } を返す
 }
 ```
 

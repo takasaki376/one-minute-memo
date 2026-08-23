@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 import HistoryDetailPage from "../page";
 import * as sessionsRepo from "@/lib/db/sessionsRepo";
@@ -73,9 +73,13 @@ describe("HistoryDetailPage", () => {
   it("displays session detail and memo list when loaded", async () => {
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "セッション詳細" })).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByRole(
+        "heading",
+        { name: "セッション詳細" },
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
 
     expect(screen.getByText("セッション概要")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "メモ一覧" })).toBeInTheDocument();
@@ -91,13 +95,11 @@ describe("HistoryDetailPage", () => {
 
     renderPage("missing-session");
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("セッション履歴を表示できません"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("対象のセッションが見つかりませんでした"),
-      ).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText("セッション履歴を表示できません", {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("対象のセッションが見つかりませんでした"),
+    ).toBeInTheDocument();
   });
 });
