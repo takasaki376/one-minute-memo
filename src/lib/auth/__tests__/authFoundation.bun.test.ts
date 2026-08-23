@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import { authErrorHttpStatus, toAuthApiError } from "../apiError";
-import { buildAuthCookieSetOptions } from "../authCookies";
+import { buildAuthCookieSetOptions } from "../authCookieOptions";
+import { AuthNotConfiguredError } from "../authErrors";
 import { AUTH_ERROR_CODES } from "../errorContract";
 import { AUTH_SESSION_COOKIE } from "../sessionCookie";
-import { AuthNotConfiguredError } from "../sessionToken";
+import { decodedIdTokenToSessionUser } from "../sessionUser";
 
 describe("buildAuthCookieSetOptions", () => {
   it("matches AUTH_SESSION_COOKIE contract", () => {
@@ -32,6 +33,12 @@ describe("toAuthApiError", () => {
     const result = toAuthApiError({ code: "auth/invalid-session-cookie" });
     expect(result.error.code).toBe(AUTH_ERROR_CODES.UNAUTHENTICATED);
   });
+
+  it("does not expose internal error messages", () => {
+    const result = toAuthApiError(new Error("secret internal detail"));
+    expect(result.error.code).toBe(AUTH_ERROR_CODES.INTERNAL);
+    expect(result.error.message).not.toContain("secret internal detail");
+  });
 });
 
 describe("authErrorHttpStatus", () => {
@@ -45,14 +52,13 @@ describe("authErrorHttpStatus", () => {
 });
 
 describe("decodedIdTokenToSessionUser", () => {
-  it("maps decoded token fields", async () => {
-    const { decodedIdTokenToSessionUser } = await import("../sessionToken");
+  it("maps decoded token fields", () => {
     expect(
       decodedIdTokenToSessionUser({
         uid: "uid-1",
         email: "user@example.com",
         email_verified: true,
-      } as Parameters<typeof decodedIdTokenToSessionUser>[0]),
+      }),
     ).toEqual({
       uid: "uid-1",
       email: "user@example.com",
