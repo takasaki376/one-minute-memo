@@ -4,7 +4,7 @@ import { winnerByUpdatedAt, winnerForSession } from "../conflictPolicy";
 import { SYNC_ERROR_CODES, toSyncErrorCode } from "../errorContract";
 
 describe("winnerByUpdatedAt", () => {
-  it("picks the newer timestamp", () => {
+  it("picks the newer timestamp when both are present", () => {
     expect(
       winnerByUpdatedAt("2026-01-02T00:00:00.000Z", "2026-01-01T00:00:00.000Z"),
     ).toBe("local");
@@ -13,7 +13,7 @@ describe("winnerByUpdatedAt", () => {
     ).toBe("remote");
   });
 
-  it("prefers remote when timestamps are equal or missing", () => {
+  it("prefers remote when timestamps are equal or either is missing", () => {
     expect(
       winnerByUpdatedAt("2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z"),
     ).toBe("remote");
@@ -21,7 +21,7 @@ describe("winnerByUpdatedAt", () => {
       "remote",
     );
     expect(winnerByUpdatedAt("2026-01-01T00:00:00.000Z", undefined)).toBe(
-      "local",
+      "remote",
     );
   });
 });

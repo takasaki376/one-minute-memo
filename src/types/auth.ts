@@ -11,6 +11,11 @@ export interface AuthCredentials {
   password: string;
 }
 
+/** signin 成功後、Admin が session cookie を発行する前段の ID token */
+export interface AuthSignInRequest {
+  idToken: string;
+}
+
 export interface AuthSessionData {
   user: SessionUser | null;
 }

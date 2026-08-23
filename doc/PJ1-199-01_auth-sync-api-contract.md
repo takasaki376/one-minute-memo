@@ -41,13 +41,34 @@ HTTP 目安:
 
 ### リクエスト
 
-signup / signin:
+**signup**（Admin SDK でユーザー作成 + 確認メール送信）:
 
 ```ts
 { email: string; password: string }
 ```
 
-signout: body なし。session: query なし。
+**signin**（2 段階。Admin SDK に email/password 直接ログイン API は無い）:
+
+1. クライアントが Firebase Client SDK で `signInWithEmailAndPassword` し **ID token** を取得（199-06 移行期のみ。最終的には REST 経由に寄せてもよい）
+2. サーバーへ token を渡し、Admin で検証して session cookie を発行
+
+```ts
+{ idToken: string }
+```
+
+**signout**: body なし。
+
+**session**: query なし。
+
+### GET /api/auth/session の扱い
+
+| 状況 | HTTP | `data` / `error` |
+| --- | --- | --- |
+| Cookie なし（未ログイン） | **200** | `{ user: null }` … 正常な未ログイン |
+| Cookie あり・有効 | **200** | `{ user: SessionUser }` |
+| Cookie あり・失効 / 改ざん | **401** | `AUTH_UNAUTHENTICATED` |
+
+`AUTH_UNAUTHENTICATED` は **「Cookie が付いているのに無効」** のみ。初回訪問の未ログインは 200 + `user: null`。
 
 ### SessionUser
 
@@ -68,7 +89,14 @@ signout: body なし。session: query なし。
 | secure | 本番のみ true |
 | maxAge | 5 日（上限 14 日） |
 
-サーバーは Firebase Admin の session cookie を検証して UID を得る（実装は 199-02）。
+**signin フロー（199-02 で実装）:**
+
+1. `POST /api/auth/signin` で `idToken` を受け取る
+2. Admin SDK `verifyIdToken(idToken)` で UID を検証
+3. Admin SDK `createSessionCookie(idToken, { expiresIn })` で session cookie 文字列を生成
+4. `Set-Cookie: __session=...` を返す
+
+**signup フロー（199-03）:** Admin SDK `createUser` + 確認メール送信。Cookie はセットしない。
 
 ### 認証エラーコード
 
@@ -77,15 +105,15 @@ signout: body なし。session: query なし。
 | code | 主な Firebase 由来 |
 | --- | --- |
 | AUTH_INVALID_EMAIL | auth/invalid-email |
-| AUTH_INVALID_CREDENTIAL | auth/invalid-credential, user-not-found, wrong-password |
+| AUTH_INVALID_CREDENTIAL | auth/invalid-credential, user-not-found, wrong-password, verifyIdToken 失敗 |
 | AUTH_EMAIL_ALREADY_IN_USE | auth/email-already-in-use |
 | AUTH_WEAK_PASSWORD | auth/weak-password |
 | AUTH_USER_DISABLED | auth/user-disabled |
 | AUTH_TOO_MANY_REQUESTS | auth/too-many-requests |
 | AUTH_NETWORK | auth/network-request-failed |
 | AUTH_NOT_CONFIGURED | サーバー秘密情報が未設定 |
-| AUTH_UNAUTHENTICATED | Cookie なし / 失効 |
-| AUTH_VALIDATION | email/password 欠落 |
+| AUTH_UNAUTHENTICATED | **Cookie あり・無効**（未ログインの 200 とは別） |
+| AUTH_VALIDATION | email/password または idToken 欠落 |
 | AUTH_INTERNAL | その他 |
 
 ## 同期 API
@@ -94,10 +122,26 @@ signout: body なし。session: query なし。
 
 | Method | Path | 役割 |
 | --- | --- | --- |
-| GET | `/api/sync/state` | クラウド `lastSyncedAt` と他端末差分フラグ |
+| GET | `/api/sync/state?localLastSyncedAt=...` | クラウド `lastSyncedAt` と他端末差分フラグ |
 | POST | `/api/sync/upload` | ローカル payload を Firestore へ反映 |
 | POST | `/api/sync/pull` | ローカル index と比較してダウンロード対象を返す |
 | POST | `/api/sync/run` | upload のあと pull（現行 `syncUserData` 相当） |
+
+### GET /api/sync/state
+
+クエリ: `localLastSyncedAt`（ISO、省略可）
+
+```ts
+// SyncStateQuery
+{ localLastSyncedAt?: string | null }
+```
+
+レスポンス `SyncStateData`:
+
+- `lastSyncedAt`: Firestore `users/{uid}/syncState/main` の値
+- `hasRemoteDifference`: `localLastSyncedAt` が渡されたときのみ `cloud > local` を評価。省略時は `false`（クライアント側で比較不能なため）
+
+既存 `hasRemoteSyncDifference(local, cloud)` と同じ比較をサーバーで行う。
 
 ### 対象コレクション（破壊的変更なし）
 
@@ -105,7 +149,7 @@ signout: body なし。session: query なし。
 
 - `memos/{id}` … `MemoRecord`
 - `sessions/{id}` … `SessionRecord`
-- `themes/{id}` … **user テーマのみ**
+- `themes/{id}` … **user テーマのみ**（`UserThemeRecord`）
 - `themeSettings/{id}` … builtin の ON/OFF 上書きのみ
 - `syncState/main` … `CloudSyncState`
 
@@ -115,26 +159,38 @@ signout: body なし。session: query なし。
 
 ### リクエスト / レスポンス型
 
-- upload body: `SyncPayload`
-- pull body: `SyncPullIndex`（id + `updatedAt` または session の `endedAt`）
-- run body: `SyncPayload` + `SyncPullIndex`（同一ローカルスナップショットから作る）
-- state data: `SyncStateData`
-- upload data: `SyncUploadData`
-- pull / run data: `SyncPullData`（適用すべきレコード + `deletedThemeSettingIds`）
+| endpoint | body |
+| --- | --- |
+| upload | `SyncPayload` |
+| pull | `SyncPullIndex` |
+| run | `SyncRunRequest` = `{ payload: SyncPayload; index: SyncPullIndex }` |
+
+`SyncPayload` と `SyncPullIndex` を JSON オブジェクトのトップレベルでマージしない（キー衝突で上書きされるため）。
+
+**SyncPayload** には `deletedThemeSettingIds` を含める。builtin をデフォルトへ戻した override の削除要求。配列から ID が消えただけでは「未変更」と区別できない。
+
+**SyncPullIndex** はコレクション別 index 型:
+
+- memos / themes / themeSettings: `{ id, updatedAt }`
+- sessions: `{ id, endedAt }`
 
 型: `src/types/sync.ts`。
 
-### 競合解決（199-09/10 で `conflictPolicy` を使う）
+### 競合解決（199-09/10）
 
-現行クライアントは同タイムスタンプを no-op にしている。API 契約では **未確定時はサーバー優先** に揃える。
+**レコード存在**（先に判定）:
+
+- remote なし → upload（local）
+- local なし → download（remote）
+
+**両方存在するとき**（`conflictPolicy`）:
 
 | 対象 | 規則 |
 | --- | --- |
-| memos / user themes / themeSettings | `updatedAt` が新しい方。欠落・同値は **remote** |
-| sessions（`updatedAt` なし・スキーマ変更しない） | 完了（`endedAt != null`）が未完了に勝つ。両方完了または両方未完了は **remote** |
-| builtin をデフォルトに戻した themeSettings | リモート文書を削除（`deletedThemeSettingIds`） |
+| memos / user themes / themeSettings | `winnerByUpdatedAt` … 新しい `updatedAt`。欠落・同値は **remote** |
+| sessions | `winnerForSession` … 完了が未完了に勝つ。両方完了 or 両方未完了は **remote** |
 
-実装関数: `winnerByUpdatedAt` / `winnerForSession`。
+`deletedThemeSettingIds` は upload/run で明示削除。
 
 ### 同期エラーコード
 
@@ -155,7 +211,7 @@ signout: body なし。session: query なし。
 
 クライアント公開（既存）:
 
-- `NEXT_PUBLIC_FIREBASE_*`
+- `NEXT_PUBLIC_FIREBASE_*`（Client SDK の signin 移行期 + 将来 REST 用に `NEXT_PUBLIC_FIREBASE_API_KEY`）
 
 サーバー専用（リポジトリにコミットしない）:
 

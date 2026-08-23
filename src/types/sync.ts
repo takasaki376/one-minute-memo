@@ -14,29 +14,60 @@ export interface CloudSyncState {
   updatedAt: string;
 }
 
+/** Firestore users/{uid}/themes に載せる user テーマのみ */
+export type UserThemeRecord = ThemeRecord & { source: "user" };
+
 /** クライアントがサーバーへ渡すローカル差分の本体 */
 export interface SyncPayload {
   memos: MemoRecord[];
   sessions: SessionRecord[];
-  themes: ThemeRecord[];
+  themes: UserThemeRecord[];
   themeSettings: ThemeSettingRecord[];
+  /** builtin をデフォルトへ戻した themeSettings の ID（リモート削除要求） */
+  deletedThemeSettingIds: string[];
 }
 
-export interface SyncEntityIndex {
+export interface MemoEntityIndex {
   id: string;
-  updatedAt?: string;
-  endedAt?: string | null;
+  updatedAt: string;
+}
+
+export interface SessionEntityIndex {
+  id: string;
+  endedAt: string | null;
+}
+
+export interface ThemeEntityIndex {
+  id: string;
+  updatedAt: string;
+}
+
+export interface ThemeSettingEntityIndex {
+  id: string;
+  updatedAt: string;
 }
 
 export interface SyncPullIndex {
-  memos: SyncEntityIndex[];
-  sessions: SyncEntityIndex[];
-  themes: SyncEntityIndex[];
-  themeSettings: SyncEntityIndex[];
+  memos: MemoEntityIndex[];
+  sessions: SessionEntityIndex[];
+  themes: ThemeEntityIndex[];
+  themeSettings: ThemeSettingEntityIndex[];
+}
+
+/** upload + pull を同一スナップショットで送る（JSON マージ不可のためネスト） */
+export interface SyncRunRequest {
+  payload: SyncPayload;
+  index: SyncPullIndex;
+}
+
+export interface SyncStateQuery {
+  /** 端末 IndexedDB の lastSyncedAt（ISO）。未同期端末は省略可 */
+  localLastSyncedAt?: string | null;
 }
 
 export interface SyncStateData {
   lastSyncedAt: string | null;
+  /** cloudLastSyncedAt > localLastSyncedAt のとき true（local 未指定時は false） */
   hasRemoteDifference: boolean;
 }
 
@@ -61,7 +92,7 @@ export interface SyncUploadData extends SyncMutationCounts {
 export interface SyncPullData extends SyncMutationCounts {
   memos: MemoRecord[];
   sessions: SessionRecord[];
-  themes: ThemeRecord[];
+  themes: UserThemeRecord[];
   themeSettings: ThemeSettingRecord[];
   deletedThemeSettingIds: string[];
   lastSyncedAt: string;
