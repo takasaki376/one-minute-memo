@@ -40,10 +40,16 @@ const FIREBASE_AUTH_CODE_MAP: Record<string, AuthErrorCode> = {
   "auth/user-not-found": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
   "auth/wrong-password": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
   "auth/invalid-credential": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
+  "auth/invalid-id-token": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
   "auth/email-already-in-use": AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
   "auth/weak-password": AUTH_ERROR_CODES.WEAK_PASSWORD,
   "auth/too-many-requests": AUTH_ERROR_CODES.TOO_MANY_REQUESTS,
   "auth/network-request-failed": AUTH_ERROR_CODES.NETWORK,
+  "auth/id-token-expired": AUTH_ERROR_CODES.UNAUTHENTICATED,
+  "auth/session-cookie-expired": AUTH_ERROR_CODES.UNAUTHENTICATED,
+  "auth/session-cookie-revoked": AUTH_ERROR_CODES.UNAUTHENTICATED,
+  "auth/invalid-session-cookie": AUTH_ERROR_CODES.UNAUTHENTICATED,
+  "auth/argument-error": AUTH_ERROR_CODES.VALIDATION,
 };
 
 export function toAuthErrorCode(firebaseCode: string | undefined): AuthErrorCode {
