@@ -20,6 +20,12 @@ describe("toAuthErrorCode", () => {
     expect(toAuthErrorCode("auth/wrong-password")).toBe(
       AUTH_ERROR_CODES.INVALID_CREDENTIAL,
     );
+    expect(toAuthErrorCode("auth/invalid-id-token")).toBe(
+      AUTH_ERROR_CODES.INVALID_CREDENTIAL,
+    );
+    expect(toAuthErrorCode("auth/id-token-expired")).toBe(
+      AUTH_ERROR_CODES.INVALID_CREDENTIAL,
+    );
   });
 
   it("maps email already in use", () => {
@@ -28,7 +34,16 @@ describe("toAuthErrorCode", () => {
     );
   });
 
-  it("falls back to AUTH_INTERNAL", () => {
+  it("maps session cookie errors to AUTH_UNAUTHENTICATED and falls back to AUTH_INTERNAL", () => {
+    expect(toAuthErrorCode("auth/session-cookie-expired")).toBe(
+      AUTH_ERROR_CODES.UNAUTHENTICATED,
+    );
+    expect(toAuthErrorCode("auth/session-cookie-revoked")).toBe(
+      AUTH_ERROR_CODES.UNAUTHENTICATED,
+    );
+    expect(toAuthErrorCode("auth/invalid-session-cookie")).toBe(
+      AUTH_ERROR_CODES.UNAUTHENTICATED,
+    );
     expect(toAuthErrorCode("auth/unknown")).toBe(AUTH_ERROR_CODES.INTERNAL);
     expect(toAuthErrorCode(undefined)).toBe(AUTH_ERROR_CODES.INTERNAL);
   });
