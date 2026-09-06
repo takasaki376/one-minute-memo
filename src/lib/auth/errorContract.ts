@@ -45,7 +45,7 @@ const FIREBASE_AUTH_CODE_MAP: Record<string, AuthErrorCode> = {
   "auth/weak-password": AUTH_ERROR_CODES.WEAK_PASSWORD,
   "auth/too-many-requests": AUTH_ERROR_CODES.TOO_MANY_REQUESTS,
   "auth/network-request-failed": AUTH_ERROR_CODES.NETWORK,
-  "auth/id-token-expired": AUTH_ERROR_CODES.UNAUTHENTICATED,
+  "auth/id-token-expired": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
   "auth/session-cookie-expired": AUTH_ERROR_CODES.UNAUTHENTICATED,
   "auth/session-cookie-revoked": AUTH_ERROR_CODES.UNAUTHENTICATED,
   "auth/invalid-session-cookie": AUTH_ERROR_CODES.UNAUTHENTICATED,
