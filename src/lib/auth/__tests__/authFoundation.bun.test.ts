@@ -46,6 +46,10 @@ describe("authErrorHttpStatus", () => {
     expect(authErrorHttpStatus(AUTH_ERROR_CODES.UNAUTHENTICATED)).toBe(401);
   });
 
+  it("returns 401 for invalid credential", () => {
+    expect(authErrorHttpStatus(AUTH_ERROR_CODES.INVALID_CREDENTIAL)).toBe(401);
+  });
+
   it("returns 500 for not configured", () => {
     expect(authErrorHttpStatus(AUTH_ERROR_CODES.NOT_CONFIGURED)).toBe(500);
   });

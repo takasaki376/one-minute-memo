@@ -4,3 +4,5 @@
 [test]
 # Playwright specs and Vitest-only suites must not be picked up accidentally.
 pathIgnorePatterns = ["e2e/**", "**/node_modules/**"]
+# Allow importing server-only modules in Bun unit tests (see scripts/bun-server-only-stub.ts).
+preload = ["./scripts/bun-server-only-stub.ts"]

@@ -23,6 +23,7 @@ function extractFirebaseErrorCode(error: unknown): string | undefined {
 export function authErrorHttpStatus(code: AuthErrorCode): number {
   switch (code) {
     case AUTH_ERROR_CODES.UNAUTHENTICATED:
+    case AUTH_ERROR_CODES.INVALID_CREDENTIAL:
       return 401;
     case AUTH_ERROR_CODES.VALIDATION:
     case AUTH_ERROR_CODES.INVALID_EMAIL:

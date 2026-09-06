@@ -1,3 +1,5 @@
+import "server-only";
+
 export type FirebaseAdminConfig = {
   projectId: string;
   clientEmail: string;
