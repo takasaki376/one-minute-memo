@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Auth } from "firebase-admin/auth";
+
 import { getFirebaseAdminAuth } from "@/lib/firebase/admin";
 
 import { AuthNotConfiguredError } from "./authErrors";
@@ -11,8 +13,55 @@ type IdentityToolkitErrorBody = {
   };
 };
 
+const ROLLBACK_DELETE_ATTEMPTS = 3;
+
 function identityToolkitError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code });
+}
+
+function rollbackFailedError(uid: string, cause: unknown): Error {
+  return Object.assign(
+    new Error(
+      `Failed to rollback created user ${uid} after signup verification failure`,
+    ),
+    { code: "auth/internal-error", cause },
+  );
+}
+
+/**
+ * Best-effort cleanup after createUser succeeded but verification email failed.
+ * Retries deletes and surfaces failure instead of swallowing it.
+ */
+export async function rollbackCreatedUser(
+  auth: Pick<Auth, "deleteUser">,
+  uid: string,
+  options?: {
+    attempts?: number;
+    log?: (message: string, details: Record<string, unknown>) => void;
+  },
+): Promise<void> {
+  const attempts = options?.attempts ?? ROLLBACK_DELETE_ATTEMPTS;
+  const log = options?.log ?? ((message, details) => {
+    console.error(message, details);
+  });
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await auth.deleteUser(uid);
+      return;
+    } catch (error) {
+      lastError = error;
+      log("[auth/signup] Failed to delete user during signup rollback", {
+        uid,
+        attempt,
+        attempts,
+        error,
+      });
+    }
+  }
+
+  throw rollbackFailedError(uid, lastError);
 }
 
 async function readIdentityToolkitError(
@@ -129,7 +178,19 @@ export async function createAuthUser(
       options?.fetchImpl ?? fetch,
     );
   } catch (error) {
-    await auth.deleteUser(user.uid).catch(() => undefined);
+    try {
+      await rollbackCreatedUser(auth, user.uid);
+    } catch (rollbackError) {
+      console.error(
+        "[auth/signup] Signup verification failed and user rollback also failed",
+        {
+          uid: user.uid,
+          verificationError: error,
+          rollbackError,
+        },
+      );
+      throw rollbackError;
+    }
     throw error;
   }
 

@@ -28,8 +28,11 @@ describe("toAuthErrorCode", () => {
     );
   });
 
-  it("maps email already in use", () => {
+  it("maps email already in use from Client and Admin codes", () => {
     expect(toAuthErrorCode("auth/email-already-in-use")).toBe(
+      AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
+    );
+    expect(toAuthErrorCode("auth/email-already-exists")).toBe(
       AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
     );
   });

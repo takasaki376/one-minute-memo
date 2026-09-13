@@ -70,8 +70,10 @@ describe("sendSignupVerificationEmail", () => {
 
 describe("createAuthUser", () => {
   beforeEach(() => {
-    createUser.mockClear();
-    deleteUser.mockClear();
+    createUser.mockReset();
+    deleteUser.mockReset();
+    createUser.mockImplementation(async () => ({ uid: "uid-1" }));
+    deleteUser.mockImplementation(async () => undefined);
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-api-key";
   });
 
@@ -116,17 +118,42 @@ describe("createAuthUser", () => {
     expect(deleteUser).toHaveBeenCalledWith("uid-1");
   });
 
-  it("maps email-already-in-use from createUser", async () => {
+  it("maps Admin email-already-exists from createUser", async () => {
     createUser.mockImplementationOnce(async () => {
       throw Object.assign(new Error("already exists"), {
-        code: "auth/email-already-in-use",
+        code: "auth/email-already-exists",
       });
     });
 
     await expect(
       createAuthUser("user@example.com", "secret1", {
-        fetchImpl: mock(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch,
+        fetchImpl: mock(
+          async () => new Response("{}", { status: 200 }),
+        ) as unknown as typeof fetch,
       }),
-    ).rejects.toMatchObject({ code: "auth/email-already-in-use" });
+    ).rejects.toMatchObject({ code: "auth/email-already-exists" });
+  });
+
+  it("retries delete and surfaces rollback failure when cleanup fails", async () => {
+    const fetchImpl = mock(async () => {
+      return new Response(
+        JSON.stringify({ error: { message: "TOO_MANY_ATTEMPTS_TRY_LATER" } }),
+        { status: 400 },
+      );
+    });
+    deleteUser.mockImplementation(async () => {
+      throw new Error("delete failed");
+    });
+
+    await expect(
+      createAuthUser("user@example.com", "secret1", {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      }),
+    ).rejects.toMatchObject({
+      code: "auth/internal-error",
+      message: expect.stringContaining("rollback"),
+    });
+
+    expect(deleteUser.mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 });
