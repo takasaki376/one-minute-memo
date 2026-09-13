@@ -42,6 +42,8 @@ const FIREBASE_AUTH_CODE_MAP: Record<string, AuthErrorCode> = {
   "auth/invalid-credential": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
   "auth/invalid-id-token": AUTH_ERROR_CODES.INVALID_CREDENTIAL,
   "auth/email-already-in-use": AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
+  // Firebase Admin createUser uses email-already-exists (Client SDK uses email-already-in-use)
+  "auth/email-already-exists": AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
   "auth/weak-password": AUTH_ERROR_CODES.WEAK_PASSWORD,
   "auth/too-many-requests": AUTH_ERROR_CODES.TOO_MANY_REQUESTS,
   "auth/network-request-failed": AUTH_ERROR_CODES.NETWORK,
