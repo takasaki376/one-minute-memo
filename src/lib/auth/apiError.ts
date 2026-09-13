@@ -38,6 +38,13 @@ export function authErrorHttpStatus(code: AuthErrorCode): number {
   }
 }
 
+export function asAuthErrorCode(code: string): AuthErrorCode {
+  const codes = Object.values(AUTH_ERROR_CODES) as string[];
+  return codes.includes(code)
+    ? (code as AuthErrorCode)
+    : AUTH_ERROR_CODES.INTERNAL;
+}
+
 export function toAuthApiError(error: unknown): ApiFailure {
   if (error instanceof AuthNotConfiguredError) {
     return fail(
