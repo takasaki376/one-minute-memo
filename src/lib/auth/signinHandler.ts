@@ -4,26 +4,26 @@ import { fail, ok } from "@/lib/api/envelope";
 import {
   asAuthErrorCode,
   authErrorHttpStatus,
-  toAuthApiError,
+  toSignInApiError,
 } from "@/lib/auth/apiError";
 import {
   AUTH_ERROR_CODES,
-  AUTH_SIGNUP_SUCCESS_MESSAGE,
   authErrorMessage,
 } from "@/lib/auth/errorContract";
-import { validateSignupBody } from "@/lib/auth/signupValidation";
-import type { AuthSignUpData } from "@/types/auth";
+import { validateSigninBody } from "@/lib/auth/signinValidation";
+import type { AuthSignInData, SessionUser } from "@/types/auth";
 
-export type SignupHandlerDeps = {
-  createAuthUser: (
-    email: string,
-    password: string,
-  ) => Promise<{ uid: string }>;
+export type SigninHandlerDeps = {
+  signInWithIdToken: (idToken: string) => Promise<{
+    user: SessionUser;
+    sessionCookie: string;
+  }>;
+  setAuthCookie: (sessionCookie: string) => Promise<void>;
 };
 
-export async function handleSignupPost(
+export async function handleSigninPost(
   request: Request,
-  deps: SignupHandlerDeps,
+  deps: SigninHandlerDeps,
 ): Promise<Response> {
   let body: unknown;
   try {
@@ -38,7 +38,7 @@ export async function handleSignupPost(
     );
   }
 
-  const validated = validateSignupBody(body);
+  const validated = validateSigninBody(body);
   if (!validated.ok) {
     return NextResponse.json(
       fail(validated.code, authErrorMessage(validated.code)),
@@ -47,14 +47,12 @@ export async function handleSignupPost(
   }
 
   try {
-    await deps.createAuthUser(validated.email, validated.password);
-    const data: AuthSignUpData = {
-      user: null,
-      message: AUTH_SIGNUP_SUCCESS_MESSAGE,
-    };
+    const session = await deps.signInWithIdToken(validated.idToken);
+    await deps.setAuthCookie(session.sessionCookie);
+    const data: AuthSignInData = { user: session.user };
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
-    const failure = toAuthApiError(error);
+    const failure = toSignInApiError(error);
     return NextResponse.json(failure, {
       status: authErrorHttpStatus(asAuthErrorCode(failure.error.code)),
     });

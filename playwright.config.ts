@@ -15,8 +15,11 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
 
-  // CI環境では並列ワーカー数を制限
-  workers: process.env.CI ? 1 : undefined,
+  // 並列ワーカー数を制限
+  // next dev はオンデマンドコンパイルのため、ワーカー数が多いと
+  // 複数ルートへの同時アクセスでサーバーが詰まりタイムアウトしやすい。
+  // CIでは1、ローカルでも過度な並列を避けるため上限を設ける。
+  workers: process.env.CI ? 1 : 2,
 
   // レポーター設定
   reporter: [["html", { open: "never" }]],

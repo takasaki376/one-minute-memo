@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { authErrorHttpStatus, toAuthApiError } from "../apiError";
+import { authErrorHttpStatus, toAuthApiError, toSignInApiError } from "../apiError";
 import { buildAuthCookieSetOptions } from "../authCookieOptions";
 import { AuthNotConfiguredError } from "../authErrors";
 import { AUTH_ERROR_CODES } from "../errorContract";
@@ -38,6 +38,18 @@ describe("toAuthApiError", () => {
     const result = toAuthApiError(new Error("secret internal detail"));
     expect(result.error.code).toBe(AUTH_ERROR_CODES.INTERNAL);
     expect(result.error.message).not.toContain("secret internal detail");
+  });
+});
+
+describe("toSignInApiError", () => {
+  it("maps auth/argument-error to AUTH_INVALID_CREDENTIAL", () => {
+    const result = toSignInApiError({ code: "auth/argument-error" });
+    expect(result.error.code).toBe(AUTH_ERROR_CODES.INVALID_CREDENTIAL);
+  });
+
+  it("keeps AUTH_NOT_CONFIGURED", () => {
+    const result = toSignInApiError(new AuthNotConfiguredError());
+    expect(result.error.code).toBe(AUTH_ERROR_CODES.NOT_CONFIGURED);
   });
 });
 

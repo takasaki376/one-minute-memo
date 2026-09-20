@@ -38,6 +38,13 @@ export function authErrorHttpStatus(code: AuthErrorCode): number {
   }
 }
 
+export function asAuthErrorCode(code: string): AuthErrorCode {
+  const codes = Object.values(AUTH_ERROR_CODES) as string[];
+  return codes.includes(code)
+    ? (code as AuthErrorCode)
+    : AUTH_ERROR_CODES.INTERNAL;
+}
+
 export function toAuthApiError(error: unknown): ApiFailure {
   if (error instanceof AuthNotConfiguredError) {
     return fail(
@@ -55,5 +62,32 @@ export function toAuthApiError(error: unknown): ApiFailure {
   return fail(
     AUTH_ERROR_CODES.INTERNAL,
     authErrorMessage(AUTH_ERROR_CODES.INTERNAL),
+  );
+}
+
+/**
+ * Sign-in (verifyIdToken / createSessionCookie) failures map to
+ * AUTH_INVALID_CREDENTIAL per PJ1-199-01, except infra / account-state codes.
+ * Without this, auth/argument-error becomes AUTH_VALIDATION (400).
+ */
+export function toSignInApiError(error: unknown): ApiFailure {
+  if (error instanceof AuthNotConfiguredError) {
+    return fail(
+      AUTH_ERROR_CODES.NOT_CONFIGURED,
+      authErrorMessage(AUTH_ERROR_CODES.NOT_CONFIGURED),
+    );
+  }
+
+  const failure = toAuthApiError(error);
+  if (
+    failure.error.code === AUTH_ERROR_CODES.TOO_MANY_REQUESTS ||
+    failure.error.code === AUTH_ERROR_CODES.USER_DISABLED
+  ) {
+    return failure;
+  }
+
+  return fail(
+    AUTH_ERROR_CODES.INVALID_CREDENTIAL,
+    authErrorMessage(AUTH_ERROR_CODES.INVALID_CREDENTIAL),
   );
 }
