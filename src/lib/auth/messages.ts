@@ -1,5 +1,6 @@
 import { FirebaseError } from "firebase/app";
 
+import { AuthApiError } from "./clientApi";
 import {
   AUTH_ERROR_CODES,
   AUTH_ERROR_MESSAGES,
@@ -11,8 +12,12 @@ export {
   AUTH_SIGNUP_SUCCESS_MESSAGE,
 } from "./errorContract";
 
-/** Firebase Auth エラーをユーザー向け日本語メッセージに変換する */
+/** Auth API / Identity Toolkit / Firebase エラーを UI 向け日本語に変換する */
 export function toAuthErrorMessage(error: unknown): string {
+  if (error instanceof AuthApiError) {
+    return error.message || authErrorMessage(toAuthErrorCode(error.code));
+  }
+
   if (error instanceof FirebaseError) {
     return authErrorMessage(toAuthErrorCode(error.code));
   }
