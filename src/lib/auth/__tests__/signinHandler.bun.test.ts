@@ -94,4 +94,31 @@ describe("handleSigninPost", () => {
       },
     });
   });
+
+  it("normalizes auth/argument-error during verify to AUTH_INVALID_CREDENTIAL", async () => {
+    const response = await handleSigninPost(
+      new Request("http://localhost/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: "not-a-jwt" }),
+      }),
+      {
+        signInWithIdToken: mock(async () => {
+          throw Object.assign(new Error("argument error"), {
+            code: "auth/argument-error",
+          });
+        }),
+        setAuthCookie: mock(async () => undefined),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: {
+        code: AUTH_ERROR_CODES.INVALID_CREDENTIAL,
+        message: expect.any(String),
+      },
+    });
+  });
 });

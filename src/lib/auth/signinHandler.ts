@@ -4,7 +4,7 @@ import { fail, ok } from "@/lib/api/envelope";
 import {
   asAuthErrorCode,
   authErrorHttpStatus,
-  toAuthApiError,
+  toSignInApiError,
 } from "@/lib/auth/apiError";
 import {
   AUTH_ERROR_CODES,
@@ -52,7 +52,7 @@ export async function handleSigninPost(
     const data: AuthSignInData = { user: session.user };
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
-    const failure = toAuthApiError(error);
+    const failure = toSignInApiError(error);
     return NextResponse.json(failure, {
       status: authErrorHttpStatus(asAuthErrorCode(failure.error.code)),
     });
