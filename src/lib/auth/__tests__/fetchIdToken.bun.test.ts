@@ -52,4 +52,33 @@ describe("fetchIdTokenWithPassword", () => {
       );
     }
   });
+
+  it("maps network failures and invalid JSON to AuthApiError", async () => {
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-key";
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "example.firebaseapp.com";
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "example";
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID = "app-1";
+
+    const networkFetch = mock(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    try {
+      await fetchIdTokenWithPassword("a@example.com", "pass", networkFetch);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthApiError);
+      expect((error as AuthApiError).code).toBe(AUTH_ERROR_CODES.NETWORK);
+    }
+
+    const invalidJsonFetch = mock(
+      async () => new Response("not-json", { status: 200 }),
+    );
+    try {
+      await fetchIdTokenWithPassword("a@example.com", "pass", invalidJsonFetch);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthApiError);
+      expect((error as AuthApiError).code).toBe(AUTH_ERROR_CODES.INTERNAL);
+    }
+  });
 });

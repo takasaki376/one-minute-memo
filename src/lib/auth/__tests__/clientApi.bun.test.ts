@@ -88,6 +88,32 @@ describe("clientApi", () => {
     );
   });
 
+  it("maps fetch network failures to AUTH_NETWORK", async () => {
+    const fetchImpl = mock(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    try {
+      await postAuthSignIn("token", fetchImpl);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthApiError);
+      expect((error as AuthApiError).code).toBe(AUTH_ERROR_CODES.NETWORK);
+    }
+  });
+
+  it("maps invalid JSON responses to AUTH_INTERNAL", async () => {
+    const fetchImpl = mock(async () => new Response("not-json", { status: 200 }));
+
+    try {
+      await postAuthSignOut(fetchImpl);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthApiError);
+      expect((error as AuthApiError).code).toBe(AUTH_ERROR_CODES.INTERNAL);
+    }
+  });
+
   it("postAuthSignOut resolves on success", async () => {
     const fetchImpl = mock(async () =>
       Response.json({

@@ -24,28 +24,64 @@ export class AuthApiError extends Error {
   }
 }
 
-async function parseAuthResult<T>(response: Response): Promise<T> {
-  let json: ApiResult<T>;
+function internalAuthError(): AuthApiError {
+  return new AuthApiError(
+    AUTH_ERROR_CODES.INTERNAL,
+    authErrorMessage(AUTH_ERROR_CODES.INTERNAL),
+  );
+}
+
+function networkAuthError(): AuthApiError {
+  return new AuthApiError(
+    AUTH_ERROR_CODES.NETWORK,
+    authErrorMessage(AUTH_ERROR_CODES.NETWORK),
+  );
+}
+
+async function authFetch(
+  fetchImpl: AuthFetch,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
   try {
-    json = (await response.json()) as ApiResult<T>;
+    return await fetchImpl(input, init);
   } catch {
-    throw new AuthApiError(
-      AUTH_ERROR_CODES.INTERNAL,
-      authErrorMessage(AUTH_ERROR_CODES.INTERNAL),
-    );
+    throw networkAuthError();
+  }
+}
+
+async function parseAuthResult<T>(response: Response): Promise<T> {
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    throw internalAuthError();
   }
 
-  if (!json.success) {
-    throw new AuthApiError(json.error.code, json.error.message);
+  if (!json || typeof json !== "object" || !("success" in json)) {
+    throw internalAuthError();
   }
 
-  return json.data;
+  const result = json as ApiResult<T>;
+  if (!result.success) {
+    const code =
+      result.error && typeof result.error.code === "string"
+        ? result.error.code
+        : AUTH_ERROR_CODES.INTERNAL;
+    const message =
+      result.error && typeof result.error.message === "string"
+        ? result.error.message
+        : authErrorMessage(AUTH_ERROR_CODES.INTERNAL);
+    throw new AuthApiError(code, message);
+  }
+
+  return result.data;
 }
 
 export async function fetchAuthSession(
   fetchImpl: AuthFetch = fetch,
 ): Promise<SessionUser | null> {
-  const response = await fetchImpl("/api/auth/session", {
+  const response = await authFetch(fetchImpl, "/api/auth/session", {
     method: "GET",
     credentials: "same-origin",
   });
@@ -63,7 +99,7 @@ export async function postAuthSignIn(
   idToken: string,
   fetchImpl: AuthFetch = fetch,
 ): Promise<SessionUser> {
-  const response = await fetchImpl("/api/auth/signin", {
+  const response = await authFetch(fetchImpl, "/api/auth/signin", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
@@ -79,7 +115,7 @@ export async function postAuthSignUp(
   password: string,
   fetchImpl: AuthFetch = fetch,
 ): Promise<{ message: string }> {
-  const response = await fetchImpl("/api/auth/signup", {
+  const response = await authFetch(fetchImpl, "/api/auth/signup", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
@@ -93,7 +129,7 @@ export async function postAuthSignUp(
 export async function postAuthSignOut(
   fetchImpl: AuthFetch = fetch,
 ): Promise<void> {
-  const response = await fetchImpl("/api/auth/signout", {
+  const response = await authFetch(fetchImpl, "/api/auth/signout", {
     method: "POST",
     credentials: "same-origin",
   });

@@ -98,7 +98,16 @@ export async function fetchIdTokenWithPassword(
     throw await readIdentityToolkitError(response);
   }
 
-  const json = (await response.json()) as IdentityToolkitSignInResponse;
+  let json: IdentityToolkitSignInResponse;
+  try {
+    json = (await response.json()) as IdentityToolkitSignInResponse;
+  } catch {
+    throw new AuthApiError(
+      AUTH_ERROR_CODES.INTERNAL,
+      authErrorMessage(AUTH_ERROR_CODES.INTERNAL),
+    );
+  }
+
   if (!json.idToken) {
     throw new AuthApiError(
       AUTH_ERROR_CODES.INTERNAL,
