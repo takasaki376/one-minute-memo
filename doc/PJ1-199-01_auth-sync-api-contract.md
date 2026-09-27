@@ -49,8 +49,8 @@ HTTP 目安:
 
 **signin**（2 段階。Admin SDK に email/password 直接ログイン API は無い）:
 
-1. クライアントが Firebase Client SDK で `signInWithEmailAndPassword` し **ID token** を取得（199-06 移行期のみ。最終的には REST 経由に寄せてもよい）
-2. サーバーへ token を渡し、Admin で検証して session cookie を発行
+1. クライアントが Identity Toolkit REST（`accounts:signInWithPassword`）で **ID token** を取得する。`firebase/auth` の `signInWithEmailAndPassword` は使わない
+2. サーバーへ token を渡し、Admin で検証して session cookie を発行する
 
 ```ts
 { idToken: string }
@@ -211,7 +211,7 @@ HTTP 目安:
 
 クライアント公開（既存）:
 
-- `NEXT_PUBLIC_FIREBASE_*`（Client SDK の signin 移行期 + 将来 REST 用に `NEXT_PUBLIC_FIREBASE_API_KEY`）
+- `NEXT_PUBLIC_FIREBASE_*`（サインイン時の Identity Toolkit REST に `NEXT_PUBLIC_FIREBASE_API_KEY` を使う。未設定だとログイン UI は出ない）
 
 サーバー専用（リポジトリにコミットしない）:
 
