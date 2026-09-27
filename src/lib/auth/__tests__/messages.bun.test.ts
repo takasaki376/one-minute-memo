@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { FirebaseError } from "firebase/app";
 
+import { AuthApiError } from "../clientApi";
+import { AUTH_ERROR_CODES } from "../errorContract";
 import {
   AUTH_SIGNUP_SUCCESS_MESSAGE,
   toAuthErrorMessage,
@@ -19,6 +21,17 @@ describe("toAuthErrorMessage", () => {
     expect(toAuthErrorMessage(error)).toBe(
       "このメールアドレスは既に登録されています",
     );
+  });
+
+  it("maps AuthApiError message from API", () => {
+    expect(
+      toAuthErrorMessage(
+        new AuthApiError(
+          AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
+          "このメールアドレスは既に登録されています",
+        ),
+      ),
+    ).toBe("このメールアドレスは既に登録されています");
   });
 
   it("handles unconfigured firebase error", () => {

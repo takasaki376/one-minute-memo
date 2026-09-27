@@ -9,20 +9,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  sendEmailVerification,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  type User,
-} from "firebase/auth";
 
-import { getFirebaseAuth } from "@/lib/firebase/client";
+import {
+  fetchAuthSession,
+  postAuthSignIn,
+  postAuthSignOut,
+  postAuthSignUp,
+} from "@/lib/auth/clientApi";
+import { fetchIdTokenWithPassword } from "@/lib/auth/fetchIdToken";
 import { isFirebaseConfigured } from "@/lib/firebase/env";
+import type { SessionUser } from "@/types/auth";
 
 export type AuthContextValue = {
-  user: User | null;
+  user: SessionUser | null;
   isLoading: boolean;
   isConfigured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -34,52 +33,52 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const isConfigured = isFirebaseConfigured();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(isConfigured);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    if (!auth) {
+    if (!isConfigured) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setIsLoading(false);
-    });
+    let cancelled = false;
 
-    return unsubscribe;
-  }, []);
+    const restore = async () => {
+      try {
+        const sessionUser = await fetchAuthSession();
+        if (!cancelled) {
+          setUser(sessionUser);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+  }, [isConfigured]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const auth = getFirebaseAuth();
-    if (!auth) {
-      throw new Error("Firebase is not configured");
-    }
-    await signInWithEmailAndPassword(auth, email.trim(), password);
+    const idToken = await fetchIdTokenWithPassword(email.trim(), password);
+    const nextUser = await postAuthSignIn(idToken);
+    setUser(nextUser);
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    const auth = getFirebaseAuth();
-    if (!auth) {
-      throw new Error("Firebase is not configured");
-    }
-    const credential = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password,
-    );
-    if (credential.user) {
-      await sendEmailVerification(credential.user);
-    }
+    await postAuthSignUp(email.trim(), password);
   }, []);
 
   const signOut = useCallback(async () => {
-    const auth = getFirebaseAuth();
-    if (!auth) {
-      throw new Error("Firebase is not configured");
-    }
-    await firebaseSignOut(auth);
+    await postAuthSignOut();
+    setUser(null);
   }, []);
 
   const value = useMemo(
