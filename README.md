@@ -5,7 +5,7 @@
 200 個のテーマの中からランダムに 10 個を選び、**1 テーマにつき 1 分間でメモを書く**体験を提供します。
 テキスト入力に加えて、**手書き入力**にも対応しています。
 
-MVP では IndexedDB にデータを保存し、将来的には Supabase と同期してマルチデバイスで利用できる仕組みを目指します。
+MVP では IndexedDB にデータを保存します。ログインは任意で、未ログインでもメモ機能を使えます。認証は Firebase のセッション Cookie をサーバー API で発行します。
 
 ---
 
@@ -28,8 +28,9 @@ MVP では IndexedDB にデータを保存し、将来的には Supabase と同�
 - **React**
 - **TypeScript**
 - **IndexedDB**
-- **Tailwind CSS（予定）**
-- （将来的に）Supabase（同期／認証）
+- **Tailwind CSS**
+- **Firebase Authentication**（Route Handler。httpOnly `__session`）
+- **Firestore**（同期は現行クライアント SDK。サーバー API 化は後続）
 
 ---
 
@@ -149,7 +150,41 @@ bun run dev
 http://localhost:3000
 ```
 
-### 4. テスト
+### 4. 認証（任意）
+
+`.env.example` を `.env.local` にコピーし、値を入れます。秘密情報はコミットしません。変更後は開発サーバーを再起動します。
+
+クライアントに公開される値:
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`（任意）
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`（任意）
+
+サーバー専用（Firebase コンソールのサービスアカウント秘密鍵）:
+
+- `FIREBASE_ADMIN_PROJECT_ID`
+- `FIREBASE_ADMIN_CLIENT_EMAIL`
+- `FIREBASE_ADMIN_PRIVATE_KEY`（改行は `\n` のまま 1 行にし、全体をダブルクォートで囲む）
+
+`*firebase-adminsdk*.json` は `.gitignore` 対象です。JSON から値を写したら、ファイルをリポジトリに含めないでください。
+
+| 操作 | 経路 |
+| --- | --- |
+| サインアップ | `POST /api/auth/signup`。Cookie は付かない。確認メール後にログインする |
+| サインイン | ブラウザが Identity Toolkit REST で ID トークンを取得し、`POST /api/auth/signin` が `__session` を発行する |
+| 復元 | `GET /api/auth/session` |
+| サインアウト | `POST /api/auth/signout` |
+
+制約:
+
+- Admin 用の環境変数が無いと、サインインは `500` / `AUTH_NOT_CONFIGURED` になる
+- 画面のログインは Firebase Client SDK の `currentUser` をセットしない。Firestore 同期はまだクライアント直叩きのため、ログイン後の同期権限は PJ1-199-11 まで揃わない
+- 未ログインでもセッション・履歴・テーマ管理は IndexedDB だけで動作する
+
+### 5. テスト
 
 単体・コンポーネントテストは **Bun + Vitest のハイブリッド**です。
 
@@ -185,7 +220,8 @@ http://localhost:3000
 - [ ] カテゴリ管理・テーマ追加機能
 - [ ] PWA 対応
 - [ ] Supabase 同期
-- [ ] ログイン・マルチデバイス対応
+- [x] ログイン（任意。未ログインでもメモ可。セッションはサーバー Cookie）
+- [ ] Firestore 同期のサーバー API 化
 - [ ] 分析画面（傾向分析など）
 
 ---

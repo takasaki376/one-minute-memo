@@ -56,6 +56,18 @@ export default defineConfig({
   webServer: {
     command: "bun run dev",
     url: "http://localhost:3000",
+    env: {
+      ...process.env,
+      // CI など .env.local が無いときもログイン UI を出す。実 Firebase は呼ばない。
+      NEXT_PUBLIC_FIREBASE_API_KEY:
+        process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "e2e-api-key",
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:
+        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "e2e.firebaseapp.com",
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID:
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e2e",
+      NEXT_PUBLIC_FIREBASE_APP_ID:
+        process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1:web:e2e",
+    },
     // ローカル開発時のみ既存サーバーを再利用（CIでは常に新規起動）
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
