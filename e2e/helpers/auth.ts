@@ -12,51 +12,66 @@ export const E2E_SESSION_USER: E2eSessionUser = {
   emailVerified: true,
 };
 
-type AuthRouteState = {
-  user: E2eSessionUser | null;
-};
+const E2E_SESSION_COOKIE = "__session=e2e-session; Path=/; HttpOnly; SameSite=Lax";
 
-function json(route: Route, status: number, body: unknown): Promise<void> {
+function json(
+  route: Route,
+  status: number,
+  body: unknown,
+  setCookie?: string,
+): Promise<void> {
   return route.fulfill({
     status,
     contentType: "application/json",
+    headers: setCookie ? { "set-cookie": setCookie } : undefined,
     body: JSON.stringify(body),
   });
 }
 
+function hasSessionCookie(route: Route): boolean {
+  const cookie = route.request().headers().cookie ?? "";
+  return cookie.split(";").some((part) => part.trim().startsWith("__session="));
+}
+
 /**
  * 認証 API と Identity Toolkit を差し替える。
- * Firebase Admin や実ユーザーがなくても signup/signin/signout/session を検証する。
+ * セッションは `__session` Cookie の有無で判定し、サインインで付与、サインアウトで削除する。
  */
-export async function installAuthRouteMocks(
-  page: Page,
-  state: AuthRouteState,
-): Promise<void> {
+export async function installAuthRouteMocks(page: Page): Promise<void> {
   await page.route("**/identitytoolkit.googleapis.com/**", async (route) => {
     await json(route, 200, { idToken: "e2e-id-token" });
   });
 
   await page.route("**/api/auth/session", async (route) => {
+    const user = hasSessionCookie(route) ? E2E_SESSION_USER : null;
     await json(route, 200, {
       success: true,
-      data: { user: state.user },
+      data: { user },
     });
   });
 
   await page.route("**/api/auth/signin", async (route) => {
-    state.user = E2E_SESSION_USER;
-    await json(route, 200, {
-      success: true,
-      data: { user: E2E_SESSION_USER },
-    });
+    await json(
+      route,
+      200,
+      {
+        success: true,
+        data: { user: E2E_SESSION_USER },
+      },
+      E2E_SESSION_COOKIE,
+    );
   });
 
   await page.route("**/api/auth/signout", async (route) => {
-    state.user = null;
-    await json(route, 200, {
-      success: true,
-      data: { user: null },
-    });
+    await json(
+      route,
+      200,
+      {
+        success: true,
+        data: { user: null },
+      },
+      "__session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+    );
   });
 
   await page.route("**/api/auth/signup", async (route) => {

@@ -1,15 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { installAuthRouteMocks, type E2eSessionUser } from "./helpers/auth";
+import { installAuthRouteMocks } from "./helpers/auth";
 import { resetE2eAppState } from "./helpers/reset";
 import { getVisibleSessionTextarea, SESSION_UI_TIMEOUT } from "./helpers/session";
 
 test.describe("認証フロー", () => {
-  const state: { user: E2eSessionUser | null } = { user: null };
-
   test.beforeEach(async ({ page }) => {
-    state.user = null;
-    await installAuthRouteMocks(page, state);
+    await installAuthRouteMocks(page);
     await resetE2eAppState(page);
   });
 
