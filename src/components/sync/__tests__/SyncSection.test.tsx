@@ -11,7 +11,10 @@ vi.mock("@/hooks/useAuth", () => ({
 
 vi.mock("@/lib/sync/syncService", () => ({
   syncUserData: vi.fn(),
-  fetchCloudLastSyncedAt: vi.fn().mockResolvedValue(null),
+  fetchSyncState: vi.fn().mockResolvedValue({
+    lastSyncedAt: null,
+    hasRemoteDifference: false,
+  }),
   fetchLocalLastSyncedAt: vi.fn().mockResolvedValue(null),
 }));
 

@@ -30,7 +30,7 @@ MVP では IndexedDB にデータを保存します。ログインは任意で�
 - **IndexedDB**
 - **Tailwind CSS**
 - **Firebase Authentication**（Route Handler。httpOnly `__session`）
-- **Firestore**（同期は現行クライアント SDK。サーバー API 化は後続）
+- **Firestore**（同期は `/api/sync/*`。未ログインでは使わない）
 
 ---
 
@@ -181,8 +181,9 @@ http://localhost:3000
 制約:
 
 - Admin 用の環境変数が無いと、サインインは `500` / `AUTH_NOT_CONFIGURED` になる
-- 画面のログインは Firebase Client SDK の `currentUser` をセットしない。Firestore 同期はまだクライアント直叩きのため、ログイン後の同期権限は PJ1-199-11 まで揃わない
-- 未ログインでもセッション・履歴・テーマ管理は IndexedDB だけで動作する
+- 画面のログインは Firebase Client SDK の `currentUser` をセットしない
+- データ同期は `GET /api/sync/state` と `POST /api/sync/run`。アップロードとダウンロードの差分判定はサーバーが行い、ダウンロード結果はクライアントが IndexedDB に反映する
+- 未ログインでもセッション・履歴・テーマ管理は IndexedDB だけで動作する。同期 API は未ログインなら `SYNC_UNAUTHENTICATED`
 
 ### 5. テスト
 
@@ -221,7 +222,7 @@ http://localhost:3000
 - [ ] PWA 対応
 - [ ] Supabase 同期
 - [x] ログイン（任意。未ログインでもメモ可。セッションはサーバー Cookie）
-- [ ] Firestore 同期のサーバー API 化
+- [x] Firestore 同期のサーバー API 化
 - [ ] 分析画面（傾向分析など）
 
 ---
