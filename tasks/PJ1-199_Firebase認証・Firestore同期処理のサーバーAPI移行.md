@@ -42,18 +42,18 @@ Task
 
 4. 同期APIの基盤と upload/pull を実装する。
    同期API共通基盤（認可、変換、エラー）を作成し、アップロード・ダウンロードAPIを実装する。
-   参照: [PJ1-199-08\_同期API基盤実装\_RouteHandler認可共通変換](tasks/PJ1-199-08_同期API基盤実装_RouteHandler認可共通変換.md)
-   参照: [PJ1-199-09\_同期アップロードAPI実装\_ローカル差分をFirestoreへ反映](tasks/PJ1-199-09_同期アップロードAPI実装_ローカル差分をFirestoreへ反映.md)
-   参照: [PJ1-199-10\_同期ダウンロードAPI実装\_Firestore差分を取得](tasks/PJ1-199-10_同期ダウンロードAPI実装_Firestore差分を取得.md)
+   参照: [PJ1-199-08\_同期API基盤実装\_RouteHandler認可共通変換](tasks/finish/PJ1-199-08_同期API基盤実装_RouteHandler認可共通変換.md)
+   参照: [PJ1-199-09\_同期アップロードAPI実装\_ローカル差分をFirestoreへ反映](tasks/finish/PJ1-199-09_同期アップロードAPI実装_ローカル差分をFirestoreへ反映.md)
+   参照: [PJ1-199-10\_同期ダウンロードAPI実装\_Firestore差分を取得](tasks/finish/PJ1-199-10_同期ダウンロードAPI実装_Firestore差分を取得.md)
 
 5. 同期UIを API 経由へ置換する。
    SyncSection の直接同期呼び出しを廃止し、API呼び出しへ置換する。
-   参照: [PJ1-199-11\_同期UIのAPI経由化\_SyncSection置換](tasks/PJ1-199-11_同期UIのAPI経由化_SyncSection置換.md)
+   参照: [PJ1-199-11\_同期UIのAPI経由化\_SyncSection置換](tasks/finish/PJ1-199-11_同期UIのAPI経由化_SyncSection置換.md)
 
 6. テスト更新と回帰確認、運用ドキュメント更新を実施する。
    認証・同期の単体/統合/E2Eを更新し、主要機能の回帰を確認する。
    参照: [PJ1-199-07\_テスト更新と回帰確認\_ドキュメント整備](tasks/finish/PJ1-199-07_テスト更新と回帰確認_ドキュメント整備.md)
-   参照: [PJ1-199-12\_同期APIのテスト更新と回帰確認\_運用ドキュメント整備](tasks/PJ1-199-12_同期APIのテスト更新と回帰確認_運用ドキュメント整備.md)
+   参照: [PJ1-199-12\_同期APIのテスト更新と回帰確認\_運用ドキュメント整備](tasks/finish/PJ1-199-12_同期APIのテスト更新と回帰確認_運用ドキュメント整備.md)
 
 ## 成果物
 

@@ -16,6 +16,8 @@ import {
   toggleThemeActive,
   updateTheme,
 } from "@/lib/db/themesRepo";
+import { getBuiltinDefaultIsActive } from "@/lib/sync/builtinThemeDefaults";
+import { setThemeSettingReverted } from "@/lib/sync/localSyncState";
 import { getMemoCountsByThemeIds } from "@/lib/db/memosRepo";
 import type { ThemeRecord } from "@/types/theme";
 
@@ -136,12 +138,30 @@ export default function ThemesPageClient() {
       setUpdateError(
         e instanceof Error ? e.message : "テーマの更新に失敗しました",
       );
+      return;
     } finally {
       setUpdatingIds((prev) => {
         const next = new Set(prev);
         next.delete(theme.id);
         return next;
       });
+    }
+
+    if (theme.source !== "builtin") {
+      return;
+    }
+    const defaultIsActive = getBuiltinDefaultIsActive(theme.id);
+    if (defaultIsActive === null) {
+      return;
+    }
+    try {
+      await setThemeSettingReverted(theme.id, nextActive === defaultIsActive);
+    } catch (e) {
+      setUpdateError(
+        e instanceof Error
+          ? e.message
+          : "テーマ設定の同期記録に失敗しました",
+      );
     }
   };
 

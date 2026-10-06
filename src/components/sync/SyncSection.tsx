@@ -9,12 +9,7 @@ import {
   SYNC_LOGIN_REQUIRED_MESSAGE,
   SYNC_OTHER_DEVICE_HINT,
 } from "@/lib/sync/messages";
-import { hasRemoteSyncDifference } from "@/lib/sync/syncDiff";
-import {
-  fetchCloudLastSyncedAt,
-  fetchLocalLastSyncedAt,
-  syncUserData,
-} from "@/lib/sync/syncService";
+import { fetchLocalLastSyncedAt, fetchSyncState, syncUserData } from "@/lib/sync/syncService";
 import type { SyncResult, SyncStatus } from "@/types/sync";
 
 function buildResultMessage(result: SyncResult): string {
@@ -44,9 +39,7 @@ export function SyncSection() {
   const [localLastSyncedAt, setLocalLastSyncedAt] = useState<string | null>(
     null,
   );
-  const [cloudLastSyncedAt, setCloudLastSyncedAt] = useState<string | null>(
-    null,
-  );
+  const [hasRemoteDifference, setHasRemoteDifference] = useState(false);
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -60,13 +53,22 @@ export function SyncSection() {
     const load = async () => {
       setIsRefreshing(true);
       try {
-        const [local, cloud] = await Promise.all([
-          fetchLocalLastSyncedAt(),
-          user ? fetchCloudLastSyncedAt(user.uid) : Promise.resolve(null),
-        ]);
+        const local = await fetchLocalLastSyncedAt();
+        const state = user
+          ? await fetchSyncState(local)
+          : { lastSyncedAt: null, hasRemoteDifference: false };
         if (!cancelled) {
           setLocalLastSyncedAt(local);
-          setCloudLastSyncedAt(cloud);
+          setHasRemoteDifference(state.hasRemoteDifference);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStatus("error");
+          setResultMessage(
+            error instanceof Error && error.message
+              ? error.message
+              : "同期状態の取得に失敗しました",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -81,10 +83,7 @@ export function SyncSection() {
     };
   }, [isConfigured, isLoading, user]);
 
-  const showOtherDeviceHint = hasRemoteSyncDifference(
-    localLastSyncedAt,
-    cloudLastSyncedAt,
-  );
+  const showOtherDeviceHint = hasRemoteDifference;
 
   const handleSync = async () => {
     if (!user) {
@@ -96,12 +95,12 @@ export function SyncSection() {
     setStatus("syncing");
     setResultMessage(null);
 
-    const result = await syncUserData(user.uid);
+    const result = await syncUserData();
     if (result.success) {
       setStatus("success");
       setResultMessage(buildResultMessage(result));
       setLocalLastSyncedAt(result.syncedAt);
-      setCloudLastSyncedAt(result.syncedAt);
+      setHasRemoteDifference(false);
     } else {
       setStatus("error");
       setResultMessage(result.error ?? "同期に失敗しました");
