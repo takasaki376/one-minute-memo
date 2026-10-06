@@ -61,6 +61,15 @@ export function SyncSection() {
           setLocalLastSyncedAt(local);
           setHasRemoteDifference(state.hasRemoteDifference);
         }
+      } catch (error) {
+        if (!cancelled) {
+          setStatus("error");
+          setResultMessage(
+            error instanceof Error && error.message
+              ? error.message
+              : "同期状態の取得に失敗しました",
+          );
+        }
       } finally {
         if (!cancelled) {
           setIsRefreshing(false);

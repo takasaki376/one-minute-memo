@@ -21,7 +21,12 @@ import {
   SYNC_ERROR_MESSAGES,
   syncErrorMessage,
 } from "./errorContract";
-import { getLocalLastSyncedAt, setLocalLastSyncedAt } from "./localSyncState";
+import {
+  clearRevertedThemeSettingIds,
+  getLocalLastSyncedAt,
+  getRevertedThemeSettingIds,
+  setLocalLastSyncedAt,
+} from "./localSyncState";
 import { collectLocalThemeSettings, pickUserThemes } from "./syncDiff";
 
 export class SyncApiError extends Error {
@@ -75,15 +80,7 @@ async function buildRunRequest(): Promise<{
   ]);
   const userThemes = pickUserThemes(themes);
   const themeSettings = collectLocalThemeSettings(themes);
-  const deletedThemeSettingIds = themes
-    .filter((theme) => {
-      if (theme.source === "user") {
-        return false;
-      }
-      const defaultIsActive = getBuiltinDefaultIsActive(theme.id);
-      return defaultIsActive !== null && theme.isActive === defaultIsActive;
-    })
-    .map((theme) => theme.id);
+  const deletedThemeSettingIds = await getRevertedThemeSettingIds();
 
   return {
     payload: {
@@ -143,6 +140,7 @@ export async function applySyncPull(data: SyncPullData): Promise<number> {
   for (const setting of data.themeSettings) {
     try {
       await toggleThemeActive(setting.id, setting.isActive);
+      await clearRevertedThemeSettingIds([setting.id]);
     } catch {
       downloadFailures += 1;
     }
@@ -195,6 +193,11 @@ export async function syncUserData(): Promise<SyncResult> {
     const applyFailures = await applySyncPull(data);
     if (data.lastSyncedAt) {
       await setLocalLastSyncedAt(data.lastSyncedAt);
+    }
+    if (data.uploadFailures === 0) {
+      await clearRevertedThemeSettingIds(
+        requestBody.payload.deletedThemeSettingIds,
+      );
     }
 
     return {

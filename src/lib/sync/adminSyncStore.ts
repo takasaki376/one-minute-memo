@@ -48,7 +48,6 @@ async function writeRecords(
       batch.set(
         db.doc(userDocPath(uid, collectionName, record.id)),
         stripUndefinedFields(record.data),
-        { merge: true },
       );
     }
     try {

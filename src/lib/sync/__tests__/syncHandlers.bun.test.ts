@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { SYNC_ERROR_CODES } from "../errorContract";
 import { handleSyncRun, handleSyncState, handleSyncUpload } from "../syncHandlers";
 import type { SyncStore } from "../syncExecute";
-import type { RemoteCollections } from "../syncPlan";
+import type { RemoteCollections, UploadPlan } from "../syncPlan";
 
 function emptyRemote(): RemoteCollections {
   return {
@@ -23,7 +23,22 @@ function storeFor(remote: RemoteCollections): SyncStore & { uid: string | null }
       store.uid = uid;
       return remote;
     },
-    async writeUpload() {
+    async writeUpload(_uid: string, plan: UploadPlan) {
+      for (const memo of plan.memos) {
+        remote.memos.set(memo.id, memo);
+      }
+      for (const session of plan.sessions) {
+        remote.sessions.set(session.id, session);
+      }
+      for (const theme of plan.themes) {
+        remote.themes.set(theme.id, theme);
+      }
+      for (const setting of plan.themeSettings) {
+        remote.themeSettings.set(setting.id, setting);
+      }
+      for (const id of plan.deletedThemeSettingIds) {
+        remote.themeSettings.delete(id);
+      }
       return {
         memoFailures: 0,
         sessionFailures: 0,
@@ -89,5 +104,40 @@ describe("sync handlers", () => {
     );
     expect(response.status).toBe(200);
     expect(store.uid).toBe("uid-from-session");
+  });
+
+  it("does not delete a theme setting that was just uploaded", async () => {
+    const remote = emptyRemote();
+    const setting = {
+      id: "theme-0001",
+      isActive: false,
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    };
+    const response = await handleSyncRun(
+      "uid-from-session",
+      {
+        payload: {
+          memos: [],
+          sessions: [],
+          themes: [],
+          themeSettings: [setting],
+          deletedThemeSettingIds: [],
+        },
+        index: {
+          memos: [],
+          sessions: [],
+          themes: [],
+          themeSettings: [{ id: setting.id, updatedAt: setting.updatedAt }],
+        },
+      },
+      storeFor(remote),
+    );
+
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as {
+      data: { deletedThemeSettingIds: string[]; uploadedThemeSettings: number };
+    };
+    expect(json.data.uploadedThemeSettings).toBe(1);
+    expect(json.data.deletedThemeSettingIds).toEqual([]);
   });
 });

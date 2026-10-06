@@ -53,6 +53,10 @@ export async function updateSettings(
       patch.lastSyncedAt !== undefined
         ? patch.lastSyncedAt
         : existing?.lastSyncedAt,
+    revertedThemeSettingIds:
+      patch.revertedThemeSettingIds !== undefined
+        ? patch.revertedThemeSettingIds
+        : existing?.revertedThemeSettingIds,
     updatedAt: now,
   };
 
@@ -74,6 +78,7 @@ export async function resetSettings(): Promise<SettingsRecord> {
     id: SETTINGS_ID,
     ...DEFAULT_SETTINGS,
     lastSyncedAt: existing?.lastSyncedAt,
+    revertedThemeSettingIds: existing?.revertedThemeSettingIds,
     updatedAt: now,
   };
 

@@ -120,7 +120,8 @@ export async function handleSyncRun(
       store,
       remote,
     );
-    const pulled = executePull(validated.value.index, remote);
+    const remoteAfterUpload = await store.load(uid);
+    const pulled = executePull(validated.value.index, remoteAfterUpload);
     const data: SyncRunData = {
       ...pulled,
       uploadedMemos: uploaded.counts.uploadedMemos,

@@ -7,6 +7,8 @@ export interface SettingsRecord {
   time_limit: string; // 1テーマあたりの制限時間（秒、文字列形式）
   updatedAt: string; // ISO文字列
   lastSyncedAt?: string | null; // 前回同期時刻（ISO文字列）
+  /** builtin をデフォルトへ戻した themeSettings ID。同期 upload の削除要求 */
+  revertedThemeSettingIds?: string[];
 }
 
 /**
