@@ -41,3 +41,18 @@ export function toSyncErrorCode(
 export function syncErrorMessage(code: SyncErrorCode): string {
   return SYNC_ERROR_MESSAGES[code];
 }
+
+export function syncErrorHttpStatus(code: SyncErrorCode): number {
+  switch (code) {
+    case SYNC_ERROR_CODES.UNAUTHENTICATED:
+      return 401;
+    case SYNC_ERROR_CODES.PERMISSION:
+      return 403;
+    case SYNC_ERROR_CODES.VALIDATION:
+      return 400;
+    case SYNC_ERROR_CODES.UNAVAILABLE:
+      return 503;
+    default:
+      return 500;
+  }
+}

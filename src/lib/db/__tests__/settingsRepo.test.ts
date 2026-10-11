@@ -127,6 +127,24 @@ describe("settingsRepo", () => {
       expect(result.updatedAt).not.toBe(initialSettings.updatedAt);
     });
 
+    it("preserves reverted theme setting ids when another field changes", async () => {
+      const { getDB } = await import("../openDB");
+      const db = await getDB();
+      const tx = db.transaction("settings", "readwrite");
+      await tx.store.put({
+        id: "default",
+        theme_count: 10,
+        time_limit: "60",
+        updatedAt: "2025-01-10T09:00:00.000Z",
+        revertedThemeSettingIds: ["theme-0001"],
+      });
+      await tx.done;
+
+      const result = await updateSettings({ theme_count: 12 });
+
+      expect(result.revertedThemeSettingIds).toEqual(["theme-0001"]);
+    });
+
     it("updates time_limit only and preserves theme_count", async () => {
       // 初期設定を作成
       const { getDB } = await import("../openDB");
