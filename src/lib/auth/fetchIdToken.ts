@@ -1,4 +1,4 @@
-import { getFirebaseConfig } from "@/lib/firebase/env";
+import { getFirebaseWebApiKey } from "@/lib/firebase/env";
 
 import { AuthApiError, type AuthFetch } from "./clientApi";
 import { AUTH_ERROR_CODES, authErrorMessage, toAuthErrorCode } from "./errorContract";
@@ -65,8 +65,8 @@ export async function fetchIdTokenWithPassword(
   password: string,
   fetchImpl: AuthFetch = fetch,
 ): Promise<string> {
-  const config = getFirebaseConfig();
-  if (!config?.apiKey) {
+  const apiKey = getFirebaseWebApiKey();
+  if (!apiKey) {
     throw new AuthApiError(
       AUTH_ERROR_CODES.NOT_CONFIGURED,
       authErrorMessage(AUTH_ERROR_CODES.NOT_CONFIGURED),
@@ -76,7 +76,7 @@ export async function fetchIdTokenWithPassword(
   let response: Response;
   try {
     response = await fetchImpl(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${config.apiKey}`,
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
