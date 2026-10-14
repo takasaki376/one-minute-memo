@@ -7,9 +7,15 @@ export type FirebaseConfig = {
   appId: string;
 };
 
+/** Identity Toolkit REST に使う Web API キー。ログイン UI の有効判定はこれだけを見る。 */
+export function getFirebaseWebApiKey(): string | null {
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() ?? "";
+  return apiKey.length > 0 ? apiKey : null;
+}
+
 export function getFirebaseConfig(): FirebaseConfig | null {
   const config: FirebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
+    apiKey: getFirebaseWebApiKey() ?? "",
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "",
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "",
@@ -30,5 +36,5 @@ export function getFirebaseConfig(): FirebaseConfig | null {
 }
 
 export function isFirebaseConfigured(): boolean {
-  return getFirebaseConfig() !== null;
+  return getFirebaseWebApiKey() !== null;
 }
