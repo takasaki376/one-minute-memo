@@ -1,4 +1,3 @@
-
 # 📘 one-minute-memo
 
 **One Minute Memo（1 分メモ）** は、短時間で思考を書き出すトレーニングをサポートする Web アプリです。
@@ -165,12 +164,12 @@ http://localhost:3000
 
 `*firebase-adminsdk*.json` は `.gitignore` 対象です。JSON から値を写したら、ファイルをリポジトリに含めないでください。
 
-| 操作 | 経路 |
-| --- | --- |
-| サインアップ | `POST /api/auth/signup`。Cookie は付かない。確認メール後にログインする |
-| サインイン | `POST /api/auth/signin` に email/password。サーバーが Identity Toolkit で ID トークンを取得し `__session` を発行する |
-| 復元 | `GET /api/auth/session` |
-| サインアウト | `POST /api/auth/signout` |
+| 操作         | 経路                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| サインアップ | `POST /api/auth/signup`。Cookie は付かない。確認メール後にログインする                                               |
+| サインイン   | `POST /api/auth/signin` に email/password。サーバーが Identity Toolkit で ID トークンを取得し `__session` を発行する |
+| 復元         | `GET /api/auth/session`                                                                                              |
+| サインアウト | `POST /api/auth/signout`                                                                                             |
 
 制約:
 
@@ -183,13 +182,13 @@ http://localhost:3000
 
 単体・コンポーネントテストは **Bun + Vitest のハイブリッド**です。
 
-| コマンド | 内容 |
-| --- | --- |
-| `bun run test` | Bun 対象 → Vitest 対象を順に実行（推奨） |
-| `bun run test:bun` | `src/**/*.bun.test.ts(x)` のみ（`scripts/run-bun-tests.ts` → Bun） |
-| `bun run test:vitest` | `*.test.ts` / `*.test.tsx`（Vitest + jsdom） |
-| `bun run test:watch` | Vitest の watch モード |
-| `bun run test:e2e` | Playwright E2E（初回のみ `bunx playwright install chromium`） |
+| コマンド              | 内容                                                               |
+| --------------------- | ------------------------------------------------------------------ |
+| `bun run test`        | Bun 対象 → Vitest 対象を順に実行（推奨）                           |
+| `bun run test:bun`    | `src/**/*.bun.test.ts(x)` のみ（`scripts/run-bun-tests.ts` → Bun） |
+| `bun run test:vitest` | `*.test.ts` / `*.test.tsx`（Vitest + jsdom）                       |
+| `bun run test:watch`  | Vitest の watch モード                                             |
+| `bun run test:e2e`    | Playwright E2E（初回のみ `bunx playwright install chromium`）      |
 
 **どちらに書くか**
 

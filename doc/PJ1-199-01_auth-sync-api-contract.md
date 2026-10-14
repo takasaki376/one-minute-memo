@@ -20,31 +20,34 @@
 
 HTTP 目安:
 
-| 状況 | status |
-| --- | --- |
-| 成功 | 200 |
-| バリデーション | 400 |
-| 未認証 | 401 |
-| 権限なし | 403 |
-| サーバー未設定 / 内部エラー | 500 |
+| 状況                        | status |
+| --------------------------- | ------ |
+| 成功                        | 200    |
+| バリデーション              | 400    |
+| 未認証                      | 401    |
+| 権限なし                    | 403    |
+| サーバー未設定 / 内部エラー | 500    |
 
 `message` は UI 表示用の日本語。`code` はプログラム判定用。
 
 ## 認証 API
 
-| Method | Path | Cookie | 成功 `data` |
-| --- | --- | --- | --- |
-| POST | `/api/auth/signup` | セットしない（現行 UX: 確認メール後にログイン） | `{ user: null, message }` |
-| POST | `/api/auth/signin` | `__session` をセット | `{ user: SessionUser }` |
-| POST | `/api/auth/signout` | `__session` を削除 | `{ user: null }` |
-| GET | `/api/auth/session` | 参照のみ | `{ user: SessionUser \| null, configured: boolean }` |
+| Method | Path                | Cookie                                          | 成功 `data`                                          |
+| ------ | ------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| POST   | `/api/auth/signup`  | セットしない（現行 UX: 確認メール後にログイン） | `{ user: null, message }`                            |
+| POST   | `/api/auth/signin`  | `__session` をセット                            | `{ user: SessionUser }`                              |
+| POST   | `/api/auth/signout` | `__session` を削除                              | `{ user: null }`                                     |
+| GET    | `/api/auth/session` | 参照のみ                                        | `{ user: SessionUser \| null, configured: boolean }` |
 
 ### リクエスト
 
 **signup**（Admin SDK でユーザー作成 + 確認メール送信）:
 
 ```ts
-{ email: string; password: string }
+{
+  email: string;
+  password: string;
+}
 ```
 
 **signin**（サーバーが Identity Toolkit + Admin を実行。Admin SDK に email/password 直接ログイン API は無い）:
@@ -54,7 +57,10 @@ HTTP 目安:
 3. Admin で検証して session cookie を発行する
 
 ```ts
-{ email: string; password: string }
+{
+  email: string;
+  password: string;
+}
 ```
 
 **signout**: body なし。
@@ -63,32 +69,36 @@ HTTP 目安:
 
 ### GET /api/auth/session の扱い
 
-| 状況 | HTTP | `data` / `error` |
-| --- | --- | --- |
-| Cookie なし（未ログイン） | **200** | `{ user: null, configured }` … 正常な未ログイン。`configured` は Admin + Web API キーの有無 |
-| Cookie あり・有効 | **200** | `{ user: SessionUser, configured: true }` |
-| Cookie あり・失効 / 改ざん | **401** | `AUTH_UNAUTHENTICATED` |
+| 状況                       | HTTP    | `data` / `error`                                                                            |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------- |
+| Cookie なし（未ログイン）  | **200** | `{ user: null, configured }` … 正常な未ログイン。`configured` は Admin + Web API キーの有無 |
+| Cookie あり・有効          | **200** | `{ user: SessionUser, configured: true }`                                                   |
+| Cookie あり・失効 / 改ざん | **401** | `AUTH_UNAUTHENTICATED`                                                                      |
 
 `AUTH_UNAUTHENTICATED` は **「Cookie が付いているのに無効」** のみ。初回訪問の未ログインは 200 + `user: null`。
 
 ### SessionUser
 
 ```ts
-{ uid: string; email: string | null; emailVerified: boolean }
+{
+  uid: string;
+  email: string | null;
+  emailVerified: boolean;
+}
 ```
 
 ### セッション Cookie
 
 `src/lib/auth/sessionCookie.ts`
 
-| 項目 | 値 |
-| --- | --- |
-| name | `__session` |
-| httpOnly | true |
-| sameSite | `lax` |
-| path | `/` |
-| secure | 本番のみ true |
-| maxAge | 5 日（上限 14 日） |
+| 項目     | 値                 |
+| -------- | ------------------ |
+| name     | `__session`        |
+| httpOnly | true               |
+| sameSite | `lax`              |
+| path     | `/`                |
+| secure   | 本番のみ true      |
+| maxAge   | 5 日（上限 14 日） |
 
 **signin フロー（PJ1-201 更新）:**
 
@@ -104,30 +114,30 @@ HTTP 目安:
 
 `src/lib/auth/errorContract.ts`。既存 UI 文言を維持しつつ、API では Firebase 生コードを返さない。
 
-| code | 主な Firebase 由来 |
-| --- | --- |
-| AUTH_INVALID_EMAIL | auth/invalid-email |
-| AUTH_INVALID_CREDENTIAL | auth/invalid-credential, user-not-found, wrong-password, verifyIdToken 失敗 |
-| AUTH_EMAIL_ALREADY_IN_USE | auth/email-already-in-use |
-| AUTH_WEAK_PASSWORD | auth/weak-password |
-| AUTH_USER_DISABLED | auth/user-disabled |
-| AUTH_TOO_MANY_REQUESTS | auth/too-many-requests |
-| AUTH_NETWORK | auth/network-request-failed |
-| AUTH_NOT_CONFIGURED | サーバー秘密情報が未設定 |
-| AUTH_UNAUTHENTICATED | **Cookie あり・無効**（未ログインの 200 とは別） |
-| AUTH_VALIDATION | email/password 欠落 |
-| AUTH_INTERNAL | その他 |
+| code                      | 主な Firebase 由来                                                          |
+| ------------------------- | --------------------------------------------------------------------------- |
+| AUTH_INVALID_EMAIL        | auth/invalid-email                                                          |
+| AUTH_INVALID_CREDENTIAL   | auth/invalid-credential, user-not-found, wrong-password, verifyIdToken 失敗 |
+| AUTH_EMAIL_ALREADY_IN_USE | auth/email-already-in-use                                                   |
+| AUTH_WEAK_PASSWORD        | auth/weak-password                                                          |
+| AUTH_USER_DISABLED        | auth/user-disabled                                                          |
+| AUTH_TOO_MANY_REQUESTS    | auth/too-many-requests                                                      |
+| AUTH_NETWORK              | auth/network-request-failed                                                 |
+| AUTH_NOT_CONFIGURED       | サーバー秘密情報が未設定                                                    |
+| AUTH_UNAUTHENTICATED      | **Cookie あり・無効**（未ログインの 200 とは別）                            |
+| AUTH_VALIDATION           | email/password 欠落                                                         |
+| AUTH_INTERNAL             | その他                                                                      |
 
 ## 同期 API
 
 認可: `__session` から UID。他ユーザーの `users/{uid}` は参照不可。
 
-| Method | Path | 役割 |
-| --- | --- | --- |
-| GET | `/api/sync/state?localLastSyncedAt=...` | クラウド `lastSyncedAt` と他端末差分フラグ |
-| POST | `/api/sync/upload` | ローカル payload を Firestore へ反映 |
-| POST | `/api/sync/pull` | ローカル index と比較してダウンロード対象を返す |
-| POST | `/api/sync/run` | upload のあと pull（現行 `syncUserData` 相当） |
+| Method | Path                                    | 役割                                            |
+| ------ | --------------------------------------- | ----------------------------------------------- |
+| GET    | `/api/sync/state?localLastSyncedAt=...` | クラウド `lastSyncedAt` と他端末差分フラグ      |
+| POST   | `/api/sync/upload`                      | ローカル payload を Firestore へ反映            |
+| POST   | `/api/sync/pull`                        | ローカル index と比較してダウンロード対象を返す |
+| POST   | `/api/sync/run`                         | upload のあと pull（現行 `syncUserData` 相当）  |
 
 ### GET /api/sync/state
 
@@ -161,11 +171,11 @@ HTTP 目安:
 
 ### リクエスト / レスポンス型
 
-| endpoint | body |
-| --- | --- |
-| upload | `SyncPayload` |
-| pull | `SyncPullIndex` |
-| run | `SyncRunRequest` = `{ payload: SyncPayload; index: SyncPullIndex }` |
+| endpoint | body                                                                |
+| -------- | ------------------------------------------------------------------- |
+| upload   | `SyncPayload`                                                       |
+| pull     | `SyncPullIndex`                                                     |
+| run      | `SyncRunRequest` = `{ payload: SyncPayload; index: SyncPullIndex }` |
 
 `SyncPayload` と `SyncPullIndex` を JSON オブジェクトのトップレベルでマージしない（キー衝突で上書きされるため）。
 
@@ -187,10 +197,10 @@ HTTP 目安:
 
 **両方存在するとき**（`conflictPolicy`）:
 
-| 対象 | 規則 |
-| --- | --- |
-| memos / user themes / themeSettings | `winnerByUpdatedAt` … 新しい `updatedAt`。欠落・同値は **remote** |
-| sessions | `winnerForSession` … 完了が未完了に勝つ。両方完了 or 両方未完了は **remote** |
+| 対象                                | 規則                                                                         |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| memos / user themes / themeSettings | `winnerByUpdatedAt` … 新しい `updatedAt`。欠落・同値は **remote**            |
+| sessions                            | `winnerForSession` … 完了が未完了に勝つ。両方完了 or 両方未完了は **remote** |
 
 `deletedThemeSettingIds` は upload/run で明示削除。
 
@@ -198,14 +208,14 @@ HTTP 目安:
 
 `src/lib/sync/errorContract.ts`
 
-| code | 意味 |
-| --- | --- |
-| SYNC_UNAUTHENTICATED | 未ログイン |
-| SYNC_NOT_CONFIGURED | Admin / Firestore 未設定 |
-| SYNC_PERMISSION | permission-denied |
-| SYNC_UNAVAILABLE | unavailable / deadline-exceeded |
-| SYNC_VALIDATION | body 不正 |
-| SYNC_INTERNAL | その他 |
+| code                 | 意味                            |
+| -------------------- | ------------------------------- |
+| SYNC_UNAUTHENTICATED | 未ログイン                      |
+| SYNC_NOT_CONFIGURED  | Admin / Firestore 未設定        |
+| SYNC_PERMISSION      | permission-denied               |
+| SYNC_UNAVAILABLE     | unavailable / deadline-exceeded |
+| SYNC_VALIDATION      | body 不正                       |
+| SYNC_INTERNAL        | その他                          |
 
 部分失敗（バッチの一部）は `success: true` のまま `uploadFailures` / `downloadFailures` で返す（現行 UI と同じ）。
 
