@@ -5,6 +5,33 @@ import { AuthApiError } from "../clientApi";
 import { fetchIdTokenWithPassword } from "../fetchIdToken";
 
 describe("fetchIdTokenWithPassword", () => {
+  it("returns idToken when only the web API key is set", async () => {
+    const previous = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-key";
+    delete process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+    delete process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    delete process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+
+    try {
+      let requestedUrl = "";
+      const fetchImpl = mock(async (input: RequestInfo | URL) => {
+        requestedUrl = String(input);
+        return Response.json({ idToken: "id-token-1" });
+      });
+
+      await expect(
+        fetchIdTokenWithPassword("a@example.com", "pass", fetchImpl),
+      ).resolves.toBe("id-token-1");
+      expect(requestedUrl).toContain("key=test-key");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      } else {
+        process.env.NEXT_PUBLIC_FIREBASE_API_KEY = previous;
+      }
+    }
+  });
+
   it("returns idToken on success", async () => {
     const previous = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-key";

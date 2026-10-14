@@ -211,7 +211,8 @@ HTTP 目安:
 
 クライアント公開（既存）:
 
-- `NEXT_PUBLIC_FIREBASE_*`（サインイン時の Identity Toolkit REST に `NEXT_PUBLIC_FIREBASE_API_KEY` を使う。未設定だとログイン UI は出ない）
+- `NEXT_PUBLIC_FIREBASE_API_KEY`（サインイン時の Identity Toolkit REST で使う。未設定だとログイン UI は出ない）
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` / `PROJECT_ID` / `APP_ID` / `STORAGE_BUCKET` / `MESSAGING_SENDER_ID` はログイン判定には使わない。クライアント SDK 初期化（`getFirebaseConfig`）を残している間だけ、その初期化側が参照する
 
 サーバー専用（リポジトリにコミットしない）:
 
