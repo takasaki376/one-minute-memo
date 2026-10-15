@@ -4,9 +4,29 @@ import { AUTH_ERROR_CODES } from "../errorContract";
 import { AuthApiError } from "../clientApi";
 import { fetchIdTokenWithPassword } from "../fetchIdToken";
 
+const CLIENT_CONFIG_KEYS = [
+  "NEXT_PUBLIC_FIREBASE_API_KEY",
+  "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+  "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  "NEXT_PUBLIC_FIREBASE_APP_ID",
+] as const;
+
+function restoreEnv(saved: Map<string, string | undefined>) {
+  for (const key of CLIENT_CONFIG_KEYS) {
+    const value = saved.get(key);
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
 describe("fetchIdTokenWithPassword", () => {
   it("returns idToken when only the web API key is set", async () => {
-    const previous = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    const saved = new Map(
+      CLIENT_CONFIG_KEYS.map((key) => [key, process.env[key]] as const),
+    );
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-key";
     delete process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
     delete process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -24,11 +44,7 @@ describe("fetchIdTokenWithPassword", () => {
       ).resolves.toBe("id-token-1");
       expect(requestedUrl).toContain("key=test-key");
     } finally {
-      if (previous === undefined) {
-        delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-      } else {
-        process.env.NEXT_PUBLIC_FIREBASE_API_KEY = previous;
-      }
+      restoreEnv(saved);
     }
   });
 
