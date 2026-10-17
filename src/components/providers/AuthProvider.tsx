@@ -16,8 +16,6 @@ import {
   postAuthSignOut,
   postAuthSignUp,
 } from "@/lib/auth/clientApi";
-import { fetchIdTokenWithPassword } from "@/lib/auth/fetchIdToken";
-import { isFirebaseConfigured } from "@/lib/firebase/env";
 import type { SessionUser } from "@/types/auth";
 
 export type AuthContextValue = {
@@ -32,26 +30,24 @@ export type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const isConfigured = isFirebaseConfigured();
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [isLoading, setIsLoading] = useState(isConfigured);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isConfigured) {
-      return;
-    }
-
     let cancelled = false;
 
     const restore = async () => {
       try {
-        const sessionUser = await fetchAuthSession();
+        const session = await fetchAuthSession();
         if (!cancelled) {
-          setUser(sessionUser);
+          setUser(session.user);
+          setIsConfigured(session.configured);
         }
       } catch {
         if (!cancelled) {
           setUser(null);
+          setIsConfigured(false);
         }
       } finally {
         if (!cancelled) {
@@ -64,12 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isConfigured]);
+  }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const idToken = await fetchIdTokenWithPassword(email.trim(), password);
-    const nextUser = await postAuthSignIn(idToken);
+    const nextUser = await postAuthSignIn(email.trim(), password);
     setUser(nextUser);
+    setIsConfigured(true);
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {

@@ -119,25 +119,25 @@ export function SyncSection() {
         メモとテーマ設定を Firestore と手動で同期します。
       </p>
 
-      {!isConfigured && (
-        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          Firebase が未設定のため同期できません。
-        </p>
-      )}
-
-      {isConfigured && isLoading && (
+      {isLoading && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
           認証状態を確認しています...
         </p>
       )}
 
-      {isConfigured && !isLoading && !user && (
+      {!isLoading && !isConfigured && (
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          Firebase が未設定のため同期できません。
+        </p>
+      )}
+
+      {!isLoading && isConfigured && !user && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
           {SYNC_LOGIN_REQUIRED_MESSAGE}
         </p>
       )}
 
-      {isConfigured && !isLoading && user && (
+      {!isLoading && isConfigured && user && (
         <div className="mt-4 space-y-4">
           <dl className="space-y-2 text-sm">
             <div>

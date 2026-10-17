@@ -154,27 +154,21 @@ http://localhost:3000
 
 `.env.example` を `.env.local` にコピーし、値を入れます。秘密情報はコミットしません。変更後は開発サーバーを再起動します。
 
-クライアントに公開される値:
+サーバー専用（クライアントには公開しない）:
 
-- `NEXT_PUBLIC_FIREBASE_API_KEY`（ログインに必要。無いとログイン画面は出ない）
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`（ログインには不要）
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`（ログインには不要）
-- `NEXT_PUBLIC_FIREBASE_APP_ID`（ログインには不要）
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`（任意。ログインには不要）
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`（任意。ログインには不要）
-
-サーバー専用（Firebase コンソールのサービスアカウント秘密鍵）:
-
+- `FIREBASE_WEB_API_KEY`（Identity Toolkit REST。Firebase コンソールの Web API キー。無いとログイン画面は出ない）
 - `FIREBASE_ADMIN_PROJECT_ID`
 - `FIREBASE_ADMIN_CLIENT_EMAIL`
 - `FIREBASE_ADMIN_PRIVATE_KEY`（改行は `\n` のまま 1 行にし、全体をダブルクォートで囲む）
+
+以前の `NEXT_PUBLIC_FIREBASE_*` は不要です。`.env.local` に残っていれば削除して構いません（このリポジトリは `.env.local` を変更しません）。
 
 `*firebase-adminsdk*.json` は `.gitignore` 対象です。JSON から値を写したら、ファイルをリポジトリに含めないでください。
 
 | 操作 | 経路 |
 | --- | --- |
 | サインアップ | `POST /api/auth/signup`。Cookie は付かない。確認メール後にログインする |
-| サインイン | ブラウザが Identity Toolkit REST で ID トークンを取得し、`POST /api/auth/signin` が `__session` を発行する |
+| サインイン | `POST /api/auth/signin` に email/password。サーバーが Identity Toolkit で ID トークンを取得し `__session` を発行する |
 | 復元 | `GET /api/auth/session` |
 | サインアウト | `POST /api/auth/signout` |
 
