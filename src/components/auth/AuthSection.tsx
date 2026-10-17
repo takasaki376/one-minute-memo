@@ -45,19 +45,19 @@ export function AuthSection() {
         ログインすると、クラウドへのデータ同期が利用できます。
       </p>
 
-      {!isConfigured && (
-        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          認証機能は Firebase 未設定のため利用できません。環境変数を設定すると有効になります。
-        </p>
-      )}
-
-      {isConfigured && isLoading && (
+      {isLoading && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
           認証状態を確認しています...
         </p>
       )}
 
-      {isConfigured && !isLoading && user && (
+      {!isLoading && !isConfigured && (
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          認証機能は Firebase 未設定のため利用できません。環境変数を設定すると有効になります。
+        </p>
+      )}
+
+      {!isLoading && isConfigured && user && (
         <div className="mt-4 space-y-3">
           <dl className="space-y-2 text-sm">
             <div>
@@ -91,7 +91,7 @@ export function AuthSection() {
         </div>
       )}
 
-      {isConfigured && !isLoading && !user && (
+      {!isLoading && isConfigured && !user && (
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             type="button"

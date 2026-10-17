@@ -22,12 +22,13 @@ export type SessionHandlerDeps = {
   getAuthCookie: () => Promise<string | undefined>;
   verifySessionCookie: (sessionCookie: string) => Promise<DecodedIdTokenLike>;
   clearAuthCookie: () => Promise<void>;
+  isAuthConfigured: () => boolean;
 };
 
 /**
- * GET /api/auth/session (PJ1-199-01):
- * - no cookie → 200 { user: null }
- * - valid cookie → 200 { user }
+ * GET /api/auth/session (PJ1-199-01 / PJ1-201):
+ * - no cookie → 200 { user: null, configured }
+ * - valid cookie → 200 { user, configured: true }
  * - invalid cookie → 401 AUTH_UNAUTHENTICATED (+ clear cookie)
  */
 export async function handleSessionGet(
@@ -44,14 +45,17 @@ export async function handleSessionGet(
   }
 
   if (!sessionCookie) {
-    const data: AuthSessionData = { user: null };
+    const data: AuthSessionData = {
+      user: null,
+      configured: deps.isAuthConfigured(),
+    };
     return NextResponse.json(ok(data), { status: 200 });
   }
 
   try {
     const decoded = await deps.verifySessionCookie(sessionCookie);
     const user: SessionUser = decodedIdTokenToSessionUser(decoded);
-    const data: AuthSessionData = { user };
+    const data: AuthSessionData = { user, configured: true };
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
     if (error instanceof AuthNotConfiguredError) {

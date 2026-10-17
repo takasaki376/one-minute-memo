@@ -10,7 +10,7 @@ import {
 } from "../clientApi";
 
 describe("clientApi", () => {
-  it("fetchAuthSession returns user on success", async () => {
+  it("fetchAuthSession returns user and configured on success", async () => {
     const fetchImpl = mock(async () =>
       Response.json({
         success: true,
@@ -20,18 +20,22 @@ describe("clientApi", () => {
             email: "a@example.com",
             emailVerified: true,
           },
+          configured: true,
         },
       }),
     );
 
     await expect(fetchAuthSession(fetchImpl)).resolves.toEqual({
-      uid: "uid-1",
-      email: "a@example.com",
-      emailVerified: true,
+      user: {
+        uid: "uid-1",
+        email: "a@example.com",
+        emailVerified: true,
+      },
+      configured: true,
     });
   });
 
-  it("fetchAuthSession returns null on 401", async () => {
+  it("fetchAuthSession returns null user on 401", async () => {
     const fetchImpl = mock(async () =>
       Response.json(
         {
@@ -45,7 +49,30 @@ describe("clientApi", () => {
       ),
     );
 
-    await expect(fetchAuthSession(fetchImpl)).resolves.toBeNull();
+    await expect(fetchAuthSession(fetchImpl)).resolves.toEqual({
+      user: null,
+      configured: true,
+    });
+  });
+
+  it("fetchAuthSession maps AUTH_NOT_CONFIGURED to configured false", async () => {
+    const fetchImpl = mock(async () =>
+      Response.json(
+        {
+          success: false,
+          error: {
+            code: AUTH_ERROR_CODES.NOT_CONFIGURED,
+            message: "未設定",
+          },
+        },
+        { status: 500 },
+      ),
+    );
+
+    await expect(fetchAuthSession(fetchImpl)).resolves.toEqual({
+      user: null,
+      configured: false,
+    });
   });
 
   it("postAuthSignIn returns user", async () => {
@@ -62,7 +89,9 @@ describe("clientApi", () => {
       }),
     );
 
-    await expect(postAuthSignIn("token", fetchImpl)).resolves.toEqual({
+    await expect(
+      postAuthSignIn("a@example.com", "pass", fetchImpl),
+    ).resolves.toEqual({
       uid: "uid-1",
       email: "a@example.com",
       emailVerified: false,
@@ -83,9 +112,9 @@ describe("clientApi", () => {
       ),
     );
 
-    await expect(postAuthSignUp("a@example.com", "pass", fetchImpl)).rejects.toBeInstanceOf(
-      AuthApiError,
-    );
+    await expect(
+      postAuthSignUp("a@example.com", "pass", fetchImpl),
+    ).rejects.toBeInstanceOf(AuthApiError);
   });
 
   it("maps fetch network failures to AUTH_NETWORK", async () => {
@@ -94,7 +123,7 @@ describe("clientApi", () => {
     });
 
     try {
-      await postAuthSignIn("token", fetchImpl);
+      await postAuthSignIn("a@example.com", "pass", fetchImpl);
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(AuthApiError);

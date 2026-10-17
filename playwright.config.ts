@@ -56,19 +56,20 @@ export default defineConfig({
   webServer: {
     command: "bun run dev",
     url: "http://localhost:3000",
-    // ローカルは .env.local を優先する。CI だけ公開用のダミーを足す。
+    // ローカルは .env.local を優先する。CI だけサーバー用のダミーを足す。
     env: process.env.CI
       ? {
           ...process.env,
-          NEXT_PUBLIC_FIREBASE_API_KEY:
-            process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "e2e-api-key",
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:
-            process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-            "e2e.firebaseapp.com",
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID:
-            process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e2e",
-          NEXT_PUBLIC_FIREBASE_APP_ID:
-            process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1:web:e2e",
+          FIREBASE_WEB_API_KEY:
+            process.env.FIREBASE_WEB_API_KEY || "e2e-api-key",
+          FIREBASE_ADMIN_PROJECT_ID:
+            process.env.FIREBASE_ADMIN_PROJECT_ID || "e2e",
+          FIREBASE_ADMIN_CLIENT_EMAIL:
+            process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
+            "firebase-adminsdk@e2e.iam.gserviceaccount.com",
+          FIREBASE_ADMIN_PRIVATE_KEY:
+            process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
+            "-----BEGIN PRIVATE KEY-----\\ne2e\\n-----END PRIVATE KEY-----",
         }
       : undefined,
     // ローカル開発時のみ既存サーバーを再利用（CIでは常に新規起動）
