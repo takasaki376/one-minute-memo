@@ -37,7 +37,7 @@ HTTP 目安:
 | POST | `/api/auth/signup` | セットしない（現行 UX: 確認メール後にログイン） | `{ user: null, message }` |
 | POST | `/api/auth/signin` | `__session` をセット | `{ user: SessionUser }` |
 | POST | `/api/auth/signout` | `__session` を削除 | `{ user: null }` |
-| GET | `/api/auth/session` | 参照のみ | `{ user: SessionUser \| null }` |
+| GET | `/api/auth/session` | 参照のみ | `{ user: SessionUser \| null, configured: boolean }` |
 
 ### リクエスト
 
@@ -47,13 +47,14 @@ HTTP 目安:
 { email: string; password: string }
 ```
 
-**signin**（2 段階。Admin SDK に email/password 直接ログイン API は無い）:
+**signin**（サーバーが Identity Toolkit + Admin を実行。Admin SDK に email/password 直接ログイン API は無い）:
 
-1. クライアントが Identity Toolkit REST（`accounts:signInWithPassword`）で **ID token** を取得する。`firebase/auth` の `signInWithEmailAndPassword` は使わない
-2. サーバーへ token を渡し、Admin で検証して session cookie を発行する
+1. クライアントは email/password だけを `POST /api/auth/signin` に送る（`NEXT_PUBLIC_*` 不要）
+2. サーバーが Identity Toolkit REST（`accounts:signInWithPassword`）で **ID token** を取得する
+3. Admin で検証して session cookie を発行する
 
 ```ts
-{ idToken: string }
+{ email: string; password: string }
 ```
 
 **signout**: body なし。
@@ -64,8 +65,8 @@ HTTP 目安:
 
 | 状況 | HTTP | `data` / `error` |
 | --- | --- | --- |
-| Cookie なし（未ログイン） | **200** | `{ user: null }` … 正常な未ログイン |
-| Cookie あり・有効 | **200** | `{ user: SessionUser }` |
+| Cookie なし（未ログイン） | **200** | `{ user: null, configured }` … 正常な未ログイン。`configured` は Admin + Web API キーの有無 |
+| Cookie あり・有効 | **200** | `{ user: SessionUser, configured: true }` |
 | Cookie あり・失効 / 改ざん | **401** | `AUTH_UNAUTHENTICATED` |
 
 `AUTH_UNAUTHENTICATED` は **「Cookie が付いているのに無効」** のみ。初回訪問の未ログインは 200 + `user: null`。
@@ -89,12 +90,13 @@ HTTP 目安:
 | secure | 本番のみ true |
 | maxAge | 5 日（上限 14 日） |
 
-**signin フロー（199-02 で実装）:**
+**signin フロー（PJ1-201 更新）:**
 
-1. `POST /api/auth/signin` で `idToken` を受け取る
-2. Admin SDK `verifyIdToken(idToken)` で UID を検証
-3. Admin SDK `createSessionCookie(idToken, { expiresIn })` で session cookie 文字列を生成
-4. `Set-Cookie: __session=...` を返す
+1. `POST /api/auth/signin` で `email` / `password` を受け取る
+2. サーバーが Identity Toolkit REST で `idToken` を取得（`FIREBASE_WEB_API_KEY`）
+3. Admin SDK `verifyIdToken(idToken)` で UID を検証
+4. Admin SDK `createSessionCookie(idToken, { expiresIn })` で session cookie 文字列を生成
+5. `Set-Cookie: __session=...` を返す
 
 **signup フロー（199-03）:** Admin SDK `createUser` + 確認メール送信。Cookie はセットしない。
 
@@ -113,7 +115,7 @@ HTTP 目安:
 | AUTH_NETWORK | auth/network-request-failed |
 | AUTH_NOT_CONFIGURED | サーバー秘密情報が未設定 |
 | AUTH_UNAUTHENTICATED | **Cookie あり・無効**（未ログインの 200 とは別） |
-| AUTH_VALIDATION | email/password または idToken 欠落 |
+| AUTH_VALIDATION | email/password 欠落 |
 | AUTH_INTERNAL | その他 |
 
 ## 同期 API
@@ -209,18 +211,14 @@ HTTP 目安:
 
 ## サーバー環境変数（199-02 で配線）
 
-クライアント公開（既存）:
+サーバー専用（リポジトリにコミットしない。`NEXT_PUBLIC_*` は使わない）:
 
-- `NEXT_PUBLIC_FIREBASE_API_KEY`（サインイン時の Identity Toolkit REST で使う。未設定だとログイン UI は出ない）
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` / `PROJECT_ID` / `APP_ID` / `STORAGE_BUCKET` / `MESSAGING_SENDER_ID` はログイン判定には使わない。クライアント SDK 初期化（`getFirebaseConfig`）を残している間だけ、その初期化側が参照する
-
-サーバー専用（リポジトリにコミットしない）:
-
+- `FIREBASE_WEB_API_KEY`（Identity Toolkit REST。未設定だと `configured: false` でログイン UI は出ない）
 - `FIREBASE_ADMIN_PROJECT_ID`
 - `FIREBASE_ADMIN_CLIENT_EMAIL`
 - `FIREBASE_ADMIN_PRIVATE_KEY`
 
-クライアント SDK の Auth 永続化（IndexedDB）は API 移行後に廃止する。セッション復元は `GET /api/auth/session`。
+クライアントは Firebase SDK を使わない。セッション復元は `GET /api/auth/session`。
 
 ## 非スコープ（親チケットどおり）
 

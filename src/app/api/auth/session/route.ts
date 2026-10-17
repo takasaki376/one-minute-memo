@@ -1,3 +1,4 @@
+import { isAuthConfigured } from "@/lib/auth/authConfigured";
 import { clearAuthCookie, getAuthCookie } from "@/lib/auth/authCookies";
 import { handleSessionGet } from "@/lib/auth/sessionHandler";
 import { verifyAuthSessionCookie } from "@/lib/auth/sessionToken";
@@ -7,5 +8,6 @@ export async function GET(): Promise<Response> {
     getAuthCookie,
     verifySessionCookie: verifyAuthSessionCookie,
     clearAuthCookie,
+    isAuthConfigured,
   });
 }

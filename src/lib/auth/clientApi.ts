@@ -80,7 +80,7 @@ async function parseAuthResult<T>(response: Response): Promise<T> {
 
 export async function fetchAuthSession(
   fetchImpl: AuthFetch = fetch,
-): Promise<SessionUser | null> {
+): Promise<AuthSessionData> {
   const response = await authFetch(fetchImpl, "/api/auth/session", {
     method: "GET",
     credentials: "same-origin",
@@ -88,22 +88,36 @@ export async function fetchAuthSession(
 
   // Invalid cookie: treat as logged out (server already cleared when possible)
   if (response.status === 401) {
-    return null;
+    return { user: null, configured: true };
   }
 
-  const data = await parseAuthResult<AuthSessionData>(response);
-  return data.user;
+  if (!response.ok) {
+    try {
+      const failure = (await response.clone().json()) as ApiResult<unknown>;
+      if (
+        !failure.success &&
+        failure.error?.code === AUTH_ERROR_CODES.NOT_CONFIGURED
+      ) {
+        return { user: null, configured: false };
+      }
+    } catch {
+      // fall through to parseAuthResult
+    }
+  }
+
+  return parseAuthResult<AuthSessionData>(response);
 }
 
 export async function postAuthSignIn(
-  idToken: string,
+  email: string,
+  password: string,
   fetchImpl: AuthFetch = fetch,
 ): Promise<SessionUser> {
   const response = await authFetch(fetchImpl, "/api/auth/signin", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ email, password }),
   });
 
   const data = await parseAuthResult<AuthSignInData>(response);

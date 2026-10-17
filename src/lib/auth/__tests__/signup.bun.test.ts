@@ -20,11 +20,11 @@ const { createAuthUser, sendSignupVerificationEmail } = await import(
 
 describe("sendSignupVerificationEmail", () => {
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-api-key";
+    process.env.FIREBASE_WEB_API_KEY = "test-api-key";
   });
 
   it("throws AuthNotConfiguredError when API key is missing", async () => {
-    delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    delete process.env.FIREBASE_WEB_API_KEY;
     await expect(
       sendSignupVerificationEmail("user@example.com", "secret1"),
     ).rejects.toBeInstanceOf(AuthNotConfiguredError);
@@ -74,7 +74,7 @@ describe("createAuthUser", () => {
     deleteUser.mockReset();
     createUser.mockImplementation(async () => ({ uid: "uid-1" }));
     deleteUser.mockImplementation(async () => undefined);
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "test-api-key";
+    process.env.FIREBASE_WEB_API_KEY = "test-api-key";
   });
 
   it("creates a user and sends verification email", async () => {
