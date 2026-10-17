@@ -79,7 +79,8 @@ export function AuthSection() {
 
       {!isLoading && !sessionError && !isConfigured && (
         <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-          認証機能は Firebase 未設定のため利用できません。環境変数を設定すると有効になります。
+          認証機能は Firebase
+          未設定のため利用できません。環境変数を設定すると有効になります。
         </p>
       )}
 
