@@ -1,5 +1,3 @@
-import { FirebaseError } from "firebase/app";
-
 import {
   SYNC_ERROR_CODES,
   SYNC_ERROR_MESSAGES,
@@ -22,9 +20,22 @@ export const SYNC_PERMISSION_ERROR_MESSAGE =
 export const SYNC_OTHER_DEVICE_HINT =
   "他の端末で同期された可能性があります。最新データを取り込むには同期してください。";
 
+function errorCodeOf(error: unknown): string | null {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return (error as { code: string }).code;
+  }
+  return null;
+}
+
 export function toSyncErrorMessage(error: unknown): string {
-  if (error instanceof FirebaseError) {
-    return syncErrorMessage(toSyncErrorCode(error.code));
+  const code = errorCodeOf(error);
+  if (code) {
+    return syncErrorMessage(toSyncErrorCode(code));
   }
 
   if (error instanceof Error && error.message.length > 0) {
