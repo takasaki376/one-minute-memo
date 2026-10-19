@@ -54,6 +54,33 @@ describe("useAuth", () => {
     });
 
     expect(result.current.isConfigured).toBe(false);
+    expect(result.current.sessionError).toBeNull();
+  });
+
+  it("keeps login available when session restore fails", async () => {
+    mockFetchAuthSession.mockRejectedValue(new Error("Failed to fetch"));
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.isConfigured).toBe(true);
+    expect(result.current.user).toBeNull();
+    expect(result.current.sessionError).toBeTruthy();
+
+    mockFetchAuthSession.mockResolvedValue({
+      user: null,
+      configured: true,
+    });
+
+    await act(async () => {
+      await result.current.refreshSession();
+    });
+
+    expect(result.current.sessionError).toBeNull();
+    expect(result.current.isConfigured).toBe(true);
   });
 
   it("restores SessionUser from GET /api/auth/session", async () => {
