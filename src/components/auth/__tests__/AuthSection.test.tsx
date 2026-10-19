@@ -20,6 +20,8 @@ describe("AuthSection", () => {
       user: null,
       isLoading: false,
       isConfigured: false,
+      sessionError: null,
+      refreshSession: vi.fn(),
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
@@ -30,11 +32,36 @@ describe("AuthSection", () => {
     expect(screen.getByText(/Firebase 未設定/)).toBeInTheDocument();
   });
 
+  it("shows retry when session restore fails", async () => {
+    const refreshSession = vi.fn().mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isLoading: false,
+      isConfigured: true,
+      sessionError: "ネットワークエラーが発生しました",
+      refreshSession,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    const user = userEvent.setup();
+    render(<AuthSection />);
+
+    expect(
+      screen.getByText("ネットワークエラーが発生しました"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByTestId("auth-refresh-session"));
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
   it("shows login and signup buttons when logged out", () => {
     mockUseAuth.mockReturnValue({
       user: null,
       isLoading: false,
       isConfigured: true,
+      sessionError: null,
+      refreshSession: vi.fn(),
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
@@ -55,6 +82,8 @@ describe("AuthSection", () => {
       },
       isLoading: false,
       isConfigured: true,
+      sessionError: null,
+      refreshSession: vi.fn(),
       signIn: vi.fn(),
       signUp: vi.fn(),
       signOut: mockSignOut,

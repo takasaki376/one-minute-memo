@@ -3,9 +3,12 @@ import {
   type AuthErrorCode,
 } from "./errorContract";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export type SigninValidationSuccess = {
   ok: true;
-  idToken: string;
+  email: string;
+  password: string;
 };
 
 export type SigninValidationFailure = {
@@ -22,10 +25,22 @@ export function validateSigninBody(body: unknown): SigninValidationResult {
     return { ok: false, code: AUTH_ERROR_CODES.VALIDATION };
   }
 
-  const idToken = (body as Record<string, unknown>).idToken;
-  if (typeof idToken !== "string" || idToken.trim().length === 0) {
+  const record = body as Record<string, unknown>;
+  const email = record.email;
+  const password = record.password;
+
+  if (typeof email !== "string" || typeof password !== "string") {
     return { ok: false, code: AUTH_ERROR_CODES.VALIDATION };
   }
 
-  return { ok: true, idToken: idToken.trim() };
+  const trimmedEmail = email.trim();
+  if (!trimmedEmail || password.length === 0) {
+    return { ok: false, code: AUTH_ERROR_CODES.VALIDATION };
+  }
+
+  if (!EMAIL_PATTERN.test(trimmedEmail)) {
+    return { ok: false, code: AUTH_ERROR_CODES.INVALID_EMAIL };
+  }
+
+  return { ok: true, email: trimmedEmail, password };
 }

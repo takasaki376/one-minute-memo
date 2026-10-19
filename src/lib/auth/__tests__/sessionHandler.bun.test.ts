@@ -12,12 +12,30 @@ describe("handleSessionGet", () => {
         throw new Error("should not be called");
       }),
       clearAuthCookie: mock(async () => undefined),
+      isAuthConfigured: () => true,
     });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       success: true,
-      data: { user: null },
+      data: { user: null, configured: true },
+    });
+  });
+
+  it("returns configured false when auth env is incomplete", async () => {
+    const response = await handleSessionGet({
+      getAuthCookie: mock(async () => undefined),
+      verifySessionCookie: mock(async () => {
+        throw new Error("should not be called");
+      }),
+      clearAuthCookie: mock(async () => undefined),
+      isAuthConfigured: () => false,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      data: { user: null, configured: false },
     });
   });
 
@@ -32,6 +50,7 @@ describe("handleSessionGet", () => {
       getAuthCookie: mock(async () => "valid-session"),
       verifySessionCookie,
       clearAuthCookie: mock(async () => undefined),
+      isAuthConfigured: () => false,
     });
 
     expect(response.status).toBe(200);
@@ -43,6 +62,7 @@ describe("handleSessionGet", () => {
           email: "user@example.com",
           emailVerified: true,
         },
+        configured: true,
       },
     });
     expect(verifySessionCookie).toHaveBeenCalledWith("valid-session");
@@ -59,6 +79,7 @@ describe("handleSessionGet", () => {
         });
       }),
       clearAuthCookie,
+      isAuthConfigured: () => true,
     });
 
     expect(response.status).toBe(401);
@@ -79,6 +100,7 @@ describe("handleSessionGet", () => {
         throw new AuthNotConfiguredError();
       }),
       clearAuthCookie: mock(async () => undefined),
+      isAuthConfigured: () => false,
     });
 
     expect(response.status).toBe(500);

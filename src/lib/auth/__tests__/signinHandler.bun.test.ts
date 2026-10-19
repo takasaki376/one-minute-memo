@@ -5,7 +5,7 @@ import { AUTH_SESSION_COOKIE } from "../sessionCookie";
 import { handleSigninPost } from "../signinHandler";
 
 describe("handleSigninPost", () => {
-  it("returns 400 AUTH_VALIDATION for missing idToken", async () => {
+  it("returns 400 AUTH_VALIDATION for missing credentials", async () => {
     const response = await handleSigninPost(
       new Request("http://localhost/api/auth/signin", {
         method: "POST",
@@ -13,7 +13,7 @@ describe("handleSigninPost", () => {
         body: JSON.stringify({}),
       }),
       {
-        signInWithIdToken: mock(async () => {
+        signInWithPassword: mock(async () => {
           throw new Error("should not be called");
         }),
         setAuthCookie: mock(async () => undefined),
@@ -32,7 +32,7 @@ describe("handleSigninPost", () => {
 
   it("sets session cookie and returns SessionUser on success", async () => {
     const setAuthCookie = mock(async () => undefined);
-    const signInWithIdToken = mock(async () => ({
+    const signInWithPassword = mock(async () => ({
       sessionCookie: "session-cookie-1",
       user: {
         uid: "uid-1",
@@ -45,9 +45,12 @@ describe("handleSigninPost", () => {
       new Request("http://localhost/api/auth/signin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: "id-token-1" }),
+        body: JSON.stringify({
+          email: "user@example.com",
+          password: "password123",
+        }),
       }),
-      { signInWithIdToken, setAuthCookie },
+      { signInWithPassword, setAuthCookie },
     );
 
     expect(response.status).toBe(200);
@@ -61,24 +64,28 @@ describe("handleSigninPost", () => {
         },
       },
     });
-    expect(signInWithIdToken).toHaveBeenCalledWith("id-token-1");
+    expect(signInWithPassword).toHaveBeenCalledWith(
+      "user@example.com",
+      "password123",
+    );
     expect(setAuthCookie).toHaveBeenCalledWith("session-cookie-1");
-    // Route Handler uses setAuthCookie (httpOnly __session); response body has no Set-Cookie
-    // when deps mock cookie writes — contract cookie name for reference:
     expect(AUTH_SESSION_COOKIE.name).toBe("__session");
   });
 
-  it("maps invalid id token to AUTH_INVALID_CREDENTIAL", async () => {
+  it("maps invalid credentials to AUTH_INVALID_CREDENTIAL", async () => {
     const response = await handleSigninPost(
       new Request("http://localhost/api/auth/signin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: "bad-token" }),
+        body: JSON.stringify({
+          email: "user@example.com",
+          password: "bad",
+        }),
       }),
       {
-        signInWithIdToken: mock(async () => {
+        signInWithPassword: mock(async () => {
           throw Object.assign(new Error("invalid"), {
-            code: "auth/invalid-id-token",
+            code: "auth/invalid-credential",
           });
         }),
         setAuthCookie: mock(async () => undefined),
@@ -100,10 +107,13 @@ describe("handleSigninPost", () => {
       new Request("http://localhost/api/auth/signin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: "not-a-jwt" }),
+        body: JSON.stringify({
+          email: "user@example.com",
+          password: "password123",
+        }),
       }),
       {
-        signInWithIdToken: mock(async () => {
+        signInWithPassword: mock(async () => {
           throw Object.assign(new Error("argument error"), {
             code: "auth/argument-error",
           });
