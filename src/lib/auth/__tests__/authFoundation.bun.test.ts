@@ -51,6 +51,16 @@ describe("toSignInApiError", () => {
     const result = toSignInApiError(new AuthNotConfiguredError());
     expect(result.error.code).toBe(AUTH_ERROR_CODES.NOT_CONFIGURED);
   });
+
+  it("keeps AUTH_NETWORK from Identity Toolkit exchange failures", () => {
+    const result = toSignInApiError({ code: "auth/network-request-failed" });
+    expect(result.error.code).toBe(AUTH_ERROR_CODES.NETWORK);
+  });
+
+  it("keeps AUTH_INTERNAL from upstream response failures", () => {
+    const result = toSignInApiError({ code: "auth/internal-error" });
+    expect(result.error.code).toBe(AUTH_ERROR_CODES.INTERNAL);
+  });
 });
 
 describe("authErrorHttpStatus", () => {
