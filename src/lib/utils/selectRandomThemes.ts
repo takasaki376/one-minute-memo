@@ -1,21 +1,81 @@
 import type { ThemeRecord } from '@/types/theme';
 
+type RandomSource = () => number;
+
+export type SelectRandomThemesOptions = {
+  /** テーマIDごとの登録メモ数。未指定のテーマは 0 件として扱う */
+  memoCounts?: Record<string, number>;
+  /** [0, 1) の乱数。テスト用。省略時は crypto の一様整数 */
+  random?: RandomSource;
+};
+
 /**
- * 配列をシャッフルする（Fisher-Yatesアルゴリズムの簡易版）
- * @param array シャッフルする配列
- * @returns シャッフルされた新しい配列（元の配列は変更しない）
+ * [0, max) の一様な整数。
+ * Math.random() * max の端数バイアスを避けるため、省略時は rejection sampling する。
  */
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+function randomInt(max: number, random?: RandomSource): number {
+  if (max <= 1) {
+    return 0;
   }
-  return shuffled;
+
+  if (random) {
+    const index = Math.floor(random() * max);
+    if (index < 0) {
+      return 0;
+    }
+    if (index >= max) {
+      return max - 1;
+    }
+    return index;
+  }
+
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj?.getRandomValues) {
+    return Math.floor(Math.random() * max);
+  }
+
+  const limit = Math.floor(0x100000000 / max) * max;
+  const buf = new Uint32Array(1);
+  let value = 0;
+  do {
+    cryptoObj.getRandomValues(buf);
+    value = buf[0] ?? 0;
+  } while (value >= limit);
+  return value % max;
+}
+
+function memoCountFor(
+  themeId: string,
+  memoCounts: Record<string, number>,
+): number {
+  const value = memoCounts[themeId];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+  return Math.floor(value);
 }
 
 /**
- * 有効なテーマからランダムに指定数だけ選ぶ
+ * 配列から count 件を重複なく一様に選ぶ（部分 Fisher-Yates）。
+ * 元の配列位置が選ばれやすさを決めない。
+ */
+function sampleWithoutReplacement<T>(
+  items: readonly T[],
+  count: number,
+  random?: RandomSource,
+): T[] {
+  const copy = [...items];
+  const picked = Math.min(count, copy.length);
+  for (let i = 0; i < picked; i++) {
+    const j = i + randomInt(copy.length - i, random);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, picked);
+}
+
+/**
+ * 有効なテーマから指定数だけ選ぶ。
+ * 登録メモが少ないテーマを優先し、同じ件数の中では一様に選ぶ。
  * @param themes テーマの配列（isActive === true のもののみが渡される想定）
  * @param count 選ぶ数（デフォルト: 10）
  * @returns 選ばれたテーマの配列（重複なし、ランダムな順序）
@@ -23,27 +83,50 @@ function shuffleArray<T>(array: T[]): T[] {
 export function selectRandomThemes(
   themes: ThemeRecord[],
   count = 10,
+  options?: SelectRandomThemesOptions,
 ): ThemeRecord[] {
-  // エッジケース: テーマが0件の場合は空配列を返す
   if (themes.length === 0) {
     return [];
   }
 
-  // エッジケース: countが0以下の場合は空配列を返す
   const safeCount = Math.max(0, count);
+  if (safeCount === 0) {
+    return [];
+  }
 
-  // エッジケース: テーマ数が指定数より少ない場合は、すべてのテーマを返す
   const actualCount = Math.min(safeCount, themes.length);
+  const memoCounts = options?.memoCounts ?? {};
+  const groups = new Map<number, ThemeRecord[]>();
 
-  // 配列をコピーしてシャッフル（元の配列を破壊しない）
-  const shuffled = shuffleArray(themes);
+  for (const theme of themes) {
+    const memoCount = memoCountFor(theme.id, memoCounts);
+    const bucket = groups.get(memoCount);
+    if (bucket) {
+      bucket.push(theme);
+    } else {
+      groups.set(memoCount, [theme]);
+    }
+  }
 
-  // 先頭のactualCount件を取得
-  return shuffled.slice(0, actualCount);
+  const selected: ThemeRecord[] = [];
+  const orderedCounts = [...groups.keys()].sort((a, b) => a - b);
+  for (const memoCount of orderedCounts) {
+    if (selected.length >= actualCount) {
+      break;
+    }
+    const bucket = groups.get(memoCount) ?? [];
+    const remaining = actualCount - selected.length;
+    selected.push(
+      ...sampleWithoutReplacement(bucket, remaining, options?.random),
+    );
+  }
+
+  return sampleWithoutReplacement(selected, selected.length, options?.random);
 }
 
 /**
- * 有効なテーマを取得してランダムに指定数だけ選ぶ（DB連携版）
+ * 有効なテーマを取得して指定数だけ選ぶ（DB連携版）
+ * メモ数が少ないテーマを優先する。
  * @param count 選ぶ数（デフォルト: 10）
  * @returns 選ばれたテーマの配列（重複なし、ランダムな順序）
  */
@@ -51,6 +134,10 @@ export async function pickRandomActiveThemes(
   count = 10,
 ): Promise<ThemeRecord[]> {
   const { getActiveThemes } = await import('@/lib/db/themesRepo');
+  const { getMemoCountsByThemeIds } = await import('@/lib/db/memosRepo');
   const activeThemes = await getActiveThemes();
-  return selectRandomThemes(activeThemes, count);
+  const memoCounts = await getMemoCountsByThemeIds(
+    activeThemes.map((theme) => theme.id),
+  );
+  return selectRandomThemes(activeThemes, count, { memoCounts });
 }
