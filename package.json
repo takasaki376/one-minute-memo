@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "NODE_OPTIONS='--require ./scripts/resolve-ts6-for-eslint.cjs' eslint",
     "test": "bun run test:bun && bun run test:vitest",
     "test:bun": "bun ./scripts/run-bun-tests.ts",
     "test:vitest": "vitest run",
@@ -23,7 +23,7 @@
     "firebase-admin": "^14.3.0",
     "idb": "^8.0.3",
     "jotai": "^2.16.0",
-    "next": "16.3.0",
+    "next": "16.4.3",
     "perfect-freehand": "^1.2.3",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
@@ -43,12 +43,15 @@
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/ui": "^1.0.4",
     "eslint": "^9",
-    "eslint-config-next": "16.3.0",
+    "eslint-config-next": "16.4.3",
     "jsdom": "^23.0.1",
     "serwist": "^9.5.11",
     "tailwindcss": "^4",
     "typescript": "7.0.2",
     "vitest": "^1.0.4"
   },
-  "packageManager": "bun@1.4.0"
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "node": "22.x"
+  }
 }
