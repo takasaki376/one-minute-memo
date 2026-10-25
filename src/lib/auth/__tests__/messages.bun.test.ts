@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { FirebaseError } from "firebase/app";
 
 import { AuthApiError } from "../clientApi";
 import { AUTH_ERROR_CODES } from "../errorContract";
@@ -10,14 +9,18 @@ import {
 
 describe("toAuthErrorMessage", () => {
   it("maps invalid credential to Japanese message", () => {
-    const error = new FirebaseError("auth/invalid-credential", "Invalid");
+    const error = Object.assign(new Error("Invalid"), {
+      code: "auth/invalid-credential",
+    });
     expect(toAuthErrorMessage(error)).toBe(
       "メールアドレスまたはパスワードが正しくありません",
     );
   });
 
   it("maps email already in use", () => {
-    const error = new FirebaseError("auth/email-already-in-use", "In use");
+    const error = Object.assign(new Error("In use"), {
+      code: "auth/email-already-in-use",
+    });
     expect(toAuthErrorMessage(error)).toBe(
       "このメールアドレスは既に登録されています",
     );

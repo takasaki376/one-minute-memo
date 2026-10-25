@@ -34,19 +34,15 @@ function hasSessionCookie(route: Route): boolean {
 }
 
 /**
- * 認証 API と Identity Toolkit を差し替える。
+ * 認証 API を差し替える。
  * セッションは `__session` Cookie の有無で判定し、サインインで付与、サインアウトで削除する。
  */
 export async function installAuthRouteMocks(page: Page): Promise<void> {
-  await page.route("**/identitytoolkit.googleapis.com/**", async (route) => {
-    await json(route, 200, { idToken: "e2e-id-token" });
-  });
-
   await page.route("**/api/auth/session", async (route) => {
     const user = hasSessionCookie(route) ? E2E_SESSION_USER : null;
     await json(route, 200, {
       success: true,
-      data: { user },
+      data: { user, configured: true },
     });
   });
 

@@ -14,7 +14,10 @@ import { validateSigninBody } from "@/lib/auth/signinValidation";
 import type { AuthSignInData, SessionUser } from "@/types/auth";
 
 export type SigninHandlerDeps = {
-  signInWithIdToken: (idToken: string) => Promise<{
+  signInWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<{
     user: SessionUser;
     sessionCookie: string;
   }>;
@@ -47,7 +50,10 @@ export async function handleSigninPost(
   }
 
   try {
-    const session = await deps.signInWithIdToken(validated.idToken);
+    const session = await deps.signInWithPassword(
+      validated.email,
+      validated.password,
+    );
     await deps.setAuthCookie(session.sessionCookie);
     const data: AuthSignInData = { user: session.user };
     return NextResponse.json(ok(data), { status: 200 });

@@ -1,4 +1,3 @@
-
 # 📘 one-minute-memo
 
 **One Minute Memo（1 分メモ）** は、短時間で思考を書き出すトレーニングをサポートする Web アプリです。
@@ -154,29 +153,23 @@ http://localhost:3000
 
 `.env.example` を `.env.local` にコピーし、値を入れます。秘密情報はコミットしません。変更後は開発サーバーを再起動します。
 
-クライアントに公開される値:
+サーバー専用（クライアントには公開しない）:
 
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`（任意）
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`（任意）
-
-サーバー専用（Firebase コンソールのサービスアカウント秘密鍵）:
-
+- `FIREBASE_WEB_API_KEY`（Identity Toolkit REST。Firebase コンソールの Web API キー。無いとログイン画面は出ない）
 - `FIREBASE_ADMIN_PROJECT_ID`
 - `FIREBASE_ADMIN_CLIENT_EMAIL`
 - `FIREBASE_ADMIN_PRIVATE_KEY`（改行は `\n` のまま 1 行にし、全体をダブルクォートで囲む）
 
+以前の `NEXT_PUBLIC_FIREBASE_*` は不要です。`.env.local` に残っていれば削除して構いません（このリポジトリは `.env.local` を変更しません）。
+
 `*firebase-adminsdk*.json` は `.gitignore` 対象です。JSON から値を写したら、ファイルをリポジトリに含めないでください。
 
-| 操作 | 経路 |
-| --- | --- |
-| サインアップ | `POST /api/auth/signup`。Cookie は付かない。確認メール後にログインする |
-| サインイン | ブラウザが Identity Toolkit REST で ID トークンを取得し、`POST /api/auth/signin` が `__session` を発行する |
-| 復元 | `GET /api/auth/session` |
-| サインアウト | `POST /api/auth/signout` |
+| 操作         | 経路                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| サインアップ | `POST /api/auth/signup`。Cookie は付かない。確認メール後にログインする                                               |
+| サインイン   | `POST /api/auth/signin` に email/password。サーバーが Identity Toolkit で ID トークンを取得し `__session` を発行する |
+| 復元         | `GET /api/auth/session`                                                                                              |
+| サインアウト | `POST /api/auth/signout`                                                                                             |
 
 制約:
 
@@ -189,13 +182,13 @@ http://localhost:3000
 
 単体・コンポーネントテストは **Bun + Vitest のハイブリッド**です。
 
-| コマンド | 内容 |
-| --- | --- |
-| `bun run test` | Bun 対象 → Vitest 対象を順に実行（推奨） |
-| `bun run test:bun` | `src/**/*.bun.test.ts(x)` のみ（`scripts/run-bun-tests.ts` → Bun） |
-| `bun run test:vitest` | `*.test.ts` / `*.test.tsx`（Vitest + jsdom） |
-| `bun run test:watch` | Vitest の watch モード |
-| `bun run test:e2e` | Playwright E2E（初回のみ `bunx playwright install chromium`） |
+| コマンド              | 内容                                                               |
+| --------------------- | ------------------------------------------------------------------ |
+| `bun run test`        | Bun 対象 → Vitest 対象を順に実行（推奨）                           |
+| `bun run test:bun`    | `src/**/*.bun.test.ts(x)` のみ（`scripts/run-bun-tests.ts` → Bun） |
+| `bun run test:vitest` | `*.test.ts` / `*.test.tsx`（Vitest + jsdom）                       |
+| `bun run test:watch`  | Vitest の watch モード                                             |
+| `bun run test:e2e`    | Playwright E2E（初回のみ `bunx playwright install chromium`）      |
 
 **どちらに書くか**
 

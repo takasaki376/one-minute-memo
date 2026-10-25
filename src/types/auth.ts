@@ -11,13 +11,16 @@ export interface AuthCredentials {
   password: string;
 }
 
-/** signin 成功後、Admin が session cookie を発行する前段の ID token */
+/** サーバーが Identity Toolkit + Admin でセッションを発行する */
 export interface AuthSignInRequest {
-  idToken: string;
+  email: string;
+  password: string;
 }
 
 export interface AuthSessionData {
   user: SessionUser | null;
+  /** Admin + Web API キーが揃っているか（ログイン UI の有効判定） */
+  configured: boolean;
 }
 
 export interface AuthSignInData {

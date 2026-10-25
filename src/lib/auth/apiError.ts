@@ -65,10 +65,21 @@ export function toAuthApiError(error: unknown): ApiFailure {
   );
 }
 
+const SIGNIN_PRESERVED_CODES: ReadonlySet<string> = new Set([
+  AUTH_ERROR_CODES.NOT_CONFIGURED,
+  AUTH_ERROR_CODES.NETWORK,
+  AUTH_ERROR_CODES.INTERNAL,
+  AUTH_ERROR_CODES.TOO_MANY_REQUESTS,
+  AUTH_ERROR_CODES.USER_DISABLED,
+  AUTH_ERROR_CODES.INVALID_EMAIL,
+  AUTH_ERROR_CODES.WEAK_PASSWORD,
+  AUTH_ERROR_CODES.EMAIL_ALREADY_IN_USE,
+]);
+
 /**
- * Sign-in (verifyIdToken / createSessionCookie) failures map to
- * AUTH_INVALID_CREDENTIAL per PJ1-199-01, except infra / account-state codes.
- * Without this, auth/argument-error becomes AUTH_VALIDATION (400).
+ * Sign-in failures from Identity Toolkit exchange keep infra / account codes.
+ * verifyIdToken / createSessionCookie style failures (e.g. auth/argument-error)
+ * still normalize to AUTH_INVALID_CREDENTIAL per PJ1-199-01.
  */
 export function toSignInApiError(error: unknown): ApiFailure {
   if (error instanceof AuthNotConfiguredError) {
@@ -79,10 +90,7 @@ export function toSignInApiError(error: unknown): ApiFailure {
   }
 
   const failure = toAuthApiError(error);
-  if (
-    failure.error.code === AUTH_ERROR_CODES.TOO_MANY_REQUESTS ||
-    failure.error.code === AUTH_ERROR_CODES.USER_DISABLED
-  ) {
+  if (SIGNIN_PRESERVED_CODES.has(failure.error.code)) {
     return failure;
   }
 
