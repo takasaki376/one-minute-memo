@@ -50,5 +50,8 @@
     "typescript": "7.0.2",
     "vitest": "^1.0.4"
   },
-  "packageManager": "bun@1.4.0"
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "node": "22.x"
+  }
 }
