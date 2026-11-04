@@ -17,6 +17,9 @@
     "postinstall": "node ./scripts/postinstall-playwright.mjs",
     "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit"
   },
+  "overrides": {
+    "jose": "5.10.0"
+  },
   "dependencies": {
     "@serwist/next": "^9.5.11",
     "classcat": "^5.0.5",
