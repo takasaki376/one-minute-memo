@@ -17,7 +17,7 @@ import {
   postAuthSignUp,
 } from "@/lib/auth/clientApi";
 import { AUTH_ERROR_CODES, authErrorMessage } from "@/lib/auth/errorContract";
-import type { SessionUser } from "@/types/auth";
+import type { AuthSessionData, SessionUser } from "@/types/auth";
 
 export type AuthContextValue = {
   user: SessionUser | null;
@@ -46,26 +46,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
+  const applySession = useCallback((session: AuthSessionData) => {
+    setUser(session.user);
+    setIsConfigured(session.configured);
+    setSessionError(null);
+    setIsLoading(false);
+  }, []);
+
+  const applySessionFailure = useCallback((error: unknown) => {
+    // 通信失敗を「未設定」にしない。ログイン入口は残し、再試行で復旧できる。
+    setUser(null);
+    setIsConfigured(true);
+    setSessionError(sessionFailureMessage(error));
+    setIsLoading(false);
+  }, []);
+
   const refreshSession = useCallback(async () => {
     setIsLoading(true);
     setSessionError(null);
     try {
-      const session = await fetchAuthSession();
-      setUser(session.user);
-      setIsConfigured(session.configured);
+      applySession(await fetchAuthSession());
     } catch (error) {
-      // 通信失敗を「未設定」にしない。ログイン入口は残し、再試行で復旧できる。
-      setUser(null);
-      setIsConfigured(true);
-      setSessionError(sessionFailureMessage(error));
-    } finally {
-      setIsLoading(false);
+      applySessionFailure(error);
     }
-  }, []);
+  }, [applySession, applySessionFailure]);
 
   useEffect(() => {
-    void refreshSession();
-  }, [refreshSession]);
+    let cancelled = false;
+
+    fetchAuthSession()
+      .then((session) => {
+        if (!cancelled) {
+          applySession(session);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          applySessionFailure(error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applySession, applySessionFailure]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const nextUser = await postAuthSignIn(email.trim(), password);

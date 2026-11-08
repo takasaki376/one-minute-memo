@@ -98,7 +98,7 @@ export interface SyncPullData extends SyncMutationCounts {
   lastSyncedAt: string;
 }
 
-export interface SyncRunData extends SyncPullData {}
+export type SyncRunData = SyncPullData;
 
 export type SyncResponse =
   | ApiResult<SyncStateData>

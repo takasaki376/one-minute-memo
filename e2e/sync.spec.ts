@@ -18,6 +18,7 @@ test.describe("同期API経由の設定画面", () => {
               email: "e2e@example.com",
               emailVerified: true,
             },
+            configured: true,
           },
         }),
       });

@@ -53,3 +53,36 @@ Next.js の不具合を修正し、安心して開発・運用を続けられる
 - 不具合の再現条件がある場合、更新後に解消を確認できている。
 - lint、型チェック、テスト、本番ビルドが成功している。
 - 更新に伴う追加変更と検証結果が記録されている。
+
+---
+
+## 6. 実施結果
+
+### 対象と更新先
+
+16.3.0 には、公式の 2026-09 セキュリティリリース（修正版 16.3.8）と 2026-10-14 の追加修正（[Next.js Security Update](https://nextjs.org/blog/nextjs-security-update-october-14-2026)、修正版 16.4.1）が未適用。16.4.2 / 16.4.3 はその修正を含むバグフィックスのバックポート。更新先は最新の **16.4.3**（`eslint-config-next` も同版）。
+
+16.4.1 で塞がれる主な項目:
+
+- `use cache` が複数の typed array を返す場合の未認証 RCE（GHSA-673q-mjm6-r5xr）
+- Image Optimization の SVG 経由の未認証 RCE（CVE-2026-96889 / GHSA-2464-fhr4-w9xw）
+- Server Actions への細工リクエストによる DoS（GHSA-p3m5-59mp-jv5r）
+
+このアプリは Cache Components、`next/image` のリモート最適化、Server Actions を使っていない。再現条件はなく、修正版へ上げることで同一系統の欠陥を避ける。
+
+16.4 の Cache Components は既存アプリでは任意。`cacheComponents` は有効にしていない。`experimental.useTypeScriptCli` は 16.4 で既定が有効だが、TypeScript 7 の `tsc` を明示するため設定は残した。
+
+### 互換のための追加変更
+
+- `eslint-config-next@16.4.3` の typescript-eslint は TypeScript 7 を読み込むと即失敗する。`bun run lint` で既存の `scripts/resolve-ts6-for-eslint.cjs` を読むようにした。
+- `react-hooks/set-state-in-effect` により、セッション復元の effect から同期 `setState` できなくなった。取得結果の反映は Promise のコールバックに移した。
+- `SyncRunData` の空 interface を type alias にした（`@typescript-eslint/no-empty-object-type`）。
+- e2e の同期シナリオがセッション応答の `configured` を欠いていたため、ログイン済みモックに `configured: true` を足した。
+
+### 検証
+
+- `bun run lint` — エラー 0（既存 warning 9）
+- `bun run typecheck` — 成功
+- `bun run test` — 成功
+- `bun run build` — Next.js 16.4.3 (webpack) で成功
+- `bun run test:e2e` — 21 件成功（同期シナリオのモック修正後）

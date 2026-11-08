@@ -2,19 +2,19 @@
 
 ## 方針
 
-| 項目 | 採用 |
-| --- | --- |
-| パッケージ管理 / スクリプト実行 | Bun (`bun install` / `bun run …`) |
-| バージョン管理 | mise（`mise.toml`） |
-| ロックファイル | `bun.lock` のみ（`yarn.lock` は削除） |
-| Volta | 撤去（`package.json` の `volta` フィールド削除） |
+| 項目                            | 採用                                             |
+| ------------------------------- | ------------------------------------------------ |
+| パッケージ管理 / スクリプト実行 | Bun (`bun install` / `bun run …`)                |
+| バージョン管理                  | mise（`mise.toml`）                              |
+| ロックファイル                  | `bun.lock` のみ（`yarn.lock` は削除）            |
+| Volta                           | 撤去（`package.json` の `volta` フィールド削除） |
 
 将来の CI / CD でも **Bun + mise** を標準実行環境とする。
 
 ## バージョン固定
 
 - Bun: `1.4.0`（`packageManager` / `mise.toml` で一致）
-- Node: `20.20.2`（互換性保険。Playwright 等の Node CLI 向けに残す）
+- Node: `24.22.1`（互換性保険。Playwright 等の Node CLI 向けに残す）
 
 ## 既知の注意点
 
