@@ -5,5 +5,5 @@
 [tools]
 # 標準のパッケージマネージャ / スクリプト実行環境
 bun = "1.4.0"
-# 互換性保険（Playwright / 一部 CLI の Node 前提向け）。将来 CI でも必要になる可能性あり
-node = "20.20.2"
+# Vercel engines.node（22.x）と firebase-admin / jwks-rsa の要求に合わせる
+node = "22.23.4"

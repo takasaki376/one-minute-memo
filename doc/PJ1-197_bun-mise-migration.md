@@ -14,7 +14,7 @@
 ## バージョン固定
 
 - Bun: `1.4.0`（`packageManager` / `mise.toml` で一致）
-- Node: `20.20.2`（互換性保険。Playwright 等の Node CLI 向けに残す）
+- Node: `22.23.4`（Vercel `engines.node` の 22.x / firebase-admin 互換）
 
 ## 既知の注意点
 
