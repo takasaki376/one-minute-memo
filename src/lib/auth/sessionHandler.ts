@@ -9,6 +9,12 @@ import {
   toAuthApiError,
 } from "./apiError";
 import {
+  annotateAuthFailure,
+  createAuthRequestId,
+  logAuthHandlerFault,
+  resolveAuthFailureRequestId,
+} from "./authDiagnostics";
+import {
   AUTH_ERROR_CODES,
   authErrorMessage,
 } from "./errorContract";
@@ -34,14 +40,30 @@ export type SessionHandlerDeps = {
 export async function handleSessionGet(
   deps: SessionHandlerDeps,
 ): Promise<Response> {
+  const requestId = createAuthRequestId();
+  const route = "/api/auth/session";
+
   let sessionCookie: string | undefined;
   try {
     sessionCookie = await deps.getAuthCookie();
   } catch (error) {
-    const failure = toAuthApiError(error);
-    return NextResponse.json(failure, {
-      status: authErrorHttpStatus(asAuthErrorCode(failure.error.code)),
+    const annotated = annotateAuthFailure(error, {
+      stage: "cookie.read",
+      requestId,
+      diagnosticClass: "cookie.read_failed",
     });
+    const failure = toAuthApiError(annotated);
+    const status = authErrorHttpStatus(
+      asAuthErrorCode(failure.error.code),
+    );
+    logAuthHandlerFault({
+      error: annotated,
+      requestId,
+      route,
+      httpStatus: status,
+      publicErrorCode: failure.error.code,
+    });
+    return NextResponse.json(failure, { status });
   }
 
   if (!sessionCookie) {
@@ -59,10 +81,21 @@ export async function handleSessionGet(
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
     if (error instanceof AuthNotConfiguredError) {
-      const failure = toAuthApiError(error);
-      return NextResponse.json(failure, {
-        status: authErrorHttpStatus(AUTH_ERROR_CODES.NOT_CONFIGURED),
+      const annotated = annotateAuthFailure(error, {
+        stage: "admin.initialize",
+        requestId,
+        diagnosticClass: "config.missing_env",
       });
+      const failure = toAuthApiError(annotated);
+      const status = authErrorHttpStatus(AUTH_ERROR_CODES.NOT_CONFIGURED);
+      logAuthHandlerFault({
+        error: annotated,
+        requestId: resolveAuthFailureRequestId(annotated) || requestId,
+        route,
+        httpStatus: status,
+        publicErrorCode: failure.error.code,
+      });
+      return NextResponse.json(failure, { status });
     }
 
     try {
@@ -71,6 +104,7 @@ export async function handleSessionGet(
       // best-effort clear; still return unauthenticated
     }
 
+    // Invalid / expired session → 401 (not a server fault log)
     return NextResponse.json(
       fail(
         AUTH_ERROR_CODES.UNAUTHENTICATED,

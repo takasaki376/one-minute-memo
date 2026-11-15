@@ -2,6 +2,12 @@ import "server-only";
 
 import { getFirebaseWebApiKey } from "@/lib/firebase/webApiKey";
 
+import {
+  annotateAuthFailure,
+  classifyIdentityToolkitMessage,
+  listMissingFirebaseWebApiKeyEnvNames,
+  type AuthDiagnosticStage,
+} from "./authDiagnostics";
 import { AuthNotConfiguredError } from "./authErrors";
 
 type IdentityToolkitErrorBody = {
@@ -15,8 +21,19 @@ type IdentityToolkitSignInResponse = {
   idToken?: string;
 };
 
-export function identityToolkitError(code: string, message: string): Error {
-  return Object.assign(new Error(message), { code });
+export function identityToolkitError(
+  code: string,
+  message: string,
+  extras?: {
+    diagnosticClass?: string;
+    httpStatus?: number;
+  },
+): Error {
+  return Object.assign(new Error(message), {
+    code,
+    diagnosticClass: extras?.diagnosticClass,
+    identityToolkitHttpStatus: extras?.httpStatus,
+  });
 }
 
 export function mapIdentityToolkitMessage(message: string): string {
@@ -48,7 +65,12 @@ export function mapIdentityToolkitMessage(message: string): string {
 
 export async function readIdentityToolkitError(
   response: Response,
-): Promise<{ code: string; message: string }> {
+): Promise<{
+  code: string;
+  message: string;
+  diagnosticClass: string;
+  httpStatus: number;
+}> {
   let body: IdentityToolkitErrorBody = {};
   try {
     body = (await response.json()) as IdentityToolkitErrorBody;
@@ -64,7 +86,40 @@ export async function readIdentityToolkitError(
   return {
     code: mapIdentityToolkitMessage(message),
     message,
+    diagnosticClass: classifyIdentityToolkitMessage(message),
+    httpStatus: response.status,
   };
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function throwAnnotatedIdentityError(
+  error: unknown,
+  stage: AuthDiagnosticStage,
+  extras?: {
+    diagnosticClass?: string;
+    httpStatus?: number;
+  },
+): never {
+  const record =
+    error && typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+  throw annotateAuthFailure(error, {
+    stage,
+    diagnosticClass:
+      extras?.diagnosticClass ??
+      readOptionalString(record?.diagnosticClass),
+    identityToolkitHttpStatus:
+      extras?.httpStatus ??
+      readOptionalNumber(record?.identityToolkitHttpStatus),
+  });
 }
 
 /**
@@ -75,9 +130,14 @@ export async function fetchIdTokenWithPassword(
   password: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
+  const stage: AuthDiagnosticStage = "identity_toolkit.signin";
   const apiKey = getFirebaseWebApiKey();
   if (!apiKey) {
-    throw new AuthNotConfiguredError();
+    throw annotateAuthFailure(new AuthNotConfiguredError(), {
+      stage,
+      diagnosticClass: "config.missing_env",
+      missingEnvNames: listMissingFirebaseWebApiKeyEnvNames(),
+    });
   }
 
   let response: Response;
@@ -95,31 +155,56 @@ export async function fetchIdTokenWithPassword(
       },
     );
   } catch (error) {
-    throw identityToolkitError(
-      "auth/network-request-failed",
-      error instanceof Error ? error.message : "Network request failed",
+    throwAnnotatedIdentityError(
+      identityToolkitError(
+        "auth/network-request-failed",
+        error instanceof Error ? error.message : "Network request failed",
+        { diagnosticClass: "identity_toolkit.network" },
+      ),
+      stage,
+      { diagnosticClass: "identity_toolkit.network" },
     );
   }
 
   if (!response.ok) {
     const mapped = await readIdentityToolkitError(response);
-    throw identityToolkitError(mapped.code, mapped.message);
+    throwAnnotatedIdentityError(
+      identityToolkitError(mapped.code, mapped.message, {
+        diagnosticClass: mapped.diagnosticClass,
+        httpStatus: mapped.httpStatus,
+      }),
+      stage,
+      {
+        diagnosticClass: mapped.diagnosticClass,
+        httpStatus: mapped.httpStatus,
+      },
+    );
   }
 
   let json: IdentityToolkitSignInResponse;
   try {
     json = (await response.json()) as IdentityToolkitSignInResponse;
   } catch {
-    throw identityToolkitError(
-      "auth/internal-error",
-      "Identity Toolkit returned invalid JSON",
+    throwAnnotatedIdentityError(
+      identityToolkitError(
+        "auth/internal-error",
+        "Identity Toolkit returned invalid JSON",
+        { diagnosticClass: "identity_toolkit.invalid_json" },
+      ),
+      stage,
+      { diagnosticClass: "identity_toolkit.invalid_json" },
     );
   }
 
   if (!json.idToken) {
-    throw identityToolkitError(
-      "auth/internal-error",
-      "Identity Toolkit sign-in did not return an idToken",
+    throwAnnotatedIdentityError(
+      identityToolkitError(
+        "auth/internal-error",
+        "Identity Toolkit sign-in did not return an idToken",
+        { diagnosticClass: "identity_toolkit.missing_id_token" },
+      ),
+      stage,
+      { diagnosticClass: "identity_toolkit.missing_id_token" },
     );
   }
 
@@ -130,25 +215,53 @@ export async function sendVerifyEmailOobCode(
   idToken: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
+  const stage: AuthDiagnosticStage = "identity_toolkit.send_verify_email";
   const apiKey = getFirebaseWebApiKey();
   if (!apiKey) {
-    throw new AuthNotConfiguredError();
+    throw annotateAuthFailure(new AuthNotConfiguredError(), {
+      stage,
+      diagnosticClass: "config.missing_env",
+      missingEnvNames: listMissingFirebaseWebApiKeyEnvNames(),
+    });
   }
 
-  const oobResponse = await fetchImpl(
-    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requestType: "VERIFY_EMAIL",
-        idToken,
-      }),
-    },
-  );
+  let oobResponse: Response;
+  try {
+    oobResponse = await fetchImpl(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestType: "VERIFY_EMAIL",
+          idToken,
+        }),
+      },
+    );
+  } catch (error) {
+    throwAnnotatedIdentityError(
+      identityToolkitError(
+        "auth/network-request-failed",
+        error instanceof Error ? error.message : "Network request failed",
+        { diagnosticClass: "identity_toolkit.network" },
+      ),
+      stage,
+      { diagnosticClass: "identity_toolkit.network" },
+    );
+  }
 
   if (!oobResponse.ok) {
     const mapped = await readIdentityToolkitError(oobResponse);
-    throw identityToolkitError(mapped.code, mapped.message);
+    throwAnnotatedIdentityError(
+      identityToolkitError(mapped.code, mapped.message, {
+        diagnosticClass: mapped.diagnosticClass,
+        httpStatus: mapped.httpStatus,
+      }),
+      stage,
+      {
+        diagnosticClass: mapped.diagnosticClass,
+        httpStatus: mapped.httpStatus,
+      },
+    );
   }
 }

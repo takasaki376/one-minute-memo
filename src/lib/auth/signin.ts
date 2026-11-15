@@ -4,6 +4,11 @@ import type { SessionUser } from "@/types/auth";
 
 import { getFirebaseAdminAuth } from "@/lib/firebase/admin";
 
+import {
+  annotateAuthFailure,
+  classifyAdminAuthError,
+  listMissingFirebaseAdminEnvNames,
+} from "./authDiagnostics";
 import { AuthNotConfiguredError } from "./authErrors";
 import { fetchIdTokenWithPassword } from "./identityToolkit";
 import { AUTH_SESSION_COOKIE } from "./sessionCookie";
@@ -37,15 +42,45 @@ export async function signInWithPassword(
 export async function signInWithIdToken(
   idToken: string,
 ): Promise<SignInSessionResult> {
-  const auth = getFirebaseAdminAuth();
-  if (!auth) {
-    throw new AuthNotConfiguredError();
+  let auth;
+  try {
+    auth = getFirebaseAdminAuth();
+  } catch (error) {
+    throw annotateAuthFailure(error, {
+      stage: "admin.initialize",
+      diagnosticClass: classifyAdminAuthError(error),
+    });
   }
 
-  const decoded = await auth.verifyIdToken(idToken);
-  const sessionCookie = await auth.createSessionCookie(idToken, {
-    expiresIn: AUTH_SESSION_COOKIE.maxAgeSeconds * 1000,
-  });
+  if (!auth) {
+    throw annotateAuthFailure(new AuthNotConfiguredError(), {
+      stage: "admin.initialize",
+      diagnosticClass: "config.missing_env",
+      missingEnvNames: listMissingFirebaseAdminEnvNames(),
+    });
+  }
+
+  let decoded;
+  try {
+    decoded = await auth.verifyIdToken(idToken);
+  } catch (error) {
+    throw annotateAuthFailure(error, {
+      stage: "admin.verify_id_token",
+      diagnosticClass: classifyAdminAuthError(error),
+    });
+  }
+
+  let sessionCookie: string;
+  try {
+    sessionCookie = await auth.createSessionCookie(idToken, {
+      expiresIn: AUTH_SESSION_COOKIE.maxAgeSeconds * 1000,
+    });
+  } catch (error) {
+    throw annotateAuthFailure(error, {
+      stage: "admin.create_session_cookie",
+      diagnosticClass: classifyAdminAuthError(error),
+    });
+  }
 
   return {
     user: decodedIdTokenToSessionUser(decoded),
