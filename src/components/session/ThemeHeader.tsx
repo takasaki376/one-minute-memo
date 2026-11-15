@@ -36,6 +36,7 @@ export function ThemeHeader({
     "w-full",
     "bg-white",
     "border-b border-slate-200",
+    // sticky 時に下の入力が透けないよう不透明背景を維持
     className,
   ]);
 
