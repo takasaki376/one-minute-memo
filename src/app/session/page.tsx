@@ -7,6 +7,11 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { HandwritingCanvas } from "@/components/session/HandwritingCanvas";
+import {
+  NextThemeIcon,
+  PauseIcon,
+  PlayIcon,
+} from "@/components/session/SessionActionIcons";
 import { TextEditor } from "@/components/session/TextEditor";
 import { ThemeHeader } from "@/components/session/ThemeHeader";
 import { type SessionTheme, useSessionFlow } from "@/hooks/useSessionFlow";
@@ -15,6 +20,8 @@ import { pickRandomActiveThemes } from "@/lib/utils/selectRandomThemes";
 import { getSettings } from "@/lib/db/settingsRepo";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import { useThemeSeedState } from "@/components/providers/ThemeSeedProvider";
+
+const TABLET_MIN_WIDTH = 768;
 
 type SessionStage = "loading" | "running" | "finished" | "error";
 
@@ -51,10 +58,12 @@ export default function SessionPage() {
   const [handwritingDataUrl, setHandwritingDataUrl] = useState<string | null>(
     null,
   );
-  // 入力モードのタブ切り替え: 手書き / テキスト
+  // 入力モード: スマホはテキスト開始（SSR/初回も手書きを出さない）。タブレット以上は初回のみ手書きへ。
   const [activeInputTab, setActiveInputTab] = useState<"handwriting" | "text">(
-    "handwriting",
+    "text",
   );
+  const userSelectedInputTabRef = useRef(false);
+  const initialInputTabResolvedRef = useRef(false);
   const [viewMode, setViewMode] = useState<"split" | "handwritingFocus">(
     "split",
   );
@@ -109,12 +118,18 @@ export default function SessionPage() {
   }, [handleThemeFinishedAuto]);
 
   const handleSwitchToHandwritingTab = () => {
+    userSelectedInputTabRef.current = true;
     setActiveInputTab("handwriting");
     if (typeof document === "undefined") return;
     const activeElement = document.activeElement;
     if (activeElement instanceof HTMLTextAreaElement) {
       activeElement.blur();
     }
+  };
+
+  const handleSwitchToTextTab = () => {
+    userSelectedInputTabRef.current = true;
+    setActiveInputTab("text");
   };
 
   const exitHandwritingFocus = useCallback(() => {
@@ -128,15 +143,23 @@ export default function SessionPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let wasTabletUp = window.innerWidth >= 768;
+    let wasTabletUp = window.innerWidth >= TABLET_MIN_WIDTH;
 
     const updateViewportFlag = () => {
-      const tablet = window.innerWidth >= 768;
+      const tablet = window.innerWidth >= TABLET_MIN_WIDTH;
       if (wasTabletUp && !tablet) {
         exitHandwritingFocus();
       }
       wasTabletUp = tablet;
       setIsTabletUp(tablet);
+
+      // 初回のみ: タブレット以上は手書き、スマホはテキストのまま。以降はユーザー選択を維持。
+      if (!initialInputTabResolvedRef.current) {
+        initialInputTabResolvedRef.current = true;
+        if (tablet && !userSelectedInputTabRef.current) {
+          setActiveInputTab("handwriting");
+        }
+      }
     };
 
     updateViewportFlag();
@@ -305,87 +328,91 @@ export default function SessionPage() {
         </div>
       )}
       {!hideChromeForHandwritingFocus && (
-        <ThemeHeader
-          currentIndex={currentNumber}
-          total={total}
-          title={currentTheme.title}
-          category={currentTheme.category}
-          secondsLeft={secondsLeft}
-        />
-      )}
-
-      {/* 入力モード/表示モードの操作 */}
-      {!hideChromeForHandwritingFocus && (
-        <section
-          className="border-t border-slate-200 pt-3"
-          data-testid="session-controls"
+        <div
+          className="sticky top-0 z-20 -mx-2 bg-slate-50 px-2 pb-2 pt-0 md:static md:z-auto md:mx-0 md:bg-transparent md:px-0 md:pb-0"
+          data-testid="session-sticky-chrome"
         >
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              {effectiveViewMode === "split" && (
-                <div
-                  className="inline-flex gap-1 rounded-lg bg-slate-100 p-0.5"
-                  role="tablist"
-                  aria-label="入力方式"
-                >
-                  <button
-                    type="button"
-                    id="tab-handwriting"
-                    role="tab"
-                    aria-controls="panel-handwriting"
-                    aria-selected={activeInputTab === "handwriting"}
-                    className={
-                      activeInputTab === "handwriting"
-                        ? "min-h-11 whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900 md:min-h-0"
-                        : "min-h-11 whitespace-nowrap rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700 md:min-h-0"
-                    }
-                    onClick={handleSwitchToHandwritingTab}
-                  >
-                    手書き入力
-                  </button>
-                  <button
-                    type="button"
-                    id="tab-text"
-                    role="tab"
-                    aria-controls="panel-text"
-                    aria-selected={activeInputTab === "text"}
-                    className={
-                      activeInputTab === "text"
-                        ? "min-h-11 whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900 md:min-h-0"
-                        : "min-h-11 whitespace-nowrap rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700 md:min-h-0"
-                    }
-                    onClick={() => setActiveInputTab("text")}
-                  >
-                    テキスト入力
-                  </button>
-                </div>
-              )}
+          <ThemeHeader
+            currentIndex={currentNumber}
+            total={total}
+            title={currentTheme.title}
+            category={currentTheme.category}
+            secondsLeft={secondsLeft}
+          />
 
-              {isTabletUp && effectiveViewMode === "split" && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="hidden md:inline-flex"
-                  onClick={() => {
-                    setViewMode("handwritingFocus");
-                    setIsFocusTextOpen(false);
-                  }}
-                  aria-label="手書き集中モードに切り替え"
-                  data-testid="focus-mode-button"
-                >
-                  手書き集中
-                </Button>
-              )}
-            </div>
+          {/* 入力モード/表示モードの操作 */}
+          <section
+            className="border-t border-slate-200 bg-slate-50 pt-2 md:bg-transparent md:pt-3"
+            data-testid="session-controls"
+          >
+            <div className="flex flex-row items-center justify-between gap-1 md:gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 md:gap-2">
+                {effectiveViewMode === "split" && (
+                  <div
+                    className="inline-flex max-w-full gap-0.5 rounded-lg bg-slate-100 p-0.5"
+                    role="tablist"
+                    aria-label="入力方式"
+                  >
+                    <button
+                      type="button"
+                      id="tab-handwriting"
+                      role="tab"
+                      aria-controls="panel-handwriting"
+                      aria-selected={activeInputTab === "handwriting"}
+                      className={
+                        activeInputTab === "handwriting"
+                          ? "min-h-11 whitespace-nowrap rounded-md bg-white px-2 py-1.5 text-[12px] font-medium text-slate-900 sm:px-3 sm:text-[13px] md:min-h-0"
+                          : "min-h-11 whitespace-nowrap rounded-md bg-transparent px-2 py-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-700 sm:px-3 sm:text-[13px] md:min-h-0"
+                      }
+                      onClick={handleSwitchToHandwritingTab}
+                    >
+                      手書き入力
+                    </button>
+                    <button
+                      type="button"
+                      id="tab-text"
+                      role="tab"
+                      aria-controls="panel-text"
+                      aria-selected={activeInputTab === "text"}
+                      className={
+                        activeInputTab === "text"
+                          ? "min-h-11 whitespace-nowrap rounded-md bg-white px-2 py-1.5 text-[12px] font-medium text-slate-900 sm:px-3 sm:text-[13px] md:min-h-0"
+                          : "min-h-11 whitespace-nowrap rounded-md bg-transparent px-2 py-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-700 sm:px-3 sm:text-[13px] md:min-h-0"
+                      }
+                      onClick={handleSwitchToTextTab}
+                    >
+                      テキスト入力
+                    </button>
+                  </div>
+                )}
 
-            {effectiveViewMode === "split" && (
-              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto md:flex-nowrap">
-                <p className="text-xs text-slate-400">
-                  {isRunning ? "入力中…" : "一時停止中"}
-                </p>
-                <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                {isTabletUp && effectiveViewMode === "split" && (
                   <Button
-                    variant="secondary"
+                    size="sm"
+                    variant="ghost"
+                    className="hidden md:inline-flex"
+                    onClick={() => {
+                      setViewMode("handwritingFocus");
+                      setIsFocusTextOpen(false);
+                    }}
+                    aria-label="手書き集中モードに切り替え"
+                    data-testid="focus-mode-button"
+                  >
+                    手書き集中
+                  </Button>
+                )}
+              </div>
+
+              {effectiveViewMode === "split" && (
+                <div className="flex shrink-0 items-center gap-1 md:gap-2">
+                  <p
+                    className="mr-1 hidden text-xs text-slate-400 md:block"
+                    aria-live="polite"
+                  >
+                    {isRunning ? "入力中…" : "一時停止中"}
+                  </p>
+                  <button
+                    type="button"
                     onClick={() => {
                       if (isRunning) {
                         pause();
@@ -394,23 +421,37 @@ export default function SessionPage() {
                       }
                     }}
                     disabled={secondsLeft === 0}
-                    className="min-h-11 min-w-0 bg-slate-100 text-slate-600 hover:bg-slate-200 sm:min-h-0"
+                    aria-label={isRunning ? "一時停止" : "再開"}
+                    data-testid="session-pause-resume"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:pointer-events-none disabled:opacity-50 md:h-9 md:w-auto md:gap-1.5 md:px-3 md:text-sm md:font-medium"
                   >
-                    {isRunning ? "一時停止" : "再開"}
-                  </Button>
-                  <Button
-                    variant="primary"
+                    {isRunning ? (
+                      <PauseIcon className="h-5 w-5 md:hidden" />
+                    ) : (
+                      <PlayIcon className="h-5 w-5 md:hidden" />
+                    )}
+                    <span className="hidden md:inline">
+                      {isRunning ? "一時停止" : "再開"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void handleThemeFinished()}
                     disabled={secondsLeft === 0}
-                    className="col-span-2 min-h-11 min-w-0 bg-blue-500 text-white hover:bg-blue-600 sm:col-span-1 sm:min-h-0"
+                    aria-label="このテーマを終えて次へ"
+                    data-testid="session-next-theme"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-blue-500 text-white hover:bg-blue-600 disabled:pointer-events-none disabled:opacity-50 md:h-9 md:w-auto md:gap-1.5 md:px-3 md:text-sm md:font-medium"
                   >
-                    このテーマを終えて次へ
-                  </Button>
+                    <NextThemeIcon className="h-5 w-5 md:hidden" />
+                    <span className="hidden md:inline">
+                      このテーマを終えて次へ
+                    </span>
+                  </button>
                 </div>
-              </div>
-            )}
-          </div>
-        </section>
+              )}
+            </div>
+          </section>
+        </div>
       )}
 
       {/* 入力エリア */}
