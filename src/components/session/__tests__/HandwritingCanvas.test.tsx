@@ -31,9 +31,11 @@ function createMock2dContext() {
 
 describe("HandwritingCanvas", () => {
   let mockCtx: ReturnType<typeof createMock2dContext>;
+  let resizeObserverCallbacks: Array<() => void>;
 
   beforeEach(() => {
     mockCtx = createMock2dContext();
+    resizeObserverCallbacks = [];
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
       function (this: HTMLCanvasElement, type: string) {
         if (type !== "2d") return null;
@@ -48,6 +50,13 @@ describe("HandwritingCanvas", () => {
     vi.stubGlobal(
       "ResizeObserver",
       class {
+        callback: ResizeObserverCallback;
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback;
+          resizeObserverCallbacks.push(() => {
+            callback([], this as unknown as ResizeObserver);
+          });
+        }
         observe() {}
         unobserve() {}
         disconnect() {}
@@ -626,6 +635,104 @@ describe("HandwritingCanvas", () => {
       });
 
       expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resize preserves strokes", () => {
+    function setWrapperSize(
+      wrapper: HTMLElement,
+      width: number,
+      height: number,
+    ) {
+      Object.defineProperty(wrapper, "clientWidth", {
+        configurable: true,
+        get: () => width,
+      });
+      Object.defineProperty(wrapper, "clientHeight", {
+        configurable: true,
+        get: () => height,
+      });
+    }
+
+    function triggerResize() {
+      // effect の再実行で callback が増えるため、最新の observer だけ発火する
+      expect(resizeObserverCallbacks.length).toBeGreaterThan(0);
+      resizeObserverCallbacks[resizeObserverCallbacks.length - 1]?.();
+    }
+
+    it("高さ縮小・復元してもリサイズでは onChange せず、旧高さへのクリップ転写をしない", async () => {
+      const onChange = vi.fn();
+
+      class MockImage {
+        onload:
+          | ((this: GlobalEventHandlers, ev: Event) => unknown)
+          | null = null;
+        onerror:
+          | ((this: GlobalEventHandlers, ev: Event) => unknown)
+          | null = null;
+        width = 400;
+        height = 480;
+        private _src = "";
+        get src() {
+          return this._src;
+        }
+        set src(value: string) {
+          this._src = value;
+          this.onload?.call(
+            this as unknown as GlobalEventHandlers,
+            new Event("load"),
+          );
+        }
+      }
+      vi.stubGlobal("Image", MockImage);
+
+      const { container } = render(
+        <HandwritingCanvas
+          value="data:image/png;base64,full-stroke"
+          onChange={onChange}
+        />,
+      );
+      const canvas = getCanvas(container);
+      const wrapper = canvas.parentElement;
+      if (!wrapper) {
+        throw new Error("Expected canvas wrapper");
+      }
+
+      setWrapperSize(wrapper, 400, 480);
+      await act(async () => {
+        triggerResize();
+      });
+      expect(canvas.style.height).toBe("480px");
+
+      mockCtx.drawImage.mockClear();
+      onChange.mockClear();
+
+      setWrapperSize(wrapper, 400, 240);
+      await act(async () => {
+        triggerResize();
+      });
+      expect(canvas.style.height).toBe("240px");
+      expect(onChange).not.toHaveBeenCalled();
+      expect(
+        mockCtx.drawImage.mock.calls.some(
+          (call: unknown[]) =>
+            call.length >= 9 && call[7] === 400 && call[8] === 480,
+        ),
+      ).toBe(false);
+
+      mockCtx.drawImage.mockClear();
+      setWrapperSize(wrapper, 400, 480);
+      await act(async () => {
+        triggerResize();
+      });
+      expect(canvas.style.height).toBe("480px");
+      expect(onChange).not.toHaveBeenCalled();
+      expect(
+        mockCtx.drawImage.mock.calls.some(
+          (call: unknown[]) =>
+            call.length >= 9 && call[7] === 400 && call[8] === 240,
+        ),
+      ).toBe(false);
     });
   });
 });

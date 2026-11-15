@@ -187,117 +187,6 @@ export function useHandwritingCanvasEngine({
     drawDataUrl(ctx, value);
   }, [drawDataUrl, clearCanvas, value]);
 
-  // ResizeObserver でラッパーサイズに追従（DPR対応 + 描画保持）
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const wrapper = wrapperRef.current;
-    if (!canvas || !wrapper) return;
-
-    const resize = () => {
-      if (isDrawingRef.current) {
-        pendingResizeRef.current = true;
-        return;
-      }
-
-      const displayWidth = Math.max(1, wrapper.clientWidth);
-      const displayHeight = Math.max(1, wrapper.clientHeight);
-      const dpr =
-        typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-
-      const prevLogical = logicalSizeRef.current;
-
-      if (
-        prevLogical.width === displayWidth &&
-        prevLogical.height === displayHeight
-      ) {
-        return;
-      }
-
-      let savedCanvas: HTMLCanvasElement | null = null;
-      if (
-        canvas.width > 0 &&
-        canvas.height > 0 &&
-        prevLogical.width > 0 &&
-        prevLogical.height > 0
-      ) {
-        savedCanvas = document.createElement("canvas");
-        savedCanvas.width = canvas.width;
-        savedCanvas.height = canvas.height;
-        const savedCtx = savedCanvas.getContext("2d");
-        if (savedCtx) {
-          savedCtx.drawImage(canvas, 0, 0);
-        } else {
-          savedCanvas = null;
-        }
-      }
-
-      const prevW = prevLogical.width;
-      const prevH = prevLogical.height;
-
-      logicalSizeRef.current = { width: displayWidth, height: displayHeight };
-      setSvgViewBoxSize({ width: displayWidth, height: displayHeight });
-
-      canvas.style.width = `${displayWidth}px`;
-      canvas.style.height = `${displayHeight}px`;
-      canvas.width = Math.round(displayWidth * dpr);
-      canvas.height = Math.round(displayHeight * dpr);
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      clearCanvas(ctx);
-
-      if (savedCanvas && prevW > 0 && prevH > 0) {
-        ctx.drawImage(
-          savedCanvas,
-          0,
-          0,
-          savedCanvas.width,
-          savedCanvas.height,
-          0,
-          0,
-          prevW,
-          prevH,
-        );
-        applyCanvasStyle(ctx);
-      } else {
-        const restoreSource =
-          latestCanvasDataUrlRef.current ?? latestValueRef.current ?? null;
-
-        if (restoreSource) {
-          drawDataUrl(ctx, restoreSource, { enforceLatestValue: false });
-        }
-      }
-    };
-
-    resizeFnRef.current = resize;
-    resize();
-
-    const scheduleResize = () => {
-      if (resizeRafIdRef.current !== null) return;
-      resizeRafIdRef.current = requestAnimationFrame(() => {
-        resizeRafIdRef.current = null;
-        resize();
-      });
-    };
-
-    const observer = new ResizeObserver(() => {
-      scheduleResize();
-    });
-    observer.observe(wrapper);
-
-    return () => {
-      if (resizeRafIdRef.current !== null) {
-        cancelAnimationFrame(resizeRafIdRef.current);
-        resizeRafIdRef.current = null;
-      }
-      pendingResizeRef.current = false;
-      resizeFnRef.current = null;
-      observer.disconnect();
-    };
-  }, [clearCanvas, drawDataUrl, applyCanvasStyle]);
-
   const getCanvasPosFromClient = useCallback((
     canvas: HTMLCanvasElement,
     clientX: number,
@@ -450,6 +339,128 @@ export function useHandwritingCanvasEngine({
     },
     [applyCanvasStyle, clearCommittedSvgStrokes],
   );
+
+  // ResizeObserver でラッパーサイズに追従（DPR対応 + 描画保持）
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrapper = wrapperRef.current;
+    if (!canvas || !wrapper) return;
+
+    const resize = () => {
+      if (isDrawingRef.current) {
+        pendingResizeRef.current = true;
+        return;
+      }
+
+      const displayWidth = Math.max(1, wrapper.clientWidth);
+      const displayHeight = Math.max(1, wrapper.clientHeight);
+      const dpr =
+        typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+
+      const prevLogical = logicalSizeRef.current;
+
+      if (
+        prevLogical.width === displayWidth &&
+        prevLogical.height === displayHeight
+      ) {
+        return;
+      }
+
+      const ctxBefore = canvas.getContext("2d");
+      if (ctxBefore) {
+        // 未確定の SVG ストロークを先に焼き込み、スナップショットに含める
+        flushCommittedSvgStrokesToCanvas(ctxBefore);
+      }
+
+      let savedCanvas: HTMLCanvasElement | null = null;
+      if (
+        canvas.width > 0 &&
+        canvas.height > 0 &&
+        prevLogical.width > 0 &&
+        prevLogical.height > 0
+      ) {
+        savedCanvas = document.createElement("canvas");
+        savedCanvas.width = canvas.width;
+        savedCanvas.height = canvas.height;
+        const savedCtx = savedCanvas.getContext("2d");
+        if (savedCtx) {
+          savedCtx.drawImage(canvas, 0, 0);
+        } else {
+          savedCanvas = null;
+        }
+      }
+
+      logicalSizeRef.current = { width: displayWidth, height: displayHeight };
+      setSvgViewBoxSize({ width: displayWidth, height: displayHeight });
+
+      canvas.style.width = `${displayWidth}px`;
+      canvas.style.height = `${displayHeight}px`;
+      canvas.width = Math.round(displayWidth * dpr);
+      canvas.height = Math.round(displayHeight * dpr);
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      clearCanvas(ctx);
+
+      // リサイズでは onChange / dataURL を更新しない。
+      // 旧サイズのまま dest に描くと縮小後に下部がクリップされ、復元しても戻らない。
+      // dataURL があれば全体を新サイズへ再描画し、なければスナップショットを新サイズへ収める。
+      const restoreSource =
+        latestCanvasDataUrlRef.current ?? latestValueRef.current ?? null;
+
+      if (restoreSource) {
+        drawDataUrl(ctx, restoreSource, { enforceLatestValue: false });
+      } else if (savedCanvas) {
+        ctx.drawImage(
+          savedCanvas,
+          0,
+          0,
+          savedCanvas.width,
+          savedCanvas.height,
+          0,
+          0,
+          displayWidth,
+          displayHeight,
+        );
+        applyCanvasStyle(ctx);
+      }
+    };
+
+    resizeFnRef.current = resize;
+    resize();
+
+    // rAF が同期実行される環境（テストモック等）でも、
+    // 「代入前に callback が走り null にしたあと return id で上書き」して
+    // 以降の schedule が永久スキップされないよう、専用フラグで管理する。
+    let resizeScheduled = false;
+    const scheduleResize = () => {
+      if (resizeScheduled) return;
+      resizeScheduled = true;
+      resizeRafIdRef.current = requestAnimationFrame(() => {
+        resizeScheduled = false;
+        resizeRafIdRef.current = null;
+        resize();
+      });
+    };
+
+    const observer = new ResizeObserver(() => {
+      scheduleResize();
+    });
+    observer.observe(wrapper);
+
+    return () => {
+      resizeScheduled = false;
+      if (resizeRafIdRef.current !== null) {
+        cancelAnimationFrame(resizeRafIdRef.current);
+        resizeRafIdRef.current = null;
+      }
+      pendingResizeRef.current = false;
+      resizeFnRef.current = null;
+      observer.disconnect();
+    };
+  }, [clearCanvas, drawDataUrl, applyCanvasStyle, flushCommittedSvgStrokesToCanvas]);
 
   const exportCanvas = useCallback(() => {
     const canvas = canvasRef.current;
