@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React from 'react';
-import cc from 'classcat';
+import React from "react";
+import cc from "classcat";
 
 export interface ThemeHeaderProps {
   /** 現在のテーマインデックス（1始まり） */
@@ -21,7 +21,7 @@ export interface ThemeHeaderProps {
 /**
  * セッション画面の上部に表示するテーマヘッダー。
  *
- * - スマホ（md未満）: テーマ情報＋タイマーを縦積み表示
+ * - スマホ（md未満）: 進捗・タイマーを1行にまとめ、テーマ本文は折り返し
  * - タブレット／PC（md以上）: 1行にコンパクト配置（テーマ名左、進捗＋タイマー右）
  */
 export function ThemeHeader({
@@ -33,38 +33,37 @@ export function ThemeHeader({
   className,
 }: ThemeHeaderProps) {
   const containerClass = cc([
-    'w-full',
-    'bg-white',
-    'border-b border-slate-200',
+    "w-full",
+    "bg-white",
+    "border-b border-slate-200",
     className,
   ]);
 
   return (
     <div className={containerClass}>
-      {/* ===== スマホ（md未満）: 従来の縦積みレイアウト ===== */}
-      <div className="block px-4 py-3 md:hidden">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-600">
+      {/* ===== スマホ（md未満）: コンパクト縦レイアウト ===== */}
+      <div className="block px-2 py-2 md:hidden">
+        <div className="mb-1.5 flex items-center gap-2">
+          <span className="shrink-0 text-sm font-medium text-slate-600">
             {currentIndex} / {total}
           </span>
           {category && (
-            <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">
+            <span className="min-w-0 truncate rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
               {category}
             </span>
           )}
-        </div>
-        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-        {secondsLeft !== undefined && (
-          <div className="mt-3 flex items-center justify-center">
-            <div className="rounded-lg bg-slate-100 px-6 py-3">
-              <p className="text-center text-sm text-slate-600">残り時間</p>
-              <p className="text-center text-3xl font-bold text-slate-900 tabular-nums">
+          {secondsLeft !== undefined && (
+            <div className="ml-auto flex shrink-0 items-baseline gap-1 rounded-md bg-slate-100 px-2.5 py-1">
+              <span className="text-xl font-bold tabular-nums text-slate-900">
                 {secondsLeft}
-              </p>
-              <p className="text-center text-xs text-slate-500">秒</p>
+              </span>
+              <span className="text-xs text-slate-500">秒</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        <h2 className="text-base font-semibold leading-snug break-words text-slate-900">
+          {title}
+        </h2>
       </div>
 
       {/* ===== タブレット／PC（md以上）: 1行コンパクトレイアウト ===== */}
@@ -92,7 +91,7 @@ export function ThemeHeader({
           </span>
           {secondsLeft !== undefined && (
             <div className="flex items-baseline gap-1 rounded-md bg-slate-100 px-3 py-1">
-              <span className="text-lg font-bold text-slate-900 tabular-nums">
+              <span className="text-lg font-bold tabular-nums text-slate-900">
                 {secondsLeft}
               </span>
               <span className="text-xs text-slate-500">秒</span>

@@ -40,16 +40,14 @@ export default defineConfig({
   },
 
   // プロジェクト設定（ブラウザ）
+  // スマホ検証は e2e/mobile-layout.spec.ts が page.setViewportSize で複数幅を確認する。
+  // 別プロジェクトを増やさないのは、既存の Desktop Chrome 実行を維持しつつ
+  // 同一ファイル内で 320〜430px を明示的に回すため。
   projects: [
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-    // 必要に応じて他のブラウザを追加
-    // {
-    //   name: "Mobile Chrome",
-    //   use: { ...devices["Pixel 5"] },
-    // },
   ],
 
   // 開発サーバーの自動起動
