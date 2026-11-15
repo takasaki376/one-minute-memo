@@ -19,7 +19,7 @@ export interface HandwritingToolbarProps {
 
 function toolBtnClass(active: boolean, disabled?: boolean) {
   return cc([
-    "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors",
+    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors md:min-h-9 md:min-w-9",
     active
       ? "border-blue-500 bg-blue-50 text-blue-800"
       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",

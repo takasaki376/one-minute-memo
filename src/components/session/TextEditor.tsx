@@ -37,6 +37,7 @@ export function TextEditor({
 
   const textareaClass = cc([
     "w-full",
+    "h-full",
     "min-h-40",
     "rounded-md",
     "border",

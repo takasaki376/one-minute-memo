@@ -33,7 +33,7 @@ export function HandwritingCanvas({
     handleClear,
   } = useHandwritingCanvasEngine({ value, onChange, disabled });
 
-  const containerClass = cc(["flex flex-col gap-2", className]);
+  const containerClass = cc(["flex h-full min-h-0 flex-col gap-2", className]);
 
   const canvasWrapperClass = cc([
     "relative",
@@ -52,6 +52,8 @@ export function HandwritingCanvas({
 
   const canvasClass = cc([
     "block",
+    "h-full",
+    "w-full",
     "rounded-md",
     "touch-none",
     "select-none",
@@ -60,24 +62,41 @@ export function HandwritingCanvas({
   ]);
 
   const toolbarClass = cc([
-    "absolute left-2 top-2 z-10",
+    "flex min-w-0 flex-1 flex-wrap items-center gap-1.5",
+    "rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm",
     "select-none",
-    "hidden flex-wrap items-center gap-1.5 md:flex",
-    "rounded-lg border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-sm",
   ]);
 
   const clearButtonClass = cc([
-    "self-end",
-    "inline-flex items-center justify-center",
+    "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center",
     "rounded-md border border-slate-300",
-    "px-2 py-1 text-xs text-slate-600",
+    "px-3 py-1 text-xs text-slate-600",
     "hover:bg-slate-50",
     "transition-colors",
+    "md:min-h-9 md:min-w-9",
     disabled && "pointer-events-none cursor-not-allowed opacity-50",
   ]);
 
   return (
     <div className={containerClass}>
+      <div className="flex flex-wrap items-center gap-2">
+        <HandwritingToolbar
+          className={toolbarClass}
+          tool={tool}
+          penSize={penSize}
+          disabled={disabled}
+          onSelectTool={selectTool}
+          onSelectPenSize={selectPenSize}
+        />
+        <button
+          type="button"
+          onClick={handleClear}
+          className={clearButtonClass}
+          disabled={disabled}
+        >
+          クリア
+        </button>
+      </div>
       <div
         ref={wrapperRef}
         className={canvasWrapperClass}
@@ -87,14 +106,6 @@ export function HandwritingCanvas({
           WebkitUserSelect: "none",
         }}
       >
-        <HandwritingToolbar
-          className={toolbarClass}
-          tool={tool}
-          penSize={penSize}
-          disabled={disabled}
-          onSelectTool={selectTool}
-          onSelectPenSize={selectPenSize}
-        />
         <canvas
           ref={canvasRef}
           onContextMenu={(e) => {
@@ -122,14 +133,6 @@ export function HandwritingCanvas({
           <path ref={activeStrokePathRef} />
         </svg>
       </div>
-      <button
-        type="button"
-        onClick={handleClear}
-        className={clearButtonClass}
-        disabled={disabled}
-      >
-        クリア
-      </button>
     </div>
   );
 }

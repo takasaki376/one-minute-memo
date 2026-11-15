@@ -51,12 +51,12 @@ export default function RootLayout({
             <div className="min-h-screen flex flex-col">
               <Header />
               <main className="flex-1">
-                <div className="max-w-4xl mx-auto px-4 py-6">
+                <div className="mx-auto max-w-4xl px-3 py-4 md:px-4 md:py-6">
                   {children}
                 </div>
               </main>
-              <footer className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                <div className="max-w-4xl mx-auto px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+              <footer className="border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                <div className="mx-auto max-w-4xl px-3 py-3 text-xs text-slate-500 md:px-4 dark:text-slate-400">
                   © {new Date().getFullYear()} one-minute-memo
                 </div>
               </footer>
