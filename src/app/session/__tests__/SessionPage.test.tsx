@@ -154,11 +154,18 @@ import * as memosRepo from "@/lib/db/memosRepo";
 import type { SettingsRecord } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 
-/** デフォルトが手書きタブなので、テキスト入力タブに切り替えるヘルパー */
+/** テキスト入力タブへ切り替える（スマホ初期はテキスト、タブレット初期は手書き） */
 async function switchToTextTab() {
   const textTab = screen.getByRole("tab", { name: "テキスト入力" });
   await act(async () => {
     fireEvent.click(textTab);
+  });
+}
+
+async function switchToHandwritingTab() {
+  const tab = screen.getByRole("tab", { name: "手書き入力" });
+  await act(async () => {
+    fireEvent.click(tab);
   });
 }
 
@@ -267,6 +274,31 @@ describe("/session page", () => {
     expect(savedArg.handwritingDataUrl).toBeUndefined();
   });
 
+  it("defaults to text input on mobile viewport", async () => {
+    await act(async () => {
+      render(<SessionPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("1 / 10")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("tab", { name: "テキスト入力" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByTestId("split-text-panel")).not.toHaveAttribute("hidden");
+    expect(screen.getByTestId("session-sticky-chrome")).toBeInTheDocument();
+    expect(
+      within(getSessionControls()).getByRole("button", { name: "一時停止" }),
+    ).toBeInTheDocument();
+    expect(
+      within(getSessionControls()).getByRole("button", {
+        name: "このテーマを終えて次へ",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("saves handwriting input data when provided", async () => {
     await act(async () => {
       render(<SessionPage />);
@@ -276,6 +308,7 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
+    await switchToHandwritingTab();
     const handwritingButton = within(getSplitHandwritingPanel()).getByRole("button", {
       name: "手書き入力",
     });
@@ -451,15 +484,12 @@ describe("/session page", () => {
       expect(screen.getByText("1 / 10")).toBeInTheDocument();
     });
 
-    await switchToTextTab();
     const textarea = within(getSplitTextPanel()).getByRole("textbox");
-    expect(textarea).toHaveFocus();
-
-    const handwritingTab = screen.getByRole("tab", { name: "手書き入力" });
-    await act(async () => {
-      fireEvent.click(handwritingTab);
+    await waitFor(() => {
+      expect(textarea).toHaveFocus();
     });
 
+    await switchToHandwritingTab();
     expect(textarea).not.toHaveFocus();
   });
 
@@ -517,6 +547,22 @@ describe("/session page", () => {
   describe("handwriting focus mode (tablet viewport)", () => {
     beforeEach(() => {
       setViewportWidth(1024);
+    });
+
+    it("defaults to handwriting input on tablet viewport", async () => {
+      await act(async () => {
+        render(<SessionPage />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 10")).toBeInTheDocument();
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("tab", { name: "手書き入力" }),
+        ).toHaveAttribute("aria-selected", "true");
+      });
     });
 
     it("switches between split and handwriting focus modes on tablet width", async () => {

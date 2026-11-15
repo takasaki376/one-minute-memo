@@ -58,8 +58,9 @@ test.describe("スマホ向けレイアウト", () => {
         await assertNoHorizontalOverflow(page);
       });
 
-      test("セッションで入力面と手書きツールが使える", async ({ page }) => {
-        // beforeEach の resetE2eAppState でテーマシード済み
+      test("セッションはテキスト初期・一行操作・sticky・細固定", async ({
+        page,
+      }) => {
         await page.goto("/session");
 
         await expect(
@@ -68,12 +69,47 @@ test.describe("スマホ向けレイアウト", () => {
 
         await assertNoHorizontalOverflow(page);
 
-        const inputSurface = page.getByTestId("split-layout");
-        await expect(inputSurface).toBeVisible();
-        const box = await inputSurface.boundingBox();
-        expect(box).not.toBeNull();
-        expect(box!.y).toBeLessThan(viewport.height);
-        expect(box!.height).toBeGreaterThanOrEqual(200);
+        const textTab = page.getByRole("tab", { name: "テキスト入力" });
+        await expect(textTab).toHaveAttribute("aria-selected", "true");
+        await expect(page.getByTestId("split-text-panel")).toBeVisible();
+
+        const controls = page.getByTestId("session-controls");
+        await expect(
+          controls.getByRole("button", { name: "一時停止" }),
+        ).toBeVisible();
+        await expect(
+          controls.getByRole("button", { name: "このテーマを終えて次へ" }),
+        ).toBeVisible();
+
+        const controlsBox = await controls.boundingBox();
+        const pauseBox = await controls
+          .getByRole("button", { name: "一時停止" })
+          .boundingBox();
+        expect(controlsBox).not.toBeNull();
+        expect(pauseBox).not.toBeNull();
+        // 入力切替と操作が同じ行付近に並ぶ
+        expect(Math.abs(controlsBox!.y - pauseBox!.y)).toBeLessThan(24);
+
+        const sticky = page.getByTestId("session-sticky-chrome");
+        await expect(sticky).toBeVisible();
+
+        await page.evaluate(() => {
+          const surface = document.querySelector(
+            '[data-testid="split-layout"]',
+          ) as HTMLElement | null;
+          if (surface) {
+            surface.style.minHeight = "2200px";
+          }
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+        await page.waitForTimeout(150);
+        const stickyAfter = await sticky.boundingBox();
+        expect(stickyAfter).not.toBeNull();
+        // 共通ヘッダーはスクロールアウトし、テーマ＋操作行が上端付近に留まる
+        expect(stickyAfter!.y).toBeLessThanOrEqual(4);
+
+        await page.getByRole("tab", { name: "手書き入力" }).click();
+        await expect(page.getByTestId("split-handwriting-panel")).toBeVisible();
 
         await expect(
           page.getByRole("toolbar", { name: "手書きツール" }),
@@ -85,11 +121,17 @@ test.describe("スマホ向けレイアウト", () => {
         await expect(
           page.getByRole("button", { name: "クリア" }),
         ).toBeVisible();
+        await expect(
+          page.getByRole("button", { name: "線の太さ 細" }),
+        ).toBeHidden();
+        await expect(
+          page.getByRole("button", { name: "線の太さ 中" }),
+        ).toBeHidden();
 
-        await page.getByRole("tab", { name: "テキスト入力" }).click();
-        await expect(page.getByTestId("split-text-panel")).toBeVisible();
-        await page.getByRole("tab", { name: "手書き入力" }).click();
-        await expect(page.getByTestId("split-handwriting-panel")).toBeVisible();
+        const inputSurface = page.getByTestId("split-layout");
+        const box = await inputSurface.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.height).toBeGreaterThanOrEqual(200);
       });
     });
   }
@@ -104,7 +146,29 @@ test.describe("スマホ向けレイアウト", () => {
     await page.setViewportSize({ width: 768, height: 800 });
     await expect(page.getByTestId("header-menu-toggle")).toBeHidden();
     await expect(
-      page.getByTestId("header-nav").getByRole("link", { name: "セッション", exact: true }),
+      page
+        .getByTestId("header-nav")
+        .getByRole("link", { name: "セッション", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("768px では手書き初期で太さ切替が見える", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 800 });
+    await resetE2eAppState(page);
+    await page.goto("/session");
+
+    await expect(
+      page.locator("text=/1\\s*\\/\\s*\\d+/ >> visible=true").first(),
+    ).toBeVisible({ timeout: SESSION_UI_TIMEOUT });
+
+    await expect(
+      page.getByRole("tab", { name: "手書き入力" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("button", { name: "線の太さ 細" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "線の太さ 中" }),
     ).toBeVisible();
   });
 });

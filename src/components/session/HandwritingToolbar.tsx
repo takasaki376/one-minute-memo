@@ -59,7 +59,8 @@ export function HandwritingToolbar({
           消しゴム
         </button>
       </div>
-      <div className="flex items-center gap-0.5">
+      {/* スマホでは太さ切替を出さず、エンジン側で「細」を適用する（PJ1-205） */}
+      <div className="hidden items-center gap-0.5 md:flex">
         {(["s", "m", "l"] as const).map((size) => (
           <button
             key={size}
