@@ -1,6 +1,6 @@
 /**
  * Server-side auth failure diagnostics for Vercel / console.error.
- * Allowlisted JSON only — never log secrets, PII, raw messages, or full stacks.
+ * Allowlisted JSON only — never log secrets, PII, raw messages, or stacks.
  */
 
 export const AUTH_DIAGNOSTIC_EVENT = {
@@ -34,7 +34,8 @@ export type AuthFailureMeta = {
   attempts?: number;
 };
 
-const AUTH_FAILURE_META = Symbol.for("one-minute-memo.authFailureMeta");
+/** WeakMap なら凍結／非拡張オブジェクトにもメタを付けられる（公開契約を壊さない） */
+const authFailureMetaByError = new WeakMap<object, AuthFailureMeta>();
 
 const ALLOWED_KEYS = [
   "event",
@@ -51,8 +52,22 @@ const ALLOWED_KEYS = [
   "identityToolkitHttpStatus",
   "attempt",
   "attempts",
-  "stackFrames",
 ] as const;
+
+const ALLOWED_ERROR_NAMES = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "SyntaxError",
+  "ReferenceError",
+  "AuthNotConfiguredError",
+  "FirebaseError",
+  "FirebaseAuthError",
+]);
+
+/** Firebase Auth / Admin / 公開 AUTH_* のみ。任意文字列は拒否 */
+const ALLOWED_ERROR_CODE_RE =
+  /^(auth\/[a-z0-9-]+|app\/[a-z0-9-]+|AUTH_[A-Z0-9_]+)$/;
 
 export type AuthDiagnosticPayload = {
   event: AuthDiagnosticEventName;
@@ -69,17 +84,22 @@ export type AuthDiagnosticPayload = {
   identityToolkitHttpStatus?: number;
   attempt?: number;
   attempts?: number;
-  stackFrames?: readonly string[];
 };
 
 export type AuthDiagnosticSink = (line: string) => void;
 
-const MAX_STACK_FRAMES = 5;
-const MAX_FRAME_LENGTH = 200;
 const MAX_STRING_FIELD = 120;
 
-function isPlainObject(value: unknown): value is Record<PropertyKey, unknown> {
+function isObject(value: unknown): value is object {
   return typeof value === "object" && value !== null;
+}
+
+function safeCall<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
 }
 
 export function createAuthRequestId(
@@ -93,54 +113,50 @@ export function createAuthRequestId(
 }
 
 export function getAuthFailureMeta(error: unknown): AuthFailureMeta | undefined {
-  if (!isPlainObject(error)) return undefined;
-  const meta = error[AUTH_FAILURE_META];
-  if (!meta || typeof meta !== "object") return undefined;
-  return meta as AuthFailureMeta;
+  return safeCall(() => {
+    if (!isObject(error)) return undefined;
+    return authFailureMetaByError.get(error);
+  }, undefined);
 }
 
 /**
  * Attach diagnostic meta without changing instanceof / Firebase `code`.
+ * Uses WeakMap so frozen / non-extensible errors still work.
  * Keeps the earliest (innermost) stage when already annotated.
  */
 export function annotateAuthFailure(
   error: unknown,
   meta: AuthFailureMeta,
 ): unknown {
-  if (!isPlainObject(error)) {
-    const wrapped = Object.assign(new Error("Auth failure"), {
-      cause: error,
-    });
-    Object.defineProperty(wrapped, AUTH_FAILURE_META, {
-      value: meta,
-      configurable: true,
-      writable: true,
-    });
-    return wrapped;
-  }
+  return safeCall(() => {
+    if (!isObject(error)) {
+      const wrapped = Object.assign(new Error("Auth failure"), {
+        cause: error,
+      });
+      authFailureMetaByError.set(wrapped, meta);
+      return wrapped;
+    }
 
-  const existing = getAuthFailureMeta(error);
-  const merged: AuthFailureMeta = existing
-    ? {
-        ...meta,
-        ...existing,
-        stage: existing.stage,
-        requestId: existing.requestId ?? meta.requestId,
-        diagnosticClass: existing.diagnosticClass ?? meta.diagnosticClass,
-        missingEnvNames: existing.missingEnvNames ?? meta.missingEnvNames,
-        identityToolkitHttpStatus:
-          existing.identityToolkitHttpStatus ?? meta.identityToolkitHttpStatus,
-        attempt: meta.attempt ?? existing.attempt,
-        attempts: meta.attempts ?? existing.attempts,
-      }
-    : meta;
+    const existing = authFailureMetaByError.get(error);
+    const merged: AuthFailureMeta = existing
+      ? {
+          ...meta,
+          ...existing,
+          stage: existing.stage,
+          requestId: existing.requestId ?? meta.requestId,
+          diagnosticClass: existing.diagnosticClass ?? meta.diagnosticClass,
+          missingEnvNames: existing.missingEnvNames ?? meta.missingEnvNames,
+          identityToolkitHttpStatus:
+            existing.identityToolkitHttpStatus ??
+            meta.identityToolkitHttpStatus,
+          attempt: meta.attempt ?? existing.attempt,
+          attempts: meta.attempts ?? existing.attempts,
+        }
+      : meta;
 
-  Object.defineProperty(error, AUTH_FAILURE_META, {
-    value: merged,
-    configurable: true,
-    writable: true,
-  });
-  return error;
+    authFailureMetaByError.set(error, merged);
+    return error;
+  }, error);
 }
 
 export function listMissingFirebaseAdminEnvNames(
@@ -160,22 +176,33 @@ export function listMissingFirebaseWebApiKeyEnvNames(
   return env.FIREBASE_WEB_API_KEY?.trim() ? [] : ["FIREBASE_WEB_API_KEY"];
 }
 
+function readRawErrorCode(error: unknown): string | undefined {
+  return safeCall(() => {
+    if (!isObject(error) || !("code" in error)) return undefined;
+    const code = (error as { code: unknown }).code;
+    return typeof code === "string" && code.length > 0 ? code : undefined;
+  }, undefined);
+}
+
 export function extractErrorCode(error: unknown): string | undefined {
-  if (!isPlainObject(error) || !("code" in error)) return undefined;
-  const code = error.code;
-  return typeof code === "string" && code.length > 0 && code.length <= MAX_STRING_FIELD
-    ? code
-    : undefined;
+  const code = readRawErrorCode(error);
+  if (!code || code.length > MAX_STRING_FIELD) return undefined;
+  if (!ALLOWED_ERROR_CODE_RE.test(code)) return undefined;
+  return code;
 }
 
 export function extractErrorName(error: unknown): string | undefined {
-  if (error instanceof Error && error.name) {
-    return error.name.slice(0, MAX_STRING_FIELD);
-  }
-  if (isPlainObject(error) && typeof error.name === "string") {
-    return error.name.slice(0, MAX_STRING_FIELD);
-  }
-  return undefined;
+  return safeCall(() => {
+    let name: string | undefined;
+    if (error instanceof Error && error.name) {
+      name = error.name;
+    } else if (isObject(error) && typeof (error as { name?: unknown }).name === "string") {
+      name = (error as { name: string }).name;
+    }
+    if (!name || name.length > MAX_STRING_FIELD) return undefined;
+    if (!ALLOWED_ERROR_NAMES.has(name)) return undefined;
+    return name;
+  }, undefined);
 }
 
 /**
@@ -230,9 +257,12 @@ export function classifyIdentityToolkitMessage(message: string): string {
  * Classify Admin SDK / credential failures without logging raw text.
  */
 export function classifyAdminAuthError(error: unknown): string {
-  const code = extractErrorCode(error)?.toLowerCase() ?? "";
-  const message =
-    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const code = (readRawErrorCode(error) ?? "").toLowerCase();
+  const message = safeCall(() => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    return "";
+  }, "");
   const lower = message.toLowerCase();
 
   if (
@@ -256,34 +286,6 @@ export function classifyAdminAuthError(error: unknown): string {
   return "admin.unknown";
 }
 
-export function extractSafeStackFrames(
-  error: unknown,
-  limit = MAX_STACK_FRAMES,
-): string[] | undefined {
-  if (!(error instanceof Error) || typeof error.stack !== "string") {
-    return undefined;
-  }
-
-  const frames: string[] = [];
-  for (const line of error.stack.split("\n").slice(1)) {
-    const withoutQuery = line.replace(/\?[^:\s)]*/g, "");
-    const withoutUrl = withoutQuery.replace(/https?:\/\/[^\s)]+/gi, "[url]");
-    const trimmed = withoutUrl.trim();
-    if (!trimmed) continue;
-    // App frames only — drop node_modules / opaque hosts
-    if (
-      !/[\\/]src[\\/]/.test(trimmed) &&
-      !/[\\/]lib[\\/]auth[\\/]/.test(trimmed)
-    ) {
-      continue;
-    }
-    if (/node_modules/.test(trimmed)) continue;
-    frames.push(trimmed.slice(0, MAX_FRAME_LENGTH));
-    if (frames.length >= limit) break;
-  }
-  return frames.length > 0 ? frames : undefined;
-}
-
 function sanitizeStringList(
   values: readonly string[] | undefined,
 ): string[] | undefined {
@@ -302,7 +304,7 @@ function buildAllowlistedPayload(
   for (const key of ALLOWED_KEYS) {
     const value = input[key];
     if (value === undefined) continue;
-    if (key === "missingEnvNames" || key === "stackFrames") {
+    if (key === "missingEnvNames") {
       const list = sanitizeStringList(value as readonly string[] | undefined);
       if (list) out[key] = list;
       continue;
@@ -338,9 +340,9 @@ export function logAuthDiagnostic(
           event: AUTH_DIAGNOSTIC_EVENT.FAILURE,
           timestamp: new Date().toISOString(),
           requestId: "logger-failed",
-          route: payload.route || "unknown",
+          route: "unknown",
           stage: "unknown",
-          httpStatus: payload.httpStatus || 500,
+          httpStatus: 500,
           publicErrorCode: "AUTH_INTERNAL",
           diagnosticClass: "logger.serialize_failed",
         }),
@@ -382,11 +384,28 @@ export function buildAuthFailurePayload(options: {
     identityToolkitHttpStatus: meta?.identityToolkitHttpStatus,
     attempt: options.attempt ?? meta?.attempt,
     attempts: options.attempts ?? meta?.attempts,
-    stackFrames: extractSafeStackFrames(options.error),
   };
 }
 
-/** Log only server faults (HTTP >= 500). Safe for handler catch blocks. */
+function fallbackPayload(options: {
+  requestId: string;
+  route: string;
+  httpStatus: number;
+  publicErrorCode: string;
+}): AuthDiagnosticPayload {
+  return {
+    event: AUTH_DIAGNOSTIC_EVENT.FAILURE,
+    timestamp: new Date().toISOString(),
+    requestId: options.requestId || "logger-failed",
+    route: options.route || "unknown",
+    stage: "unknown",
+    httpStatus: options.httpStatus || 500,
+    publicErrorCode: options.publicErrorCode || "AUTH_INTERNAL",
+    diagnosticClass: "logger.payload_failed",
+  };
+}
+
+/** Log only server faults (HTTP >= 500). Never throws into handlers. */
 export function logAuthHandlerFault(options: {
   error: unknown;
   requestId: string;
@@ -395,6 +414,14 @@ export function logAuthHandlerFault(options: {
   publicErrorCode: string;
   sink?: AuthDiagnosticSink;
 }): void {
-  if (options.httpStatus < 500) return;
-  logAuthDiagnostic(buildAuthFailurePayload(options), options.sink);
+  try {
+    if (options.httpStatus < 500) return;
+    const payload = safeCall(
+      () => buildAuthFailurePayload(options),
+      fallbackPayload(options),
+    );
+    logAuthDiagnostic(payload, options.sink);
+  } catch {
+    // never alter auth responses
+  }
 }

@@ -239,9 +239,10 @@ export async function sendVerifyEmailOobCode(
       },
     );
   } catch (error) {
+    // 公開契約は AUTH_INTERNAL を維持。ネットワーク区別は diagnosticClass のみ。
     throwAnnotatedIdentityError(
       identityToolkitError(
-        "auth/network-request-failed",
+        "auth/internal-error",
         error instanceof Error ? error.message : "Network request failed",
         { diagnosticClass: "identity_toolkit.network" },
       ),

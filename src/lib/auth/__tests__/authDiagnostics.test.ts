@@ -7,7 +7,8 @@ import {
   classifyAdminAuthError,
   classifyIdentityToolkitMessage,
   createAuthRequestId,
-  extractSafeStackFrames,
+  extractErrorCode,
+  extractErrorName,
   getAuthFailureMeta,
   listMissingFirebaseAdminEnvNames,
   logAuthDiagnostic,
@@ -44,6 +45,29 @@ describe("authDiagnostics", () => {
     expect(getAuthFailureMeta(firebaseError)?.stage).toBe(
       "identity_toolkit.signin",
     );
+  });
+
+  it("annotates frozen and non-extensible errors via WeakMap", () => {
+    const frozen = Object.freeze(
+      Object.assign(new Error("frozen"), { code: "auth/internal-error" }),
+    );
+    const annotatedFrozen = annotateAuthFailure(frozen, {
+      stage: "admin.create_user",
+      diagnosticClass: "admin.unknown",
+      requestId: "req-frozen",
+    });
+    expect(annotatedFrozen).toBe(frozen);
+    expect(getAuthFailureMeta(frozen)).toMatchObject({
+      stage: "admin.create_user",
+      requestId: "req-frozen",
+    });
+
+    const sealed = Object.seal(new Error("sealed"));
+    const annotatedSealed = annotateAuthFailure(sealed, {
+      stage: "cookie.set",
+    });
+    expect(annotatedSealed).toBe(sealed);
+    expect(getAuthFailureMeta(sealed)?.stage).toBe("cookie.set");
   });
 
   it("keeps innermost stage when re-annotated", () => {
@@ -97,16 +121,43 @@ describe("authDiagnostics", () => {
     ).toEqual(["FIREBASE_ADMIN_CLIENT_EMAIL"]);
   });
 
-  it("logAuthDiagnostic emits allowlisted JSON and strips secrets", () => {
+  it("only allowlists known errorName / errorCode values", () => {
+    expect(
+      extractErrorCode(
+        Object.assign(new Error("x"), { code: "auth/internal-error" }),
+      ),
+    ).toBe("auth/internal-error");
+    expect(
+      extractErrorCode(
+        Object.assign(new Error("x"), {
+          code: "user@example.com/token-abc",
+        }),
+      ),
+    ).toBeUndefined();
+    expect(
+      extractErrorName(
+        Object.assign(new Error("x"), { name: "AuthNotConfiguredError" }),
+      ),
+    ).toBe("AuthNotConfiguredError");
+    expect(
+      extractErrorName(
+        Object.assign(new Error("x"), {
+          name: "user@example.com",
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("logAuthDiagnostic emits allowlisted JSON without stack or secrets", () => {
     const sink = vi.fn();
     const error = annotateAuthFailure(
       Object.assign(new Error("password=super-secret&token=abc"), {
         code: "auth/internal-error",
+        name: "Error",
         stack: [
           "Error: password=super-secret",
           "    at run (/Users/me/src/lib/auth/signin.ts:10:5)",
           "    at Object.<anonymous> (/Users/me/node_modules/foo/index.js:1:1)",
-          "    at https://example.com/callback?key=SECRET (/tmp/x.js:1:1)",
         ].join("\n"),
       }),
       {
@@ -139,18 +190,14 @@ describe("authDiagnostics", () => {
       httpStatus: 500,
       publicErrorCode: "AUTH_INTERNAL",
       errorCode: "auth/internal-error",
+      errorName: "Error",
       diagnosticClass: "identity_toolkit.api_key_invalid",
       identityToolkitHttpStatus: 400,
     });
+    expect(parsed).not.toHaveProperty("stackFrames");
     expect(line).not.toContain("super-secret");
     expect(line).not.toContain("password=");
-    expect(line).not.toContain("SECRET");
-    expect(line).not.toContain("node_modules");
-    expect(JSON.stringify(parsed)).not.toMatch(/https?:\/\//);
-
-    const frames = extractSafeStackFrames(error);
-    expect(frames?.some((f) => f.includes("signin.ts"))).toBe(true);
-    expect(frames?.some((f) => f.includes("node_modules"))).toBeFalsy();
+    expect(line).not.toContain("signin.ts");
   });
 
   it("logAuthHandlerFault skips non-500 statuses", () => {
@@ -164,6 +211,41 @@ describe("authDiagnostics", () => {
       sink,
     });
     expect(sink).not.toHaveBeenCalled();
+  });
+
+  it("logAuthHandlerFault tolerates throwing getters during payload build", () => {
+    const sink = vi.fn();
+    const hostile = {};
+    Object.defineProperty(hostile, "name", {
+      enumerable: true,
+      get() {
+        throw new Error("getter boom");
+      },
+    });
+    Object.defineProperty(hostile, "code", {
+      enumerable: true,
+      get() {
+        throw new Error("code boom");
+      },
+    });
+
+    expect(() =>
+      logAuthHandlerFault({
+        error: hostile,
+        requestId: "r-hostile",
+        route: "/api/auth/signin",
+        httpStatus: 500,
+        publicErrorCode: "AUTH_INTERNAL",
+        sink,
+      }),
+    ).not.toThrow();
+    expect(sink).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(sink.mock.calls[0]?.[0] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(parsed.publicErrorCode).toBe("AUTH_INTERNAL");
+    expect(parsed.requestId).toBe("r-hostile");
   });
 
   it("logger failure does not throw", () => {
