@@ -293,7 +293,7 @@ export default function SessionPage() {
   const hideChromeForHandwritingFocus = isHandwritingFocusActive;
 
   return (
-    <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-4 bg-slate-50 p-8">
+    <main className="mx-auto flex w-full max-w-[1024px] flex-col gap-3 bg-slate-50 p-2 md:gap-4 md:p-8">
       {themeShortage && (
         <div
           className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -336,8 +336,8 @@ export default function SessionPage() {
                     aria-selected={activeInputTab === "handwriting"}
                     className={
                       activeInputTab === "handwriting"
-                        ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
-                        : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+                        ? "min-h-11 whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900 md:min-h-0"
+                        : "min-h-11 whitespace-nowrap rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700 md:min-h-0"
                     }
                     onClick={handleSwitchToHandwritingTab}
                   >
@@ -351,8 +351,8 @@ export default function SessionPage() {
                     aria-selected={activeInputTab === "text"}
                     className={
                       activeInputTab === "text"
-                        ? "rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900"
-                        : "rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700"
+                        ? "min-h-11 whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900 md:min-h-0"
+                        : "min-h-11 whitespace-nowrap rounded-md bg-transparent px-3 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-700 md:min-h-0"
                     }
                     onClick={() => setActiveInputTab("text")}
                   >
@@ -379,32 +379,34 @@ export default function SessionPage() {
             </div>
 
             {effectiveViewMode === "split" && (
-              <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap">
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto md:flex-nowrap">
                 <p className="text-xs text-slate-400">
                   {isRunning ? "入力中…" : "一時停止中"}
                 </p>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    if (isRunning) {
-                      pause();
-                    } else {
-                      start();
-                    }
-                  }}
-                  disabled={secondsLeft === 0}
-                  className="bg-slate-100 text-slate-600 hover:bg-slate-200"
-                >
-                  {isRunning ? "一時停止" : "再開"}
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => void handleThemeFinished()}
-                  disabled={secondsLeft === 0}
-                  className="bg-blue-500 text-white hover:bg-blue-600"
-                >
-                  このテーマを終えて次へ
-                </Button>
+                <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (isRunning) {
+                        pause();
+                      } else {
+                        start();
+                      }
+                    }}
+                    disabled={secondsLeft === 0}
+                    className="min-h-11 min-w-0 bg-slate-100 text-slate-600 hover:bg-slate-200 sm:min-h-0"
+                  >
+                    {isRunning ? "一時停止" : "再開"}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => void handleThemeFinished()}
+                    disabled={secondsLeft === 0}
+                    className="col-span-2 min-h-11 min-w-0 bg-blue-500 text-white hover:bg-blue-600 sm:col-span-1 sm:min-h-0"
+                  >
+                    このテーマを終えて次へ
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -414,7 +416,7 @@ export default function SessionPage() {
       {/* 入力エリア */}
       {mountSplitInputSection && (
         <section
-          className="min-h-[520px] rounded-lg bg-white p-4"
+          className="flex min-h-[240px] flex-col rounded-lg bg-white p-2 md:min-h-[520px] md:p-4"
           data-testid="split-layout"
         >
           <div
@@ -422,7 +424,7 @@ export default function SessionPage() {
             role="tabpanel"
             aria-labelledby="tab-handwriting"
             hidden={activeInputTab !== "handwriting"}
-            className="h-[480px]"
+            className="min-h-[240px] h-[min(50dvh,480px)] md:h-[480px]"
             data-testid="split-handwriting-panel"
           >
             <HandwritingCanvas
@@ -449,7 +451,7 @@ export default function SessionPage() {
                 secondsLeft > 0
               }
               maxLength={1000}
-              className="h-[480px]"
+              className="min-h-[240px] h-[min(50dvh,480px)] md:h-[480px]"
             />
           </div>
         </section>
