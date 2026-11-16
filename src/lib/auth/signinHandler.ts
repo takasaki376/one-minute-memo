@@ -7,6 +7,12 @@ import {
   toSignInApiError,
 } from "@/lib/auth/apiError";
 import {
+  annotateAuthFailure,
+  createAuthRequestId,
+  logAuthHandlerFault,
+  resolveAuthFailureRequestId,
+} from "@/lib/auth/authDiagnostics";
+import {
   AUTH_ERROR_CODES,
   authErrorMessage,
 } from "@/lib/auth/errorContract";
@@ -28,6 +34,9 @@ export async function handleSigninPost(
   request: Request,
   deps: SigninHandlerDeps,
 ): Promise<Response> {
+  const requestId = createAuthRequestId();
+  const route = "/api/auth/signin";
+
   let body: unknown;
   try {
     body = await request.json();
@@ -54,13 +63,33 @@ export async function handleSigninPost(
       validated.email,
       validated.password,
     );
-    await deps.setAuthCookie(session.sessionCookie);
+    try {
+      await deps.setAuthCookie(session.sessionCookie);
+    } catch (error) {
+      throw annotateAuthFailure(error, {
+        stage: "cookie.set",
+        requestId,
+        diagnosticClass: "cookie.set_failed",
+      });
+    }
     const data: AuthSignInData = { user: session.user };
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
-    const failure = toSignInApiError(error);
-    return NextResponse.json(failure, {
-      status: authErrorHttpStatus(asAuthErrorCode(failure.error.code)),
+    const annotated = annotateAuthFailure(error, {
+      stage: "unknown",
+      requestId,
     });
+    const failure = toSignInApiError(annotated);
+    const status = authErrorHttpStatus(
+      asAuthErrorCode(failure.error.code),
+    );
+    logAuthHandlerFault({
+      error: annotated,
+      requestId: resolveAuthFailureRequestId(annotated) ?? requestId,
+      route,
+      httpStatus: status,
+      publicErrorCode: failure.error.code,
+    });
+    return NextResponse.json(failure, { status });
   }
 }

@@ -50,7 +50,11 @@ describe("handleSignupPost", () => {
         message: AUTH_SIGNUP_SUCCESS_MESSAGE,
       },
     });
-    expect(createAuthUser).toHaveBeenCalledWith("user@example.com", "secret1");
+    expect(createAuthUser).toHaveBeenCalledWith(
+      "user@example.com",
+      "secret1",
+      expect.objectContaining({ requestId: expect.any(String) }),
+    );
   });
 
   it("maps createAuthUser failures to API error envelope", async () => {
