@@ -13,6 +13,7 @@ import {
   listMissingFirebaseAdminEnvNames,
   logAuthDiagnostic,
   logAuthHandlerFault,
+  resolveAuthFailureRequestId,
 } from "../authDiagnostics";
 import { AuthNotConfiguredError } from "../authErrors";
 
@@ -20,6 +21,15 @@ describe("authDiagnostics", () => {
   it("createAuthRequestId returns a non-empty string", () => {
     expect(createAuthRequestId(() => "fixed-id")).toBe("fixed-id");
     expect(createAuthRequestId().length).toBeGreaterThan(0);
+  });
+
+  it("resolveAuthFailureRequestId returns meta id only (no new id)", () => {
+    expect(resolveAuthFailureRequestId(new Error("x"))).toBeUndefined();
+    const annotated = annotateAuthFailure(new Error("y"), {
+      stage: "unknown",
+      requestId: "from-meta",
+    });
+    expect(resolveAuthFailureRequestId(annotated)).toBe("from-meta");
   });
 
   it("annotateAuthFailure preserves AuthNotConfiguredError and Firebase code", () => {

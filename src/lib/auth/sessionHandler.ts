@@ -90,7 +90,7 @@ export async function handleSessionGet(
       const status = authErrorHttpStatus(AUTH_ERROR_CODES.NOT_CONFIGURED);
       logAuthHandlerFault({
         error: annotated,
-        requestId: resolveAuthFailureRequestId(annotated) || requestId,
+        requestId: resolveAuthFailureRequestId(annotated) ?? requestId,
         route,
         httpStatus: status,
         publicErrorCode: failure.error.code,

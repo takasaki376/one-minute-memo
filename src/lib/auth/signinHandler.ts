@@ -75,13 +75,17 @@ export async function handleSigninPost(
     const data: AuthSignInData = { user: session.user };
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
-    const failure = toSignInApiError(error);
+    const annotated = annotateAuthFailure(error, {
+      stage: "unknown",
+      requestId,
+    });
+    const failure = toSignInApiError(annotated);
     const status = authErrorHttpStatus(
       asAuthErrorCode(failure.error.code),
     );
     logAuthHandlerFault({
-      error,
-      requestId: resolveAuthFailureRequestId(error) || requestId,
+      error: annotated,
+      requestId: resolveAuthFailureRequestId(annotated) ?? requestId,
       route,
       httpStatus: status,
       publicErrorCode: failure.error.code,

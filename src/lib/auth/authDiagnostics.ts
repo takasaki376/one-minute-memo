@@ -353,8 +353,14 @@ export function logAuthDiagnostic(
   }
 }
 
-export function resolveAuthFailureRequestId(error: unknown): string {
-  return getAuthFailureMeta(error)?.requestId ?? createAuthRequestId();
+/**
+ * 例外に付いた相関 ID だけを返す。無いときは undefined（Handler 側の requestId にフォールバック）。
+ * ここで新規 ID を発行すると、同一 HTTP リクエストのログ相関が壊れる。
+ */
+export function resolveAuthFailureRequestId(
+  error: unknown,
+): string | undefined {
+  return getAuthFailureMeta(error)?.requestId;
 }
 
 export function buildAuthFailurePayload(options: {

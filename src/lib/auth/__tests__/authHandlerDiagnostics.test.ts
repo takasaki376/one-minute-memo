@@ -101,6 +101,33 @@ describe("auth handler diagnostics", () => {
     expect(errorCalls).toHaveLength(0);
   });
 
+  it("correlates signin fault logs to a single handler requestId", async () => {
+    const response = await handleSigninPost(
+      new Request("http://localhost/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "user@example.com",
+          password: "password123",
+        }),
+      }),
+      {
+        signInWithPassword: vi.fn(async () => {
+          throw Object.assign(new Error("boom"), {
+            code: "auth/internal-error",
+          });
+        }),
+        setAuthCookie: vi.fn(async () => undefined),
+      },
+    );
+
+    expect(response.status).toBe(500);
+    const logged = parseLoggedJson();
+    expect(typeof logged.requestId).toBe("string");
+    expect(String(logged.requestId).length).toBeGreaterThan(0);
+    expect(logged.stage).toBe("unknown");
+  });
+
   it("logs cookie.set failures on signin", async () => {
     const response = await handleSigninPost(
       new Request("http://localhost/api/auth/signin", {

@@ -73,7 +73,7 @@ export async function handleSignupPost(
     );
     logAuthHandlerFault({
       error: annotated,
-      requestId: resolveAuthFailureRequestId(annotated) || requestId,
+      requestId: resolveAuthFailureRequestId(annotated) ?? requestId,
       route,
       httpStatus: status,
       publicErrorCode: failure.error.code,
