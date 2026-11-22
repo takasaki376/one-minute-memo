@@ -7,6 +7,12 @@ import {
   toAuthApiError,
 } from "@/lib/auth/apiError";
 import {
+  annotateAuthFailure,
+  createAuthRequestId,
+  logAuthHandlerFault,
+  resolveAuthFailureRequestId,
+} from "@/lib/auth/authDiagnostics";
+import {
   AUTH_ERROR_CODES,
   AUTH_SIGNUP_SUCCESS_MESSAGE,
   authErrorMessage,
@@ -18,6 +24,7 @@ export type SignupHandlerDeps = {
   createAuthUser: (
     email: string,
     password: string,
+    options?: { requestId?: string },
   ) => Promise<{ uid: string }>;
 };
 
@@ -25,6 +32,9 @@ export async function handleSignupPost(
   request: Request,
   deps: SignupHandlerDeps,
 ): Promise<Response> {
+  const requestId = createAuthRequestId();
+  const route = "/api/auth/signup";
+
   let body: unknown;
   try {
     body = await request.json();
@@ -47,16 +57,27 @@ export async function handleSignupPost(
   }
 
   try {
-    await deps.createAuthUser(validated.email, validated.password);
+    await deps.createAuthUser(validated.email, validated.password, {
+      requestId,
+    });
     const data: AuthSignUpData = {
       user: null,
       message: AUTH_SIGNUP_SUCCESS_MESSAGE,
     };
     return NextResponse.json(ok(data), { status: 200 });
   } catch (error) {
-    const failure = toAuthApiError(error);
-    return NextResponse.json(failure, {
-      status: authErrorHttpStatus(asAuthErrorCode(failure.error.code)),
+    const annotated = annotateAuthFailure(error, { stage: "unknown", requestId });
+    const failure = toAuthApiError(annotated);
+    const status = authErrorHttpStatus(
+      asAuthErrorCode(failure.error.code),
+    );
+    logAuthHandlerFault({
+      error: annotated,
+      requestId: resolveAuthFailureRequestId(annotated) ?? requestId,
+      route,
+      httpStatus: status,
+      publicErrorCode: failure.error.code,
     });
+    return NextResponse.json(failure, { status });
   }
 }

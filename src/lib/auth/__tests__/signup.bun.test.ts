@@ -145,15 +145,20 @@ describe("createAuthUser", () => {
       throw new Error("delete failed");
     });
 
-    await expect(
-      createAuthUser("user@example.com", "secret1", {
+    let thrown: unknown;
+    try {
+      await createAuthUser("user@example.com", "secret1", {
         fetchImpl: fetchImpl as unknown as typeof fetch,
-      }),
-    ).rejects.toMatchObject({
-      code: "auth/internal-error",
-      message: expect.stringContaining("rollback"),
-    });
+        sink: () => undefined,
+      });
+    } catch (error) {
+      thrown = error;
+    }
 
+    expect(thrown).toMatchObject({ code: "auth/internal-error" });
+    const message = String((thrown as { message?: unknown }).message ?? "");
+    expect(message.includes("rollback")).toBe(true);
+    expect(message.includes("uid-1")).toBe(false);
     expect(deleteUser.mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -94,22 +94,34 @@ describe("handleSessionGet", () => {
   });
 
   it("returns 500 AUTH_NOT_CONFIGURED when Admin is missing and cookie exists", async () => {
-    const response = await handleSessionGet({
-      getAuthCookie: mock(async () => "any-session"),
-      verifySessionCookie: mock(async () => {
-        throw new AuthNotConfiguredError();
-      }),
-      clearAuthCookie: mock(async () => undefined),
-      isAuthConfigured: () => false,
-    });
+    const logged: string[] = [];
+    const originalError = console.error;
+    console.error = ((...args: unknown[]) => {
+      logged.push(String(args[0] ?? ""));
+    }) as typeof console.error;
+    try {
+      const response = await handleSessionGet({
+        getAuthCookie: mock(async () => "any-session"),
+        verifySessionCookie: mock(async () => {
+          throw new AuthNotConfiguredError();
+        }),
+        clearAuthCookie: mock(async () => undefined),
+        isAuthConfigured: () => false,
+      });
 
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({
-      success: false,
-      error: {
-        code: AUTH_ERROR_CODES.NOT_CONFIGURED,
-        message: expect.any(String),
-      },
-    });
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        success: false,
+        error: {
+          code: AUTH_ERROR_CODES.NOT_CONFIGURED,
+          message: expect.any(String),
+        },
+      });
+      expect(logged.length).toBeGreaterThan(0);
+      expect(logged[0]?.includes("AUTH_NOT_CONFIGURED")).toBe(true);
+      expect(logged[0]?.includes("any-session")).toBe(false);
+    } finally {
+      console.error = originalError;
+    }
   });
 });
