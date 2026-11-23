@@ -1,11 +1,14 @@
 "use client";
 
+import { useLayoutEffect } from "react";
 import cc from "classcat";
 
 import { HandwritingToolbar } from "@/components/session/HandwritingToolbar";
 import { useHandwritingCanvasEngine } from "@/components/session/useHandwritingCanvasEngine";
 
 export type { PenSize } from "@/components/session/handwritingStrokeUtils";
+
+const MOBILE_MAX_WIDTH_QUERY = "(max-width: 767px)";
 
 export interface HandwritingCanvasProps {
   value?: string | null;
@@ -32,6 +35,22 @@ export function HandwritingCanvas({
     selectTool,
     handleClear,
   } = useHandwritingCanvasEngine({ value, onChange, disabled });
+
+  // スマホでは線幅「細」を適用（太さ UI は Toolbar 側で md 未満非表示）
+  useLayoutEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(MOBILE_MAX_WIDTH_QUERY);
+    const syncPenForViewport = () => {
+      if (mq.matches) {
+        selectPenSize("s");
+      }
+    };
+    syncPenForViewport();
+    mq.addEventListener("change", syncPenForViewport);
+    return () => {
+      mq.removeEventListener("change", syncPenForViewport);
+    };
+  }, [selectPenSize]);
 
   const containerClass = cc(["flex h-full min-h-0 flex-col gap-2", className]);
 
