@@ -8,7 +8,7 @@ Upgrade Task
 
 ## 状態
 
-**未完了** - アップグレード対応が必要
+**完了** - Next.js 16.4.6 へ更新し、lint / typecheck / test / build とブラウザでのセッション・履歴読み込みを確認済み
 
 ---
 
@@ -16,8 +16,8 @@ Upgrade Task
 
 ### 背景
 
-- 現在のプロジェクトは Next.js 16.4.3 を使用中
-- 次の安定版（Next.js 16.4.6）への升格が必要
+- 対応前は Next.js 16.4.3 を使用していた
+- 16.4.6 は 16.4.4 の Turbopack 修正と 16.4.5 のセキュリティ修正を含むバグフィックス版
 
 ### 目的
 
@@ -282,10 +282,10 @@ export default function SessionPage() {
 | **bun run typecheck**                | ✅ 実施  | ✅ 成功   | 型エラーなし                                    |
 | **bun run test**                     | ✅ 実施  | ✅ 成功   | テスト全て通過                                  |
 | **bun run build**                    | ✅ 実施  | ✅ 成功   | Next.js build 完了                              |
-| **ブラウザ実行確認**                 | ✅ 実施  | ⚠️ 要対応 | "準備中..." から進まず（2026-11-22 試行時）     |
-| **console エラー確認**               | ✅ 実施  | ⚠️ 検出   | React Refresh Utils + Service Worker precaching |
-| **キャッシュクリア試行**             | ✅ 実施  | ⚠️ 未改善 | 症状は継続                                      |
-| **ThemeSeedProvider async/await 化** | ✅ 試行  | ❌ 失敗   | ビルド成功も症状は継続                          |
+| **ブラウザ実行確認**                 | ✅ 実施  | ✅ 成功   | 2026-11-23。`.next` を消して `next dev`（16.4.6 / Turbopack）を起動。`/session` でテーマ表示とカウントダウン開始、`/history` で保存したセッションを表示 |
+| **console エラー確認**               | ✅ 実施  | ✅ 成功   | Next.js のエラーダイアログなし。Service Worker の登録もなし |
+| **キャッシュクリア試行**             | ✅ 実施  | ⚠️ 未改善 | 2026-11-22 の試行。今回の再現確認では不要だった |
+| **ThemeSeedProvider async/await 化** | ✅ 試行  | ❌ 失敗   | 2026-11-22。今回はアプリコードの変更なし        |
 
 ---
 
@@ -351,25 +351,32 @@ export default function SessionPage() {
 | 2026-11-22 | package.json 更新 → テスト → ブラウザ確認 | "準備中..." 停止を検出 | Copilot |
 | 2026-11-22 | ThemeSeedProvider async/await 化 試行     | 未改善                 | Copilot |
 | 2026-11-22 | コミット取り消し、16.4.3 に戻す           | 完了                   | Copilot |
+| 2026-11-23 | 16.4.6 を再適用し、`.next` を消して dev / ブラウザ確認 | セッションと履歴が正常に読み込めた。アプリコードの修正は不要 | Cursor |
 
 ---
 
 ## 次回実施時の注意点
 
-✅ **再確認不要な項目（既に試行済み）**:
+このアップグレード自体は 2026-11-23 に完了している。同種の「準備中...」が再発した場合だけ、次を見る。
 
-- ThemeSeedProvider の async/await 置き換え（失敗確認済み）
-- ブラウザキャッシュクリアでの修復試行
-
-🔴 **優先的に実施すべき項目**:
-
-1. デバッグログを追加し、init フロー全体をトレース
-2. IndexedDB が正常に初期化されているか DevTools で確認
-3. Service Worker precaching が原因か判定（一時的に無効化）
-4. Jotai state が確実に更新されているか検証
+- `.next` を消してから `bun run dev` を起動する
+- 開発者ツールの Application > Service Workers に古い `sw.js` が残っていれば Unregister する（開発時の Serwist は無効でも、既存の Service Worker はリクエストを横取りする）
+- ThemeSeedProvider の async/await 置き換えと、HTTP キャッシュ削除だけでは 2026-11-22 に直らなかった
 
 ---
 
-**現在の状態**: Next.js 16.4.3  
-**対応必須**: Yes - アップグレード対応が必要  
-**関連タスク**: 本タスク完了後に main/develop へのマージ
+**現在の状態**: Next.js 16.4.6（`eslint-config-next` も 16.4.6）  
+**対応必須**: No - アップグレード対応済み。`develop` へのマージは同僚待ち  
+**関連タスク**: ブランチ `feat/PJ1-206-next-16-4-6`
+
+### 2026-11-23 の確認結果
+
+`.next` を削除してから `bun run dev`（Next.js 16.4.6 / Turbopack）を起動し、ブラウザで確認した。
+
+- `/` で初期テーマ準備の待ち表示は出ず、セッション開始へ進めた
+- `/session` でテーマ「失敗から学べていますか？」が表示され、残り秒数がカウントダウンした（「セッションを準備中...」には止まらない）
+- 1テーマ進めたあと `/history` に「失敗から学べていますか？」のメモ 1 件が表示された
+- IndexedDB `one-minute-memo-db` が作成され、Service Worker は未登録だった
+- Next.js のエラーダイアログは出なかった
+
+前回（2026-11-22）の React Refresh Utils / `bad-precaching-response` は再現しなかった。16.4.4 で Turbopack の strict module factory 最適化が戻されており、加えて開発時は Serwist が無効（`next.config.ts` の `disable: process.env.NODE_ENV === "development"`）なので、当時の停止はインプレース更新後の `.next` と、開発サーバーを横取りする古い Service Worker の組み合わせだった可能性が高い。今回のアプリコード変更は不要だった。
